@@ -26,6 +26,23 @@ const communityApi = {
   getMembers: async (id) => {
     return await ApiClient.get(`${API_BASE_URL}/communities/${id}/members`);
   },
+
+  getMessages: async (id, userId) => {
+    const params = userId ? `?userId=${userId}` : '';
+    return await ApiClient.get(`${API_BASE_URL}/communities/${id}/messages${params}`);
+  },
+
+  getStudentCommunities: async (studentId) => {
+    return await ApiClient.get(`${API_BASE_URL}/communities/student/${studentId}`);
+  },
+
+  getTeacherCommunities: async (teacherId) => {
+    return await ApiClient.get(`${API_BASE_URL}/communities/teacher/${teacherId}`);
+  },
+
+  joinCommunity: async (joinCode, studentId) => {
+    return await ApiClient.post(`${API_BASE_URL}/communities/join`, { joinCode, studentId });
+  },
 };
 
 export default communityApi;

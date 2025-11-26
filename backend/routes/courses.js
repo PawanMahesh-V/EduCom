@@ -5,20 +5,46 @@ const auth = require('../middleware/auth');
 
 router.get('/', auth, async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, department, semester } = req.query;
         const offset = (page - 1) * limit;
 
-        const result = await pool.query(
-            `SELECT c.*, 
-                    u.full_name as teacher_name 
+        let query = `SELECT c.*, 
+                    u.name as teacher_name 
              FROM courses c 
-             LEFT JOIN users u ON c.teacher_id = u.user_id 
-             ORDER BY c.course_code 
-             LIMIT $1 OFFSET $2`,
-            [limit, offset]
-        );
+             LEFT JOIN users u ON c.teacher_id = u.id`;
+        const queryParams = [];
+        const conditions = [];
+        
+        // Add department filter
+        if (department && department !== 'All') {
+            queryParams.push(department);
+            conditions.push(`c.department = $${queryParams.length}`);
+        }
+        
+        // Add semester filter
+        if (semester && semester !== 'All') {
+            queryParams.push(semester);
+            conditions.push(`c.semester = $${queryParams.length}`);
+        }
+        
+        // Append WHERE clause if filters exist
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+        
+        // Add ordering and pagination
+        queryParams.push(limit);
+        queryParams.push(offset);
+        query += ` ORDER BY c.code LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`;
 
-        const countResult = await pool.query('SELECT COUNT(*) FROM courses');
+        const result = await pool.query(query, queryParams);
+
+        // Count total with same filters
+        let countQuery = 'SELECT COUNT(*) FROM courses c';
+        if (conditions.length > 0) {
+            countQuery += ' WHERE ' + conditions.join(' AND ');
+        }
+        const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
         const totalCourses = parseInt(countResult.rows[0].count);
 
         res.json({
@@ -39,11 +65,11 @@ router.get('/student/:studentId', auth, async (req, res) => {
         
         const result = await pool.query(
             `SELECT c.*, 
-                    u.full_name as teacher_name,
+                    u.name as teacher_name,
                     e.enrolled_on
              FROM enrollments e
-             JOIN courses c ON e.course_id = c.course_id
-             LEFT JOIN users u ON c.teacher_id = u.user_id
+             JOIN courses c ON e.course_id = c.id
+             LEFT JOIN users u ON c.teacher_id = u.id
              WHERE e.student_id = $1
              ORDER BY e.enrolled_on DESC`,
             [studentId]
@@ -54,7 +80,6 @@ router.get('/student/:studentId', auth, async (req, res) => {
             totalCourses: result.rows.length
         });
     } catch (err) {
-        console.error('Error fetching student courses:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -66,13 +91,15 @@ router.get('/teacher/:teacherId', auth, async (req, res) => {
         
         const result = await pool.query(
             `SELECT c.*, 
+                    com.join_code,
                     COUNT(DISTINCT e.student_id) as enrolled_count,
                     'active' as status
              FROM courses c
-             LEFT JOIN enrollments e ON c.course_id = e.course_id
+             LEFT JOIN enrollments e ON c.id = e.course_id
+             LEFT JOIN communities com ON c.id = com.course_id
              WHERE c.teacher_id = $1
-             GROUP BY c.course_id
-             ORDER BY c.course_code`,
+             GROUP BY c.id, com.join_code
+             ORDER BY c.code`,
             [teacherId]
         );
 
@@ -81,7 +108,6 @@ router.get('/teacher/:teacherId', auth, async (req, res) => {
             totalCourses: result.rows.length
         });
     } catch (err) {
-        console.error('Error fetching teacher courses:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -101,7 +127,7 @@ router.get('/teacher/:teacherId/stats', auth, async (req, res) => {
         const studentsResult = await pool.query(
             `SELECT COUNT(DISTINCT e.student_id) as total_students
              FROM courses c
-             LEFT JOIN enrollments e ON c.course_id = e.course_id
+             LEFT JOIN enrollments e ON c.id = e.id
              WHERE c.teacher_id = $1`,
             [teacherId]
         );
@@ -113,7 +139,6 @@ router.get('/teacher/:teacherId/stats', auth, async (req, res) => {
             pendingGrading: 0 // Placeholder - implement when grading table is ready
         });
     } catch (err) {
-        console.error('Error fetching teacher stats:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -123,10 +148,10 @@ router.get('/:id', auth, async (req, res) => {
         const { id } = req.params;
         const result = await pool.query(
             `SELECT c.*, 
-                    u.full_name as teacher_name 
+                    u.name as teacher_name 
              FROM courses c 
-             LEFT JOIN users u ON c.teacher_id = u.user_id 
-             WHERE c.course_id = $1`,
+             LEFT JOIN users u ON c.teacher_id = u.id 
+             WHERE c.id = $1`,
             [id]
         );
 
@@ -140,33 +165,50 @@ router.get('/:id', auth, async (req, res) => {
     }
 });
 
+// Generate random join code
+function generateJoinCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+}
+
 router.post('/', auth, async (req, res) => {
     const client = await pool.connect();
     
     try {
-        const { course_code, course_name, department, semester, teacher_id } = req.body;
-        if (!course_code || !course_name || !department || !semester) {
+        const { code, name, department, semester, teacher_id } = req.body;
+        if (!code || !name || !department || !semester) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
         await client.query('BEGIN');
 
         const courseResult = await client.query(
-            `INSERT INTO courses (course_code, course_name, department, semester, teacher_id) 
+            `INSERT INTO courses (code, name, department, semester, teacher_id) 
              VALUES ($1, $2, $3, $4, $5) 
              RETURNING *, 
-                (SELECT full_name FROM users WHERE user_id = $5) as teacher_name`,
-            [course_code, course_name, department, semester, teacher_id]
+                (SELECT name FROM users WHERE id = $5) as teacher_name`,
+            [code, name, department, semester, teacher_id]
         );
 
         const newCourse = courseResult.rows[0];
 
-        const communityName = `${course_code} Community`;
-        await client.query(
-            `INSERT INTO communities (course_id, name, status) 
-             VALUES ($1, $2, 'active')`,
-            [newCourse.course_id, communityName]
+        // Generate unique join code for the community
+        const joinCode = generateJoinCode();
+        const communityName = `${code} Community`;
+        
+        const communityResult = await client.query(
+            `INSERT INTO communities (course_id, name, join_code, status) 
+             VALUES ($1, $2, $3, 'active')
+             RETURNING *`,
+            [newCourse.id, communityName, joinCode]
         );
+
+        // Add join_code to the response
+        newCourse.join_code = communityResult.rows[0].join_code;
 
         await client.query('COMMIT');
 
@@ -174,9 +216,14 @@ router.post('/', auth, async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         if (err.code === '23505') {
-            return res.status(400).json({ message: 'Course code already exists' });
+            if (err.constraint === 'courses_code_key') {
+                return res.status(400).json({ message: 'Course code already exists' });
+            } else if (err.constraint === 'communities_join_code_key') {
+                // Retry with a new join code
+                return res.status(500).json({ message: 'Join code collision. Please try again.' });
+            }
         }
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', error: err.message });
     } finally {
         client.release();
     }
@@ -185,20 +232,20 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { course_code, course_name, department, semester, teacher_id } = req.body;
+        const { code, name, department, semester, teacher_id } = req.body;
 
-        if (!course_code || !course_name || !department || !semester) {
+        if (!code || !name || !department || !semester) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
         const result = await pool.query(
             `UPDATE courses 
-             SET course_code = $1, course_name = $2, department = $3, 
+             SET code = $1, name = $2, department = $3, 
                  semester = $4, teacher_id = $5
-             WHERE course_id = $6 
+             WHERE id = $6 
              RETURNING *,
-                (SELECT full_name FROM users WHERE user_id = $5) as teacher_name`,
-            [course_code, course_name, department, semester, teacher_id, id]
+                (SELECT name FROM users WHERE id = $5) as teacher_name`,
+            [code, name, department, semester, teacher_id, id]
         );
 
         if (result.rows.length === 0) {
@@ -219,7 +266,7 @@ router.delete('/:id', auth, async (req, res) => {
         const { id } = req.params;
 
         const result = await pool.query(
-            'DELETE FROM courses WHERE course_id = $1 RETURNING course_id',
+            'DELETE FROM courses WHERE id = $1 RETURNING id',
             [id]
         );
 
@@ -239,9 +286,9 @@ router.get('/:id/enrolled', auth, async (req, res) => {
         const { id } = req.params;
         
         const result = await pool.query(
-            `SELECT u.user_id, u.reg_id, u.full_name, u.email, u.department, e.enrolled_on
+            `SELECT u.id, u.reg_id, u.name, u.email, u.department, u.semester, u.program_year, u.section, e.enrolled_on
              FROM enrollments e
-             JOIN users u ON e.student_id = u.user_id
+             JOIN users u ON e.student_id = u.id
              WHERE e.course_id = $1
              ORDER BY e.enrolled_on DESC`,
             [id]
@@ -249,7 +296,6 @@ router.get('/:id/enrolled', auth, async (req, res) => {
 
         res.json(result.rows);
     } catch (err) {
-        console.error('Error fetching enrolled students:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -262,17 +308,13 @@ router.post('/:id/remove', auth, async (req, res) => {
         const { id } = req.params;
         const { student_ids } = req.body;
 
-        console.log('=== COURSE REMOVAL REQUEST ===');
-        console.log('Course ID:', id);
-        console.log('Student IDs:', student_ids);
-
         if (!student_ids || !Array.isArray(student_ids) || student_ids.length === 0) {
             return res.status(400).json({ message: 'student_ids array is required' });
         }
 
         // Verify course exists
         const courseCheck = await client.query(
-            'SELECT course_id, course_name FROM courses WHERE course_id = $1',
+            'SELECT id, name FROM courses WHERE id = $1',
             [id]
         );
 
@@ -286,16 +328,13 @@ router.post('/:id/remove', auth, async (req, res) => {
         const deleteResult = await client.query(
             `DELETE FROM enrollments 
              WHERE course_id = $1 AND student_id = ANY($2::int[])
-             RETURNING enrollment_id`,
+             RETURNING id`,
             [id, student_ids]
         );
 
         const removedCount = deleteResult.rows.length;
 
         await client.query('COMMIT');
-
-        console.log('Removed enrollments:', removedCount);
-        console.log('=== END REMOVAL REQUEST ===');
 
         res.json({ 
             message: `Successfully removed ${removedCount} student(s) from course`,
@@ -305,7 +344,6 @@ router.post('/:id/remove', auth, async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Error removing students from course:', err);
         res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
@@ -320,38 +358,29 @@ router.post('/:id/assign', auth, async (req, res) => {
         const { id } = req.params;
         const { student_ids } = req.body;
 
-        console.log('=== COURSE ASSIGNMENT REQUEST ===');
-        console.log('Course ID:', id);
-        console.log('Student IDs:', student_ids);
-
         if (!student_ids || !Array.isArray(student_ids) || student_ids.length === 0) {
             return res.status(400).json({ message: 'student_ids array is required' });
         }
 
         // Verify course exists
         const courseCheck = await client.query(
-            'SELECT course_id, department FROM courses WHERE course_id = $1',
+            'SELECT id, department FROM courses WHERE id = $1',
             [id]
         );
-
-        console.log('Course check result:', courseCheck.rows);
 
         if (courseCheck.rows.length === 0) {
             return res.status(404).json({ message: 'Course not found' });
         }
 
         const courseDepartment = courseCheck.rows[0].department;
-        console.log('Course department:', courseDepartment);
 
         // Verify all students exist and belong to the same department
         const studentsCheck = await client.query(
-            `SELECT user_id, department, full_name 
+            `SELECT id, department, name 
              FROM users 
-             WHERE user_id = ANY($1::int[]) AND role = 'Student'`,
+             WHERE id = ANY($1::int[]) AND role = 'Student'`,
             [student_ids]
         );
-
-        console.log('Students check result:', studentsCheck.rows);
 
         if (studentsCheck.rows.length !== student_ids.length) {
             return res.status(400).json({ message: 'Some student IDs are invalid' });
@@ -362,16 +391,13 @@ router.post('/:id/assign', auth, async (req, res) => {
             student => student.department !== courseDepartment
         );
 
-        console.log('Mismatched students:', mismatchedStudents);
-
         if (mismatchedStudents.length > 0) {
-            const names = mismatchedStudents.map(s => s.full_name).join(', ');
+            const names = mismatchedStudents.map(s => s.name).join(', ');
             return res.status(400).json({ 
                 message: `Department mismatch: ${names} cannot be assigned to ${courseDepartment} course` 
             });
         }
 
-        console.log('Starting transaction...');
         await client.query('BEGIN');
 
         // Insert enrollments (using ON CONFLICT to avoid duplicates)
@@ -380,20 +406,15 @@ router.post('/:id/assign', auth, async (req, res) => {
                 `INSERT INTO enrollments (course_id, student_id) 
                  VALUES ($1, $2) 
                  ON CONFLICT (course_id, student_id) DO NOTHING
-                 RETURNING enrollment_id`,
+                 RETURNING id`,
                 [id, student_id]
             )
         );
 
         const results = await Promise.all(enrollmentPromises);
-        console.log('Enrollment results:', results.map(r => r.rows));
         const newEnrollments = results.filter(r => r.rows.length > 0).length;
 
-        console.log('Committing transaction...');
         await client.query('COMMIT');
-        console.log('Transaction committed successfully');
-        console.log('New enrollments:', newEnrollments);
-        console.log('=== END ASSIGNMENT REQUEST ===');
 
         res.json({ 
             message: `Successfully assigned course to ${newEnrollments} student(s)`,
@@ -403,7 +424,6 @@ router.post('/:id/assign', auth, async (req, res) => {
 
     } catch (err) {
         await client.query('ROLLBACK');
-        console.error('Error assigning course:', err);
         res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();

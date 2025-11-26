@@ -1,4 +1,5 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -8,9 +9,25 @@ import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import StudentDashboard from './pages/StudentDashboard';
+import socketService from './services/socket';
 import './styles/global.css';
-
 function App() {
+  useEffect(() => {
+    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      const userId = user.id || user.userId;
+      
+      if (userId) {
+        socketService.connect(userId);
+      }
+    }
+
+    return () => {
+      socketService.disconnect();
+    };
+  }, []);
   return (
     <Router>
       <div className="app-container">
@@ -50,5 +67,4 @@ function App() {
     </Router>
   )
 }
-
 export default App

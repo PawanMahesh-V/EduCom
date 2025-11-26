@@ -124,7 +124,6 @@ const sendVerificationCode = async (email, code) => {
     await transporter.sendMail(mailOptions);
     return { success: true };
   } catch (error) {
-    console.error('Email sending error:', error);
     throw new Error('Failed to send verification email');
   }
 };

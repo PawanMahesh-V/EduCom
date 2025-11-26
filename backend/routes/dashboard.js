@@ -26,16 +26,16 @@ router.get('/admin/stats', auth, async (req, res) => {
         );
         const pendingMarketplaceItems = parseInt(pendingItemsResult.rows[0].count);
         const recentUsersResult = await pool.query(
-            `SELECT user_id, reg_id, full_name, email, role, department, created_at 
+            `SELECT id, reg_id, name, email, role, department, created_at 
              FROM users 
              ORDER BY created_at DESC 
              LIMIT 5`
         );
         const recentCoursesResult = await pool.query(
-            `SELECT c.course_id, c.course_code, c.course_name, c.department, 
-                    u.full_name as teacher_name, c.created_at
+            `SELECT c.id, c.code, c.name, c.department, 
+                    u.name as teacher_name, c.created_at
              FROM courses c
-             LEFT JOIN users u ON c.teacher_id = u.user_id
+             LEFT JOIN users u ON c.teacher_id = u.id
              ORDER BY c.created_at DESC
              LIMIT 5`
         );
@@ -98,3 +98,4 @@ router.get('/admin/activity', auth, async (req, res) => {
 });
 
 module.exports = router;
+

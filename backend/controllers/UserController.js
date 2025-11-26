@@ -51,8 +51,8 @@ class UserController {
 
     static async createUser(req, res) {
         try {
-            const { reg_id, full_name, email, password, role = 'Student', department = 'CS' } = req.body;
-            if (!reg_id || !full_name || !email || !password) {
+            const { reg_id, name, email, password, role = 'Student', department = 'CS', semester, program_year, section } = req.body;
+            if (!reg_id || !name || !email || !password) {
                 return res.status(400).json({ message: 'Missing required fields' });
             }
             const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
@@ -76,11 +76,14 @@ class UserController {
             const hashedPassword = await bcrypt.hash(password, 10);
             const newUser = await User.create({
                 reg_id,
-                full_name,
+                name,
                 email,
-                password_hash: hashedPassword,
+                password: hashedPassword,
                 role,
-                department
+                department,
+                semester,
+                program_year,
+                section
             });
 
             res.status(201).json(newUser);
@@ -98,7 +101,7 @@ class UserController {
     static async updateUser(req, res) {
         try {
             const { id } = req.params;
-            const { reg_id, full_name, email, password, role, department } = req.body;
+            const { reg_id, name, email, password, role, department, semester, program_year, section } = req.body;
             const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
             const validDepartments = ['CS', 'BBA', 'IT'];
 
@@ -132,10 +135,13 @@ class UserController {
                 await User.updatePassword(id, hashedPassword);
             }
             const updatedUser = await User.update(id, {
-                full_name,
+                name,
                 email,
                 role,
-                department
+                department,
+                semester,
+                program_year,
+                section
             });
 
             res.json(updatedUser);

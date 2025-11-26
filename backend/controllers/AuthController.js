@@ -4,7 +4,6 @@ const User = require('../models/User');
 const pool = require('../config/database');
 const { sendVerificationCode } = require('../config/emailConfig');
 
-const DEBUG_AUTH = process.env.AUTH_DEBUG === 'true';
 class AuthController {
     static async login(req, res) {
         try {
@@ -15,14 +14,14 @@ class AuthController {
             if (!user) {
                 return res.status(401).json({ message: 'Invalid credentials' });
             }
-            if (!user.password_hash) {
+            if (!user.password) {
                 return res.status(401).json({ message: 'Invalid credentials' });
             }
 
             try {
-                const storedHash = typeof user.password_hash === 'string'
-                    ? user.password_hash
-                    : user.password_hash.toString();
+                const storedHash = typeof user.password === 'string'
+                    ? user.password
+                    : user.password.toString();
                 const isValidPassword = await bcrypt.compare(password, storedHash);
 
                 if (!isValidPassword) {
@@ -47,7 +46,7 @@ class AuthController {
             try {
                 await sendVerificationCode(user.email, verificationCode);
             } catch (emailError) {
-                console.error('Email error:', emailError);
+                // Email sending failed silently
             }
 
             res.json({
@@ -57,7 +56,6 @@ class AuthController {
             });
 
         } catch (err) {
-            console.error('Login error:', err);
             res.status(500).json({ message: 'Server error during login' });
         }
     }
@@ -100,19 +98,19 @@ class AuthController {
             }
 
             const payload = {
-                userId: user.user_id,
+                userId: user.id,
                 email: user.email,
                 role: user.role
             };
             const token = jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
-            delete user.password_hash;
+            delete user.password;
 
             res.json({
                 user: {
-                    id: user.user_id,
+                    id: user.id,
                     reg_id: user.reg_id,
                     email: user.email,
-                    full_name: user.full_name,
+                    name: user.name,
                     role: user.role,
                     department: user.department
                 },
@@ -120,7 +118,6 @@ class AuthController {
             });
 
         } catch (err) {
-            console.error('Verify login error:', err);
             res.status(500).json({ message: 'Server error during verification' });
         }
     }
@@ -135,10 +132,10 @@ class AuthController {
 
             res.json({
                 user: {
-                    id: user.user_id,
+                    id: user.id,
                     reg_id: user.reg_id,
                     email: user.email,
-                    full_name: user.full_name,
+                    name: user.name,
                     role: user.role,
                     department: user.department
                 }
@@ -265,7 +262,7 @@ class AuthController {
 
             const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-            await User.updatePassword(user.user_id, hashedPassword);
+            await User.updatePassword(user.id, hashedPassword);
 
             res.json({ message: 'Password reset successfully' });
 

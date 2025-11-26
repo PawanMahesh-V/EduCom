@@ -25,7 +25,7 @@ const userApi = {
 
   delete: async (id) => {
     return await ApiClient.delete(API_ENDPOINTS.USERS.BY_ID(id));
-  },
+  }
 };
 
 export default userApi;

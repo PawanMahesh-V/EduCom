@@ -3,7 +3,7 @@ const pool = require('../config/database');
 class User {
     static async findByIdentifier(identifier) {
         const query = `
-            SELECT user_id, reg_id, email, full_name, role, department, password_hash 
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, password 
             FROM users 
             WHERE LOWER(email) = LOWER($1) OR LOWER(reg_id) = LOWER($1)
         `;
@@ -12,16 +12,16 @@ class User {
     }
     static async findById(userId) {
         const query = `
-            SELECT user_id, reg_id, email, full_name, role, department, created_at, updated_at
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, created_at, updated_at
             FROM users 
-            WHERE user_id = $1
+            WHERE id = $1
         `;
         const result = await pool.query(query, [userId]);
         return result.rows[0];
     }
     static async findAll(filters = {}) {
         let query = `
-            SELECT user_id, reg_id, email, full_name, role, department, created_at, updated_at
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, created_at, updated_at
             FROM users
         `;
         const params = [];
@@ -47,38 +47,38 @@ class User {
         return result.rows;
     }
     static async create(userData) {
-        const { reg_id, full_name, email, password_hash, role, department } = userData;
+        const { reg_id, name, email, password, role, department, semester, program_year, section } = userData;
         const query = `
-            INSERT INTO users (reg_id, full_name, email, password_hash, role, department)
-            VALUES ($1, $2, $3, $4, $5, $6)
-            RETURNING user_id, reg_id, email, full_name, role, department, created_at
+            INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, section)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, created_at
         `;
-        const result = await pool.query(query, [reg_id, full_name, email, password_hash, role, department]);
+        const result = await pool.query(query, [reg_id, name, email, password, role, department, semester || null, program_year || null, section || null]);
         return result.rows[0];
     }
     static async update(userId, userData) {
-        const { full_name, email, role, department } = userData;
+        const { name, email, role, department, semester, program_year, section } = userData;
         const query = `
             UPDATE users 
-            SET full_name = $1, email = $2, role = $3, department = $4, updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $5
-            RETURNING user_id, reg_id, email, full_name, role, department, updated_at
+            SET name = $1, email = $2, role = $3, department = $4, semester = $5, program_year = $6, section = $7, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $8
+            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, updated_at
         `;
-        const result = await pool.query(query, [full_name, email, role, department, userId]);
+        const result = await pool.query(query, [name, email, role, department, semester || null, program_year || null, section || null, userId]);
         return result.rows[0];
     }
     static async delete(userId) {
-        const query = 'DELETE FROM users WHERE user_id = $1 RETURNING user_id';
+        const query = 'DELETE FROM users WHERE id = $1 RETURNING id';
         const result = await pool.query(query, [userId]);
         return result.rows[0];
     }
-    static async updatePassword(userId, passwordHash) {
+    static async updatePassword(userId, newPassword) {
         const query = `
             UPDATE users 
-            SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
-            WHERE user_id = $2
+            SET password = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
         `;
-        await pool.query(query, [passwordHash, userId]);
+        await pool.query(query, [newPassword, userId]);
     }
     static async countByRole() {
         const query = `

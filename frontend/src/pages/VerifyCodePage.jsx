@@ -1,5 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faArrowLeft, 
+  faShieldHalved,
+  faExclamationCircle,
+  faRotate
+} from '@fortawesome/free-solid-svg-icons';
 
 const VerifyCodePage = () => {
   const navigate = useNavigate();
@@ -112,53 +119,105 @@ const VerifyCodePage = () => {
   };
 
   return (
-    <div className="verify-code-page">
-      <div className="verify-code-container">
-        <div className="verify-code-header">
-          <h1>Enter Verification Code</h1>
-          <p>We sent a 6-digit code to <strong>{email}</strong></p>
-        </div>
+    <div className="auth-container">
+      {/* Animated Background */}
+      <div className="auth-background">
+        <div className="gradient-orb gradient-orb--1"></div>
+        <div className="gradient-orb gradient-orb--2"></div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="verify-code-form">
-          <div className="code-inputs" onPaste={handlePaste}>
-            {code.map((digit, index) => (
-              <input
-                key={index}
-                id={`code-${index}`}
-                type="text"
-                maxLength="1"
-                value={digit}
-                onChange={(e) => handleChange(index, e.target.value)}
-                onKeyDown={(e) => handleKeyDown(index, e)}
-                disabled={loading}
-                className="code-input"
-                autoFocus={index === 0}
-              />
-            ))}
+      {/* Header Bar */}
+      <div className="auth-header">
+        <button className="auth-back-button" onClick={() => navigate('/')}>
+          <FontAwesomeIcon icon={faArrowLeft} />
+          <span>Back to Home</span>
+        </button>
+      </div>
+
+      {/* Main Card */}
+      <div className="auth-card auth-card--medium">
+        <div className="auth-form-section">
+          {/* Brand Header */}
+          <div className="auth-brand-header">
+            <div className="auth-brand-icon-wrapper">
+              <FontAwesomeIcon icon={faShieldHalved} className="auth-brand-icon" />
+            </div>
+            <div className="auth-brand-text">
+              Edu<span className="auth-brand-accent">Com</span>
+            </div>
           </div>
 
-          {error && <div className="error-message">{error}</div>}
+          {/* Welcome Section */}
+          <div className="auth-welcome">
+            <h2>Enter Verification Code</h2>
+            <p>We sent a 6-digit code to <strong className="color-primary">{email}</strong></p>
+          </div>
 
-          <button type="submit" className="submit-btn" disabled={loading || code.join('').length !== 6}>
-            {loading ? 'Verifying...' : 'Verify Code'}
-          </button>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="auth-form">
+            <div className="auth-code-inputs" onPaste={handlePaste}>
+              {code.map((digit, index) => (
+                <input
+                  key={index}
+                  id={`code-${index}`}
+                  type="text"
+                  maxLength="1"
+                  value={digit}
+                  onChange={(e) => handleChange(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  disabled={loading}
+                  className="auth-code-input"
+                  autoFocus={index === 0}
+                />
+              ))}
+            </div>
 
-          <div className="resend-section">
-            <p>Didn't receive the code?</p>
-            <button 
-              type="button" 
-              className="resend-btn" 
-              onClick={handleResendCode}
-              disabled={loading}
-            >
-              Resend Code
+            {error && (
+              <div className="auth-error-message fade-in">
+                <FontAwesomeIcon icon={faExclamationCircle} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <button type="submit" className="auth-submit-button" disabled={loading || code.join('').length !== 6}>
+              {loading ? (
+                <>
+                  <div className="spinner-small"></div>
+                  <span>Verifying...</span>
+                </>
+              ) : (
+                <>
+                  <FontAwesomeIcon icon={faShieldHalved} />
+                  <span>Verify Code</span>
+                </>
+              )}
+            </button>
+
+            <div className="auth-resend-section">
+              <p>Didn't receive the code?</p>
+              <button 
+                type="button" 
+                className="auth-resend-button" 
+                onClick={handleResendCode}
+                disabled={loading}
+              >
+                <FontAwesomeIcon icon={faRotate} />
+                <span>Resend Code</span>
+              </button>
+            </div>
+          </form>
+
+          {/* Footer */}
+          <div className="auth-footer">
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+            <button className="auth-back-link" onClick={() => navigate('/login')}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              <span>Back to Login</span>
             </button>
           </div>
-
-          <div className="back-to-login">
-            <Link to="/login">← Back to Login</Link>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

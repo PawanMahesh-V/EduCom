@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faLock, faEye, faEyeSlash, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faLock, 
+  faEye, 
+  faEyeSlash, 
+  faCheckCircle,
+  faArrowLeft,
+  faExclamationCircle 
+} from '@fortawesome/free-solid-svg-icons';
 
 const ResetPasswordPage = () => {
   const navigate = useNavigate();
@@ -91,111 +98,159 @@ const ResetPasswordPage = () => {
   const strength = getPasswordStrength(newPassword);
 
   return (
-    <div className="reset-password-page">
-      
+    <>
+      {/* Success Modal */}
       {showSuccessModal && (
-        <div className="success-modal-overlay">
-          <div className="success-modal">
-            <div className="success-modal-icon">
+        <div className="auth-success-modal-overlay">
+          <div className="auth-success-modal">
+            <div className="auth-success-modal-icon">
               <FontAwesomeIcon icon={faCheckCircle} />
             </div>
             <h2>Password Reset Successfully!</h2>
             <p>You can now login with your new password.</p>
             <button 
-              className="success-modal-btn"
+              className="auth-success-modal-button"
               onClick={() => navigate('/login')}
             >
-              OK
+              Go to Login
             </button>
           </div>
         </div>
       )}
 
-      <div className="reset-password-container">
-        <div className="reset-password-header">
-          <div className="success-icon">
-            <FontAwesomeIcon icon={faCheckCircle} />
-          </div>
-          <h1>Create New Password</h1>
-          <p>Your identity has been verified. Set your new password below.</p>
+      <div className="auth-container">
+        {/* Animated Background */}
+        <div className="auth-background">
+          <div className="gradient-orb gradient-orb--1"></div>
+          <div className="gradient-orb gradient-orb--2"></div>
         </div>
 
-        <form onSubmit={handleSubmit} className="reset-password-form">
-          <div className="form-group">
-            <label htmlFor="newPassword">New Password</label>
-            <div className="input-wrapper">
-              <div className="input-icon">
-              </div>
-              <input
-                className="login-input"
-                type={showPassword ? 'text' : 'password'}
-                id="newPassword"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                placeholder="Enter new password"
-                required
-                disabled={loading}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowPassword(!showPassword)}
-              >
-                <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
-              </button>
-            </div>
-            {newPassword && (
-              <div className="password-strength">
-                <div className="strength-bar">
-                  <div 
-                    className="strength-fill" 
-                    style={{ width: strength.width, backgroundColor: strength.color }}
-                  ></div>
-                </div>
-                <span className="strength-text" style={{ color: strength.color }}>
-                  {strength.text}
-                </span>
-              </div>
-            )}
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm Password</label>
-            <div className="input-wrapper">
-              <div className="input-icon">
-              </div>
-              <input
-              className="login-input"
-                type={showConfirmPassword ? 'text' : 'password'}
-                id="confirmPassword"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
-                required
-                disabled={loading}
-              />
-              <button
-                type="button"
-                className="password-toggle"
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              >
-                <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
-              </button>
-            </div>
-          </div>
-
-          {error && <div className="error-message">{error}</div>}
-
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Resetting Password...' : 'Reset Password'}
+        {/* Header Bar */}
+        <div className="auth-header">
+          <button className="auth-back-button" onClick={() => navigate('/')}>
+            <FontAwesomeIcon icon={faArrowLeft} />
+            <span>Back to Home</span>
           </button>
+        </div>
 
-          <div className="back-to-login">
-            <Link to="/login">← Back to Login</Link>
+        {/* Main Card */}
+        <div className="auth-card auth-card--narrow">
+          <div className="auth-form-section">
+            {/* Brand Header */}
+            <div className="auth-brand-header">
+              <div className="auth-brand-icon-wrapper auth-brand-icon-wrapper--green">
+                <FontAwesomeIcon icon={faCheckCircle} className="auth-brand-icon" />
+              </div>
+              <div className="auth-brand-text">
+                Edu<span className="auth-brand-accent">Com</span>
+              </div>
+            </div>
+
+            {/* Welcome Section */}
+            <div className="auth-welcome">
+              <h2>Create New Password</h2>
+              <p>Your identity has been verified. Set your new password below.</p>
+            </div>
+
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="auth-form">
+              <div className="auth-form-group">
+                <label htmlFor="newPassword" className="auth-label">New Password</label>
+                <div className="auth-input-wrapper">
+                  <FontAwesomeIcon icon={faLock} className="auth-input-icon" />
+                  <input
+                    className="auth-input"
+                    type={showPassword ? 'text' : 'password'}
+                    id="newPassword"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
+                  </button>
+                </div>
+                {newPassword && (
+                  <div className="auth-password-strength">
+                    <div className="auth-strength-bar">
+                      <div 
+                        className="auth-strength-fill password-strength-bar" 
+                        style={{ width: strength.width, backgroundColor: strength.color }}
+                      ></div>
+                    </div>
+                    <span className="auth-strength-text password-strength-text" style={{ color: strength.color }}>
+                      {strength.text}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="auth-form-group">
+                <label htmlFor="confirmPassword" className="auth-label">Confirm Password</label>
+                <div className="auth-input-wrapper">
+                  <FontAwesomeIcon icon={faLock} className="auth-input-icon" />
+                  <input
+                    className="auth-input"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    id="confirmPassword"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Confirm new password"
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    className="auth-password-toggle"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  >
+                    <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="auth-error-message fade-in">
+                  <FontAwesomeIcon icon={faExclamationCircle} />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <button type="submit" className="auth-submit-button" disabled={loading}>
+                {loading ? (
+                  <>
+                    <div className="spinner-small"></div>
+                    <span>Resetting Password...</span>
+                  </>
+                ) : (
+                  <>
+                    <FontAwesomeIcon icon={faLock} />
+                    <span>Reset Password</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* Footer */}
+            <div className="auth-footer">
+              <div className="auth-divider">
+                <span>or</span>
+              </div>
+              <button className="auth-back-link" onClick={() => navigate('/login')}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+                <span>Back to Login</span>
+              </button>
+            </div>
           </div>
-        </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 };
 export default ResetPasswordPage;

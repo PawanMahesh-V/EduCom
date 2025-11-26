@@ -9,9 +9,11 @@ router.get('/', auth, async (req, res) => {
         const { limit = 50 } = req.query;
 
         const result = await pool.query(
-            `SELECT * FROM notifications
-             WHERE user_id = $1
-             ORDER BY created_at DESC
+            `SELECT n.*, u.name as sender_name
+             FROM notifications n
+             LEFT JOIN users u ON n.sender_id = u.id
+             WHERE n.user_id = $1
+             ORDER BY n.created_at DESC
              LIMIT $2`,
             [userId, limit]
         );
@@ -30,7 +32,7 @@ router.put('/:id/read', auth, async (req, res) => {
         const result = await pool.query(
             `UPDATE notifications 
              SET is_read = true 
-             WHERE notification_id = $1 AND user_id = $2
+             WHERE id = $1 AND user_id = $2
              RETURNING *`,
             [id, userId]
         );
@@ -69,8 +71,8 @@ router.delete('/:id', auth, async (req, res) => {
 
         const result = await pool.query(
             `DELETE FROM notifications 
-             WHERE notification_id = $1 AND user_id = $2
-             RETURNING notification_id`,
+             WHERE id = $1 AND user_id = $2
+             RETURNING id`,
             [id, userId]
         );
 
@@ -86,21 +88,21 @@ router.delete('/:id', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
     try {
-        const { user_id, title, message, type = 'info' } = req.body;
+        const { id, title, message, type = 'info' } = req.body;
 
         if (req.user.role !== 'Admin') {
             return res.status(403).json({ message: 'Not authorized' });
         }
 
-        if (!user_id || !title || !message) {
+        if (!id || !title || !message) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
         const result = await pool.query(
-            `INSERT INTO notifications (user_id, title, message, type) 
+            `INSERT INTO notifications (id, title, message, type) 
              VALUES ($1, $2, $3, $4) 
              RETURNING *`,
-            [user_id, title, message, type]
+            [id, title, message, type]
         );
 
         res.status(201).json(result.rows[0]);
@@ -121,7 +123,7 @@ router.post('/broadcast', auth, async (req, res) => {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        let userQuery = 'SELECT user_id FROM users';
+        let userQuery = 'SELECT id FROM users';
         const queryParams = [];
         
         if (role_filter) {
@@ -133,9 +135,9 @@ router.post('/broadcast', auth, async (req, res) => {
 
         const insertPromises = users.rows.map(user => 
             pool.query(
-                `INSERT INTO notifications (user_id, title, message, type) 
+                `INSERT INTO notifications (id, title, message, type) 
                  VALUES ($1, $2, $3, $4)`,
-                [user.user_id, title, message, type]
+                [user.id, title, message, type]
             )
         );
 
@@ -151,3 +153,4 @@ router.post('/broadcast', auth, async (req, res) => {
 });
 
 module.exports = router;
+

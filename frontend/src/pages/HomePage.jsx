@@ -1,45 +1,70 @@
 import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
-  faBookOpen,
-  faComments,
+  faGraduationCap,
+  faBook,
   faUsers,
-  faChartLine,
-  faShieldAlt,
-  faRobot,
+  faComments,
+  faBell,
+  faChalkboardTeacher,
+  faUserShield,
   faArrowRight,
-  faCheckCircle,
+  faUserGraduate,
+  faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
-import Threads from "../components/Threads";
 
 const HomePage = () => {
   const navigate = useNavigate();
 
   const features = [
     {
+      icon: faBook,
+      title: "Course Management",
+      description: "Create and manage courses with course codes, departments, semesters, and teacher assignments.",
+    },
+    {
       icon: faUsers,
-      title: "Communities",
-      description: "Separate spaces for departments, courses, and discussions.",
+      title: "Student Enrollment",
+      description: "Assign students to courses with department validation and track enrollment records.",
+    },
+    {
+      icon: faChalkboardTeacher,
+      title: "Teacher Dashboard",
+      description: "View assigned courses, student lists, and manage course-related activities.",
     },
     {
       icon: faComments,
-      title: "Real-time Chat",
-      description: "Instant communication powered by Socket.IO.",
+      title: "Course Communities",
+      description: "Organize course-specific communities for communication and collaboration.",
     },
     {
-      icon: faShieldAlt,
-      title: "Anonymity",
-      description: "Safe and transparent feedback system for students.",
+      icon: faBell,
+      title: "Notifications",
+      description: "Broadcast system notifications and course updates to users based on roles.",
     },
     {
-      icon: faRobot,
-      title: "AI Moderation",
-      description: "Smart content moderation for healthy discussions.",
+      icon: faUserShield,
+      title: "Role-Based Access",
+      description: "Secure dashboards for Students, Teachers, HODs, Program Managers, and Admins.",
+    },
+  ];
+
+  const roles = [
+    {
+      title: "Admin",
+      description: "Full system management, user creation, course oversight",
     },
     {
-      icon: faChartLine,
-      title: "Analytics",
-      description: "Visual insights into engagement and performance.",
+      title: "Teachers & HODs",
+      description: "Course management, student tracking, community access",
+    },
+    {
+      title: "Students",
+      description: "View enrolled courses, access communities, receive notifications",
+    },
+    {
+      title: "Program Managers",
+      description: "Oversee program-level operations and year-specific activities",
     },
   ];
 
@@ -48,7 +73,7 @@ const HomePage = () => {
       {/* Navbar */}
       <nav className="nav">
         <div className="nav-brand" onClick={() => navigate("/")}>
-          <FontAwesomeIcon icon={faBookOpen} />
+          <FontAwesomeIcon icon={faGraduationCap} />
           <span>
             Edu<span className="accent">Com</span>
           </span>
@@ -59,20 +84,13 @@ const HomePage = () => {
       </nav>
 
       <section className="hero">
-        <div className="threads-background">
-          <Threads
-            amplitude={1}
-            distance={0}
-            color={[0, 0, 0]}
-          />
-        </div>
         <div className="hero-content fade-up">
           <h1>
-            A Smarter Way to <span className="accent">Connect & Learn</span>
+            Academic Management <span className="accent">Platform</span>
           </h1>
           <p>
-            EduCom connects students, teachers, and administrators in one
-            seamless communication platform for modern education.
+            A comprehensive system for course management, student enrollment,
+            and institutional communication across departments.
           </p>
           <div className="hero-actions">
             <button
@@ -81,29 +99,19 @@ const HomePage = () => {
             >
               Get Started <FontAwesomeIcon icon={faArrowRight} />
             </button>
-            <button
-              className="btn-outline"
-              onClick={() =>
-                document.getElementById("features").scrollIntoView({
-                  behavior: "smooth",
-                })
-              }
-            >
-              Learn More
-            </button>
           </div>
         </div>
       </section>
 
       <section id="features" className="features-section fade-up">
-        <h2>Core Features</h2>
+        <h2>Core Functionality</h2>
         <p className="subtitle">
-          Simplify communication and boost collaboration across your institution
+          Streamlined education management system
         </p>
 
         <div className="features-grid">
           {features.map((feature, i) => (
-            <div key={i} className="feature-card fade-up" style={{ animationDelay: `${i * 100}ms` }}>
+            <div key={i} className="feature-card">
               <div className="feature-icon">
                 <FontAwesomeIcon icon={feature.icon} />
               </div>
@@ -117,31 +125,30 @@ const HomePage = () => {
       <section className="benefits-section fade-up">
         <div className="benefits-content">
           <div className="benefits-text">
-            <h2>Empowering Academic Collaboration</h2>
+            <h2>Built for Educational Institutions</h2>
             <p>
-              Manage courses, share ideas, and give feedback in a transparent,
-              engaging, and structured way.
+              EduCom provides role-based dashboards and comprehensive tools for
+              managing academic workflows across departments (CS, BBA, IT).
             </p>
-            <ul>
-              <li>
-                <FontAwesomeIcon icon={faCheckCircle} /> Course Communities
-              </li>
-              <li>
-                <FontAwesomeIcon icon={faCheckCircle} /> Real-time Messaging
-              </li>
-              <li>
-                <FontAwesomeIcon icon={faCheckCircle} /> Transparent Feedback
-              </li>
-            </ul>
+            <div className="role-info">
+              <h3>User Roles</h3>
+              <div className="role-grid">
+                {roles.map((role, i) => (
+                  <div key={i} className="role-item">
+                    <strong>{role.title}</strong>
+                    <p>{role.description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
       <section className="cta-section fade-up">
-        <h2 style={{color:"white"}}>Ready to Get Started?</h2>
-        <p style={{color:"white"}}>
-          Join thousands of students and educators already using EduCom to
-          connect and collaborate better.
+        <h2 className="text-white">Access Your Dashboard</h2>
+        <p className="text-white">
+          Sign in to access your role-based dashboard and manage your academic activities.
         </p>
         <button className="btn-primary" onClick={() => navigate("/login")}>
           Sign In Now <FontAwesomeIcon icon={faArrowRight} />
@@ -149,7 +156,7 @@ const HomePage = () => {
       </section>
 
       <footer className="footer">
-        <p>© {new Date().getFullYear()} EduCom. All rights reserved.</p>
+        <p>© {new Date().getFullYear()} EduCom. Educational Management Platform.</p>
       </footer>
     </div>
   );

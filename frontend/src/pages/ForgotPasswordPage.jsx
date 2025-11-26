@@ -1,5 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { 
+  faEnvelope, 
+  faArrowLeft, 
+  faKey,
+  faCircleCheck,
+  faExclamationCircle 
+} from '@fortawesome/free-solid-svg-icons';
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
@@ -64,46 +72,108 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="forgot-password-page">
-      <div className="forgot-password-container">
-        <div className="forgot-password-header">
-          <h1>Forgot Password</h1>
-          <p>Enter your email address and we'll send you instructions to reset your password.</p>
-        </div>
+    <div className="auth-container">
+      {/* Animated Background */}
+      <div className="auth-background">
+        <div className="gradient-orb gradient-orb--1"></div>
+        <div className="gradient-orb gradient-orb--2"></div>
+      </div>
 
-        <form onSubmit={handleSubmit} className="forgot-password-form">
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input
-              type="email"
-              id="email"
-              value={email}
-              onChange={(e) => {
-                setEmail(e.target.value);
-                if (fieldError) setFieldError('');
-                if (error) setError('');
-              }}
-              placeholder="your.email@szabist.pk"
-              disabled={loading}
-            />
-            {fieldError && (
-              <div className="error-message" style={{ marginTop: '0.5rem' }}>
-                {fieldError}
+      {/* Header Bar */}
+      <div className="auth-header">
+        <button className="auth-back-button" onClick={() => navigate('/')}>
+          <FontAwesomeIcon icon={faArrowLeft} />
+          <span>Back to Home</span>
+        </button>
+      </div>
+
+      {/* Main Card */}
+      <div className="auth-card auth-card--narrow">
+        <div className="auth-form-section">
+          {/* Brand Header */}
+          <div className="auth-brand-header">
+            <div className="auth-brand-icon-wrapper">
+              <FontAwesomeIcon icon={faKey} className="auth-brand-icon" />
+            </div>
+            <div className="auth-brand-text">
+              Edu<span className="auth-brand-accent">Com</span>
+            </div>
+          </div>
+
+          {/* Welcome Section */}
+          <div className="auth-welcome">
+            <h2>Forgot Password?</h2>
+            <p>Enter your email address and we'll send you a verification code to reset your password.</p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="auth-form">
+            <div className="auth-form-group">
+              <label htmlFor="email" className="auth-label">Email Address</label>
+              <div className="auth-input-wrapper">
+                <FontAwesomeIcon icon={faEnvelope} className="auth-input-icon" />
+                <input
+                  type="email"
+                  id="email"
+                  className="auth-input"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (fieldError) setFieldError('');
+                    if (error) setError('');
+                  }}
+                  placeholder="your.email@szabist.pk"
+                  disabled={loading}
+                />
+              </div>
+              {fieldError && (
+                <div className="auth-error-message fade-in mt-2">
+                  <FontAwesomeIcon icon={faExclamationCircle} />
+                  <span>{fieldError}</span>
+                </div>
+              )}
+            </div>
+
+            {error && (
+              <div className="auth-error-message fade-in">
+                <FontAwesomeIcon icon={faExclamationCircle} />
+                <span>{error}</span>
               </div>
             )}
+            
+            {message && (
+              <div className="auth-success-message fade-in">
+                <FontAwesomeIcon icon={faCircleCheck} />
+                <span>{message}</span>
+              </div>
+            )}
+
+            <button type="submit" className="auth-submit-button" disabled={loading}>
+              {loading ? (
+                <>
+                  <div className="spinner-small"></div>
+                  <span>Sending Code...</span>
+                </>
+              ) : (
+                <>
+                  <FontAwesomeIcon icon={faEnvelope} />
+                  <span>Send Verification Code</span>
+                </>
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <div className="auth-footer">
+            <div className="auth-divider">
+              <span>or</span>
+            </div>
+            <button className="auth-back-link" onClick={() => navigate('/login')}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              <span>Back to Login</span>
+            </button>
           </div>
-
-          {error && <div className="error-message">{error}</div>}
-          {message && <div className="success-message">{message}</div>}
-
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Sending...' : 'Send Reset Instructions'}
-          </button>
-
-          <div className="back-to-login">
-            <Link to="/login">← Back to Login</Link>
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

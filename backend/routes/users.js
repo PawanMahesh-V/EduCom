@@ -6,10 +6,10 @@ const auth = require('../middleware/auth');
 router.get('/teachers', auth, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT user_id, reg_id, full_name, email, department, role 
+            `SELECT id, reg_id, name, email, department, role 
              FROM users 
              WHERE role IN ('Teacher','HOD','PM') 
-             ORDER BY full_name`
+             ORDER BY name`
         );
 
         res.json({
@@ -22,15 +22,43 @@ router.get('/teachers', auth, async (req, res) => {
 
 router.get('/', auth, async (req, res) => {
     try {
-        const { page = 1, limit = 10 } = req.query;
+        const { page = 1, limit = 10, role, department } = req.query;
         const offset = (page - 1) * limit;
 
-        const result = await pool.query(
-            'SELECT user_id, reg_id, full_name, email, role, department, program_year FROM users LIMIT $1 OFFSET $2',
-            [limit, offset]
-        );
+        let query = 'SELECT id, reg_id, name, email, role, department, semester, program_year, section FROM users';
+        const queryParams = [];
+        const conditions = [];
+        
+        // Add role filter
+        if (role && role !== 'All') {
+            queryParams.push(role);
+            conditions.push(`role = $${queryParams.length}`);
+        }
+        
+        // Add department filter
+        if (department && department !== 'All') {
+            queryParams.push(department);
+            conditions.push(`department = $${queryParams.length}`);
+        }
+        
+        // Append WHERE clause if filters exist
+        if (conditions.length > 0) {
+            query += ' WHERE ' + conditions.join(' AND ');
+        }
+        
+        // Add pagination
+        queryParams.push(limit);
+        queryParams.push(offset);
+        query += ` LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`;
 
-        const countResult = await pool.query('SELECT COUNT(*) FROM users');
+        const result = await pool.query(query, queryParams);
+
+        // Count total with same filters
+        let countQuery = 'SELECT COUNT(*) FROM users';
+        if (conditions.length > 0) {
+            countQuery += ' WHERE ' + conditions.join(' AND ');
+        }
+        const countResult = await pool.query(countQuery, queryParams.slice(0, -2));
         const totalUsers = parseInt(countResult.rows[0].count);
 
         res.json({
@@ -48,7 +76,7 @@ router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
         const result = await pool.query(
-            'SELECT user_id, reg_id, full_name, email, role, department, program_year FROM users WHERE user_id = $1',
+            'SELECT id, reg_id, name, email, role, department, semester, program_year, section FROM users WHERE id = $1',
             [id]
         );
 
@@ -64,16 +92,23 @@ router.get('/:id', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
     try {
-    const { reg_id, full_name, email, password, role = 'Student', department = 'CS', program_year } = req.body;
+    const { reg_id, name, email, password, role = 'Student', department = 'CS', semester, program_year, section } = req.body;
 
-        if (!reg_id || !full_name || !email) {
+        if (!reg_id || !name || !email) {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
         const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
     const validDepartments = ['CS', 'BBA', 'IT'];
+        let semesterValue = null;
         let programYearValue = null;
-        if (role === 'PM') {
+        
+        if (role === 'Student') {
+            const sem = parseInt(semester, 10);
+            if (sem >= 1 && sem <= 8) {
+                semesterValue = sem;
+            }
+        } else if (role === 'PM') {
             const py = parseInt(program_year, 10);
             if (!(py >= 1 && py <= 4)) {
                 return res.status(400).json({ message: 'Program year must be between 1 and 4 for PM role' });
@@ -105,8 +140,8 @@ router.post('/', auth, async (req, res) => {
 
         const hashedPassword = await bcrypt.hash(password, 10);
         const result = await pool.query(
-            'INSERT INTO users (reg_id, full_name, email, password_hash, role, department, program_year) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING user_id, reg_id, full_name, email, role, department, program_year',
-            [reg_id, full_name, email, hashedPassword, role, department, programYearValue]
+            'INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, section) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, reg_id, name, email, role, department, semester, program_year, section',
+            [reg_id, name, email, hashedPassword, role, department, semesterValue, programYearValue, section || null]
         );
 
         res.status(201).json(result.rows[0]);
@@ -128,9 +163,16 @@ router.post('/', auth, async (req, res) => {
 router.put('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        const { reg_id, full_name, email, password, role, department, program_year } = req.body;
+        const { reg_id, name, email, password, role, department, semester, program_year, section } = req.body;
+        let semesterValue = null;
         let programYearValue = null;
-        if (role === 'PM') {
+        
+        if (role === 'Student') {
+            const sem = parseInt(semester, 10);
+            if (sem >= 1 && sem <= 8) {
+                semesterValue = sem;
+            }
+        } else if (role === 'PM') {
             const py = parseInt(program_year, 10);
             if (!(py >= 1 && py <= 4)) {
                 return res.status(400).json({ message: 'Program year must be between 1 and 4 for PM role' });
@@ -150,7 +192,7 @@ router.put('/:id', auth, async (req, res) => {
         }
 
         const userExists = await pool.query(
-            'SELECT role FROM users WHERE user_id = $1',
+            'SELECT role FROM users WHERE id = $1',
             [id]
         );
 
@@ -177,15 +219,15 @@ router.put('/:id', auth, async (req, res) => {
             }
             
             const result = await pool.query(
-                'UPDATE users SET reg_id = $1, full_name = $2, email = $3, role = $4, department = $5, program_year = $6, password_hash = $7 WHERE user_id = $8 RETURNING user_id, reg_id, full_name, email, role, department, program_year',
-                [reg_id, full_name, email, role, department, programYearValue, hashedPassword, id]
+                'UPDATE users SET reg_id = $1, name = $2, email = $3, role = $4, department = $5, semester = $6, program_year = $7, password = $8, section = $9 WHERE id = $10 RETURNING id, reg_id, name, email, role, department, semester, program_year, section',
+                [reg_id, name, email, role, department, semesterValue, programYearValue, hashedPassword, section || null, id]
             );
             return res.json(result.rows[0]);
         }
 
         const result = await pool.query(
-            'UPDATE users SET reg_id = $1, full_name = $2, email = $3, role = $4, department = $5, program_year = $6 WHERE user_id = $7 RETURNING user_id, reg_id, full_name, email, role, department, program_year',
-            [reg_id, full_name, email, role, department, programYearValue, id]
+            'UPDATE users SET reg_id = $1, name = $2, email = $3, role = $4, department = $5, semester = $6, program_year = $7, section = $8 WHERE id = $9 RETURNING id, reg_id, name, email, role, department, semester, program_year, section',
+            [reg_id, name, email, role, department, semesterValue, programYearValue, section || null, id]
         );
 
         res.json(result.rows[0]);
@@ -211,7 +253,7 @@ router.delete('/:id', auth, async (req, res) => {
         const { id } = req.params;
         await client.query('BEGIN');
         const userExists = await client.query(
-            'SELECT role FROM users WHERE user_id = $1',
+            'SELECT role FROM users WHERE id = $1',
             [id]
         );
 
@@ -236,20 +278,20 @@ router.delete('/:id', auth, async (req, res) => {
         await client.query('UPDATE courses SET teacher_id = NULL WHERE teacher_id = $1', [id]);
         await client.query('DELETE FROM reports WHERE reporter_id = $1', [id]);
         const marketplaceItems = await client.query(
-            'SELECT item_id FROM marketplace_items WHERE seller_id = $1',
+            'SELECT id FROM marketplace_items WHERE seller_id = $1',
             [id]
         );
         
         if (marketplaceItems.rows.length > 0) {
-            const itemIds = marketplaceItems.rows.map(item => item.item_id);
-            await client.query('DELETE FROM transactions WHERE item_id = ANY($1::int[])', [itemIds]);
+            const itemIds = marketplaceItems.rows.map(item => item.id);
+            await client.query('DELETE FROM transactions WHERE id = ANY($1::int[])', [itemIds]);
         }
         
         await client.query('DELETE FROM transactions WHERE buyer_id = $1', [id]);
         
         await client.query('DELETE FROM marketplace_items WHERE seller_id = $1', [id]);
         const result = await client.query(
-            'DELETE FROM users WHERE user_id = $1 RETURNING user_id',
+            'DELETE FROM users WHERE id = $1 RETURNING id',
             [id]
         );
         await client.query('COMMIT');
@@ -269,10 +311,10 @@ router.delete('/:id', auth, async (req, res) => {
 router.get('/teachers', auth, async (req, res) => {
     try {
         const result = await pool.query(
-            `SELECT user_id, reg_id, full_name, email, department, role 
+            `SELECT id, reg_id, name, email, department, role 
              FROM users 
              WHERE role IN ('Teacher','HOD','PM') 
-             ORDER BY full_name`
+             ORDER BY name`
         );
 
         res.json({
@@ -286,7 +328,7 @@ router.get('/teachers', auth, async (req, res) => {
 router.get('/admin/profile', auth, async (req, res) => {
     try {
         const result = await pool.query(
-            'SELECT user_id, reg_id, full_name, email, role, department FROM users WHERE user_id = $1 AND role = $2',
+            'SELECT id, reg_id, name, email, role, department FROM users WHERE id = $1 AND role = $2',
             [req.user.userId, 'Admin']
         );
 
@@ -311,7 +353,7 @@ router.post('/admin/reset-invalid-passwords', auth, async (req, res) => {
             await client.query('BEGIN');
 
             const invalidQ = await client.query(
-                "SELECT user_id, reg_id, email, password_hash FROM users WHERE password_hash IS NULL OR password_hash NOT LIKE '$2%'");
+                "SELECT id, reg_id, email, password FROM users WHERE password IS NULL OR password NOT LIKE '$2%'");
 
             if (invalidQ.rows.length === 0) {
                 await client.query('COMMIT');
@@ -326,11 +368,11 @@ router.post('/admin/reset-invalid-passwords', auth, async (req, res) => {
                 const hashed = await bcrypt.hash(tempPassword, 10);
 
                 await client.query(
-                    'UPDATE users SET password_hash = $1 WHERE user_id = $2',
-                    [hashed, u.user_id]
+                    'UPDATE users SET password = $1 WHERE id = $2',
+                    [hashed, u.id]
                 );
 
-                updated.push({ user_id: u.user_id, reg_id: u.reg_id, email: u.email, tempPassword });
+                updated.push({ id: u.id, reg_id: u.reg_id, email: u.email, tempPassword });
             }
 
             await client.query('COMMIT');

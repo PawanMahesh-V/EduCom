@@ -1,104 +1,450 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBook,
   faClipboardList,
   faComments,
-  faSignOutAlt,
-  faBars,
   faBell,
-  faBookOpen,
   faChalkboardTeacher,
   faCalendar,
-  faPaperPlane,
-  faSearch,
-  faEllipsisV
+  faUsers,
+  faPlus
 } from '@fortawesome/free-solid-svg-icons';
-import { courseApi } from '../api';
-
+import { courseApi, communityApi, directMessageApi, notificationApi } from '../api';
+import DashboardLayout from '../components/DashboardLayout';
+import MessageLayout from '../components/MessageLayout';
+import { useCommunityMessages, useTypingIndicator, useNotifications, useDirectMessages, useDMTypingIndicator } from '../hooks/useSocket';
+import socketService from '../services/socket';
+import { showAlert } from '../utils/alert';
 const StudentDashboard = () => {
   const navigate = useNavigate();
   const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
   const user = raw ? JSON.parse(raw) : null;
-  const name = user?.full_name || user?.name || 'User';
-  const role = user?.role || 'Role';
   // Try different possible ID field names
-  const userId = user?.user_id || user?.id || user?.userId;
+  const userId = user?.id || user?.userId;
   const [activeSection, setActiveSection] = useState('courses');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
   
   // Chat states
   const [selectedChat, setSelectedChat] = useState(null);
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
-  const [chats, setChats] = useState([
-    { id: 1, name: 'Data Structures Community', lastMessage: 'Welcome to the group!', time: '10:30 AM', unread: 2 },
-    { id: 2, name: 'Algorithms Study Group', lastMessage: 'Anyone solved problem 5?', time: '9:15 AM', unread: 0 },
-    { id: 3, name: 'Web Development', lastMessage: 'Check out this resource', time: 'Yesterday', unread: 1 },
-    { id: 4, name: 'Intro to Programming', lastMessage: 'Check out this resource', time: 'Yesterday', unread: 1 },
-  ]);
+  const [typingUsers, setTypingUsers] = useState([]);
+  const messagesEndRef = useRef(null);
+  const [chats, setChats] = useState([]);
+  const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [unreadCounts, setUnreadCounts] = useState({});
+  const addedMessageIds = useRef(new Set());
+  // Direct message states
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [dmMessages, setDmMessages] = useState([]);
+  const [dmTypingUsers, setDmTypingUsers] = useState([]);
+  const [showUserSearch, setShowUserSearch] = useState(false);
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [isAnonymous, setIsAnonymous] = useState(false);
 
-  console.log('StudentDashboard - User object:', user);
-  console.log('StudentDashboard - userId:', userId);
-  console.log('StudentDashboard - activeSection:', activeSection);
+  // Join community modal states
+  const [showJoinModal, setShowJoinModal] = useState(false);
+  const [joinCode, setJoinCode] = useState('');
+  const [joiningCommunity, setJoiningCommunity] = useState(false);
 
+  // Real-time notifications
+  useNotifications((notification) => {
+    showAlert(notification.title, notification.message, notification.type || 'info');
+    // Add new notification to the list
+    setNotifications(prev => [notification, ...prev]);
+  });
+
+  // Global listener for all community messages (for unread tracking)
   useEffect(() => {
-    console.log('useEffect triggered - activeSection:', activeSection, 'userId:', userId);
+    if (!userId) return;
+    
+    const socket = socketService.connect(userId);
+    
+    const handleGlobalMessage = (newMessage) => {
+      // If message is for a community we're not currently viewing, increment unread
+      if (newMessage.community_id && newMessage.community_id !== selectedChat?.id) {
+        setUnreadCounts(prev => ({
+          ...prev,
+          [newMessage.community_id]: (prev[newMessage.community_id] || 0) + 1
+        }));
+      }
+    };
+
+    socket.on('new-message', handleGlobalMessage);
+
+    return () => {
+      socket.off('new-message', handleGlobalMessage);
+    };
+  }, [userId, selectedChat?.id]);
+  // Real-time direct messages
+  const { sendDirectMessage } = useDirectMessages(userId, (newMessage) => {
+    
+    // Update conversations list
+    fetchConversations();
+    
+    // If this message is for the currently selected conversation, add it to the messages
+    if (selectedConversation && 
+        (newMessage.sender_id === selectedConversation.user_id || 
+         newMessage.receiver_id === selectedConversation.user_id)) {
+      setDmMessages(prev => [...prev, newMessage]);
+      scrollToBottom();
+    }
+  });
+  // DM typing indicator
+  const dmTypingIndicator = useDMTypingIndicator(
+    selectedConversation?.user_id,
+    user?.name || 'Student'
+  );
+  useEffect(() => {
+    if (selectedConversation) {
+      dmTypingIndicator.onTyping((data) => {
+        if (data.isTyping) {
+          setDmTypingUsers(prev => [...new Set([...prev, data.senderName])]);
+          setTimeout(() => {
+            setDmTypingUsers(prev => prev.filter(name => name !== data.senderName));
+          }, 3000);
+        } else {
+          setDmTypingUsers(prev => prev.filter(name => name !== data.senderName));
+        }
+      });
+    }
+  }, [selectedConversation]);
+  // Real-time chat for selected community
+  const { sendMessage: sendSocketMessage } = useCommunityMessages(
+    selectedChat?.id,
+    (newMessage) => {
+      // Only add message if it belongs to the currently selected community
+      if (newMessage.community_id === selectedChat?.id) {
+        // Check if we've already processed this message
+        if (addedMessageIds.current.has(newMessage.id)) {
+          return;
+        }
+        
+        addedMessageIds.current.add(newMessage.id);
+        
+        setMessages(prev => {
+          // Double-check it's not already in state
+          const exists = prev.some(msg => msg.id === newMessage.id);
+          if (exists) return prev;
+          
+          return [...prev, {
+            id: newMessage.id,
+            text: newMessage.content,
+            sender: newMessage.is_anonymous ? 'Anonymous' : newMessage.sender_name,
+            senderId: newMessage.sender_id,
+            time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isAnonymous: newMessage.is_anonymous
+          }];
+        });
+        scrollToBottom();
+      }
+    },
+    (data) => {
+      setMessages(prev => prev.filter(m => m.id !== data.messageId));
+    }
+  );
+  // Typing indicator
+  const { onTyping, startTyping, stopTyping } = useTypingIndicator(
+    selectedChat?.id,
+    user?.name || 'Student'
+  );
+  useEffect(() => {
+    if (selectedChat?.id) {
+      const handleTyping = ({ userName, isTyping }) => {
+        if (isTyping) {
+          setTypingUsers(prev => [...new Set([...prev, userName])]);
+        } else {
+          setTypingUsers(prev => prev.filter(u => u !== userName));
+        }
+      };
+      onTyping(handleTyping);
+    }
+  }, [selectedChat?.id]);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+  useEffect(() => {
     if (activeSection === 'courses' && userId) {
-      console.log('Calling fetchMyCourses...');
       fetchMyCourses();
+    } else if (activeSection === 'community' && userId) {
+      fetchCommunities();
+    } else if (activeSection === 'messages' && userId) {
+      fetchConversations();
+      fetchAvailableUsers();
+    } else if (activeSection === 'notifications' && userId) {
+      fetchNotifications();
     } else {
-      console.log('Not fetching - activeSection:', activeSection, 'userId:', userId);
       setLoading(false);
     }
   }, [activeSection, userId]);
 
+  // Update chat unread counts when they change
   useEffect(() => {
-    return () => {
-      document.body.classList.remove('sidebar-open');
-    };
-  }, []);
+    if (chats.length > 0) {
+      setChats(prevChats => prevChats.map(chat => ({
+        ...chat,
+        unread: unreadCounts[chat.id] || 0
+      })));
+    }
+  }, [unreadCounts]);
 
+  const fetchNotifications = async () => {
+    try {
+      setLoading(true);
+      const response = await notificationApi.getAll({ userId });
+      setNotifications(response.notifications || []);
+    } catch (err) {
+      setNotifications([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await notificationApi.markAsRead(notificationId);
+      setNotifications(prev => 
+        prev.map(notif => 
+          notif.id === notificationId ? { ...notif, is_read: true } : notif
+        )
+      );
+    } catch (err) {
+      showAlert('Error', 'Failed to mark notification as read', 'error');
+    }
+  };
+  const fetchCommunities = async () => {
+    try {
+      setLoading(true);
+      const communities = await communityApi.getStudentCommunities(userId);
+      
+      const formattedChats = communities.map(community => ({
+        id: community.id,
+        name: community.course_name || community.name,
+        courseId: community.course_id,
+        courseName: community.course_name,
+        courseCode: community.course_code,
+        lastMessage: 'Start chatting...',
+        time: new Date(community.created_at).toLocaleDateString(),
+        unread: community.unread_count || 0
+      }));
+      
+      setChats(formattedChats);
+      
+      // Join all communities to receive messages
+      const socket = socketService.connect(userId);
+      communities.forEach(community => {
+        socket.emit('join-community', community.id);
+      });
+    } catch (err) {
+      setChats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
   const fetchMyCourses = async () => {
     try {
       setLoading(true);
-      console.log('Fetching courses for student:', userId);
       const data = await courseApi.getStudentCourses(userId);
-      console.log('Received data:', data);
       setCourses(data.courses || []);
     } catch (err) {
-      console.error('Error fetching courses:', err);
       alert('Error loading courses: ' + err);
       setCourses([]);
     } finally {
       setLoading(false);
     }
   };
-
-  const handleSendMessage = () => {
-    if (message.trim() && selectedChat) {
-      const newMessage = {
-        id: messages.length + 1,
-        text: message,
-        sender: 'me',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      };
-      setMessages([...messages, newMessage]);
-      setMessage('');
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await directMessageApi.getConversations(userId);
+      setConversations(response || []);
+    } catch (err) {
+      setConversations([]);
+    } finally {
+      setLoading(false);
     }
   };
-
-  const handleChatSelect = (chat) => {
+  const fetchAvailableUsers = async () => {
+    try {
+      const response = await directMessageApi.getUsers(userId);
+      setAvailableUsers(response || []);
+    } catch (err) {
+      setAvailableUsers([]);
+    }
+  };
+  const loadDirectMessages = async (otherUserId, isAnon = false) => {
+    try {
+      const response = await directMessageApi.getMessages(userId, otherUserId, isAnon);
+      setDmMessages(response || []);
+      scrollToBottom();
+    } catch (err) {
+      setDmMessages([]);
+    }
+  };
+  const handleCourseClick = async (course) => {
+    // Switch to community view and load that course's community
+    setActiveSection('community');
+    setLoading(true);
+    
+    try {
+      
+      // Fetch the community for this course
+      const communities = await communityApi.getStudentCommunities(userId);
+      
+      const courseCommunity = communities.find(c => c.course_id === course.id);
+      
+      if (courseCommunity) {
+        const formattedChat = {
+          id: courseCommunity.id,
+          name: courseCommunity.name || `${course.name} Community`,
+          courseId: courseCommunity.course_id,
+          courseName: course.name,
+          courseCode: course.code,
+          lastMessage: 'Start chatting...',
+          time: new Date(courseCommunity.created_at).toLocaleDateString(),
+          unread: 0
+        };
+        
+        setChats([formattedChat]);
+        await handleChatSelect(formattedChat);
+      } else {
+        setChats([]);
+        setSelectedChat(null);
+        showAlert('No Community', `No community found for ${course.name}. Please contact your administrator.`, 'warning');
+      }
+    } catch (err) {
+      setChats([]);
+      setSelectedChat(null);
+      showAlert('Error', 'Failed to load course community', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleSendMessage = () => {
+    if (message.trim() && selectedChat) {
+      sendSocketMessage(
+        message,
+        userId,
+        user?.name || 'Student',
+        false
+      );
+      setMessage('');
+      stopTyping();
+    }
+  };
+  const handleSendDirectMessage = () => {
+    if (message.trim() && selectedConversation) {
+      sendDirectMessage(
+        selectedConversation.user_id,
+        message,
+        user?.name || 'Student',
+        isAnonymous
+      );
+      
+      setMessage('');
+      dmTypingIndicator.stopTyping();
+      
+      // Refresh conversations to show new message
+      setTimeout(() => {
+        fetchConversations();
+      }, 500);
+    }
+  };
+  const handleSelectConversation = async (conversation) => {
+    setSelectedConversation(conversation);
+    setDmMessages([]);
+    setIsAnonymous(conversation.is_anonymous || false);
+    await loadDirectMessages(conversation.user_id, conversation.is_anonymous || false);
+    // Refresh conversations to update unread count
+    await fetchConversations();
+  };
+  const handleStartNewConversation = async (user) => {
+    const newConversation = {
+      user_id: user.id,
+      user_name: user.name,
+      user_email: user.email,
+      last_message: null,
+      last_message_time: null,
+      unread_count: 0
+    };
+    
+    setSelectedConversation(newConversation);
+    setDmMessages([]);
+    setShowUserSearch(false);
+    setUserSearchQuery('');
+  };
+  const handleDMTyping = () => {
+    if (selectedConversation) {
+      dmTypingIndicator.startTyping();
+    }
+  };
+  const handleChatSelect = async (chat) => {
     setSelectedChat(chat);
-    // Mock messages for selected chat
-    setMessages([
-      { id: 1, text: 'Hey everyone!', sender: 'John Doe', time: '9:00 AM' },
-      { id: 2, text: 'Welcome to the group!', sender: 'Jane Smith', time: '9:05 AM' },
-      { id: 3, text: 'Thanks! Happy to be here.', sender: 'me', time: '9:10 AM' },
-    ]);
+    setMessages([]);
+    addedMessageIds.current.clear();
+    
+    // Reset unread count for this chat
+    setUnreadCounts(prev => ({
+      ...prev,
+      [chat.id]: 0
+    }));
+    
+    // Fetch existing messages for this community
+    try {
+      const messages = await communityApi.getMessages(chat.id, userId);
+      // Refresh communities to update unread counts
+      await fetchCommunities();
+      const formattedMessages = messages.map(msg => ({
+        id: msg.id,
+        text: msg.content,
+        sender: msg.is_anonymous ? 'Anonymous' : msg.sender_name,
+        senderId: msg.sender_id,
+        time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isAnonymous: msg.is_anonymous
+      }));
+      setMessages(formattedMessages);
+    } catch (err) {
+    }
+  };
+  const handleMessageChange = (e) => {
+    setMessage(e.target.value);
+    if (e.target.value.trim()) {
+      startTyping();
+    } else {
+      stopTyping();
+    }
+  };
+  const handleJoinCommunity = async () => {
+    if (!joinCode.trim()) {
+      showAlert('Error', 'Please enter a join code', 'error');
+      return;
+    }
+
+    try {
+      setJoiningCommunity(true);
+      const response = await communityApi.joinCommunity(joinCode.trim(), userId);
+      showAlert('Success', response.message, 'success');
+      setShowJoinModal(false);
+      setJoinCode('');
+      
+      // Refresh communities list
+      if (activeSection === 'community') {
+        await fetchCommunities();
+      }
+    } catch (err) {
+      showAlert('Error', err.response?.data?.message || 'Failed to join community', 'error');
+    } finally {
+      setJoiningCommunity(false);
+    }
   };
 
   const handleLogout = () => {
@@ -111,450 +457,226 @@ const StudentDashboard = () => {
       navigate('/login', { replace: true });
     }
   };
-
-  const getInitials = (fullName) => {
-    if (!fullName) return 'U';
-    const names = fullName.trim().split(' ');
-    if (names.length === 1) return names[0].charAt(0).toUpperCase();
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
-  };
-
   const menuItems = [
     { id: 'courses', name: 'My Courses', icon: faBook },
-    { id: 'community', name: 'Community/Chat', icon: faComments },
-    { id: 'assignments', name: 'Assignments', icon: faClipboardList },
+    { id: 'community', name: 'Community Chat', icon: faUsers },
+    { id: 'messages', name: 'Messages', icon: faComments },
     { id: 'notifications', name: 'Notifications', icon: faBell },
   ];
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-    if (!isSidebarOpen) {
-      document.body.classList.add('sidebar-open');
-    } else {
-      document.body.classList.remove('sidebar-open');
-    }
-  };
-
-  const closeSidebar = () => {
-    setIsSidebarOpen(false);
-    document.body.classList.remove('sidebar-open');
-  };
-
   return (
-    <div className="admin-layout">
-      {/* Sidebar */}
-      <aside className="sidebar">
-        <div className="sidebar-header">
-          <h1>
-            <FontAwesomeIcon icon={faBookOpen} style={{ marginRight: '8px' }} />
-            EduCom<span style={{ background: 'linear-gradient(135deg, #79797a 0%, #374151 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}></span>
-          </h1>
-        </div>
-        <nav className="sidebar-nav">
-          <ul>
-            {menuItems.map((item) => (
-              <li key={item.id}>
-                <button
-                  className={`nav-link ${activeSection === item.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setActiveSection(item.id);
-                    closeSidebar();
-                  }}
+    <DashboardLayout
+      user={user}
+      role={user?.role || 'Student'}
+      menuItems={menuItems}
+      activeSection={activeSection}
+      onMenuClick={setActiveSection}
+      onLogout={handleLogout}
+    >
+      {activeSection === 'courses' && (
+        <div className="container">
+          {loading ? (
+            <div className="text-center p-4 text-secondary">
+              Loading your courses...
+            </div>
+          ) : courses.length === 0 ? (
+            <div className="empty-state text-center p-4 text-secondary">
+              <FontAwesomeIcon icon={faBook} className="icon-xl mb-3 opacity-30" />
+              <p>You are not enrolled in any courses yet.</p>
+            </div>
+          ) : (
+            <div className="course-card-grid">
+              {courses.map((course) => (
+                <div 
+                  key={course.id}
+                  className="course-card clickable"
+                  onClick={() => handleCourseClick(course)}
                 >
-                  <FontAwesomeIcon icon={item.icon} />
-                  <span>{item.name}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        <div className="sidebar-footer">
-          <button className="nav-link logout" onClick={handleLogout}>
-            <FontAwesomeIcon icon={faSignOutAlt} />
-            <span>Logout</span>
-          </button>
+                  <div className="course-card-header">
+                    <span className="course-card-code">{course.code}</span>
+                  </div>
+                  
+                  <h3 className="course-card-title">
+                    {course.name}
+                  </h3>
+                  
+                  <div className="course-card-meta">
+                    <div className="course-card-meta-item">
+                      <FontAwesomeIcon icon={faChalkboardTeacher} />
+                      <span>{course.teacher_name || 'No teacher assigned'}</span>
+                    </div>
+                    <div className="course-card-meta-item">
+                      <FontAwesomeIcon icon={faBook} />
+                      <span>{course.department} - Semester {course.semester}</span>
+                    </div>
+                    <div className="course-card-meta-item">
+                      <FontAwesomeIcon icon={faCalendar} />
+                      <span>Enrolled: {new Date(course.enrolled_on).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="main-content">
-        <header className="header">
-          <button className="menu-toggle" onClick={toggleSidebar}>
-            <FontAwesomeIcon icon={faBars} />
-          </button>
-          <div className="header-title">
-            <h2>{menuItems.find(item => item.id === activeSection)?.name || 'My Courses'}</h2>
+      )}
+      {activeSection === 'assignments' && (
+        <div>
+          <h3>Assignments</h3>
+          <p>Your assignments will appear here.</p>
+        </div>
+      )}
+      {activeSection === 'messages' && (
+        <MessageLayout
+          mode="direct"
+          userId={userId}
+          messagesEndRef={messagesEndRef}
+          conversations={conversations}
+          selectedConversation={selectedConversation}
+          dmMessages={dmMessages}
+          dmTypingUsers={dmTypingUsers}
+          dmMessage={message}
+          setDmMessage={setMessage}
+          userSearchQuery={userSearchQuery}
+          setUserSearchQuery={setUserSearchQuery}
+          showUserSearch={showUserSearch}
+          setShowUserSearch={setShowUserSearch}
+          availableUsers={availableUsers}
+          onSelectConversation={handleSelectConversation}
+          onStartNewConversation={handleStartNewConversation}
+          onSendDirectMessage={handleSendDirectMessage}
+          onDMTyping={handleDMTyping}
+          isAnonymous={isAnonymous}
+          setIsAnonymous={setIsAnonymous}
+          loading={loading}
+        />
+      )}
+      {activeSection === 'community' && (
+        <MessageLayout
+          mode="community"
+          userId={userId}
+          messagesEndRef={messagesEndRef}
+          chats={chats}
+          selectedChat={selectedChat}
+          communityMessages={messages}
+          communityTypingUsers={typingUsers}
+          communityMessage={message}
+          setCommunityMessage={setMessage}
+          onSelectChat={handleChatSelect}
+          onSendCommunityMessage={handleSendMessage}
+          onCommunityTyping={startTyping}
+          loading={loading}
+        />
+      )}
+      {activeSection === 'notifications' && (
+        <div className="container">
+          <div className="notifications-header">
+            <h1 className="mb-1">Notifications</h1>
+            <p className="text-secondary m-0">Stay updated with your course activities</p>
           </div>
-          <div className="header-actions">
-            <div className="profile-icon">
-              {getInitials(name)}
+          
+          {loading ? (
+            <div className="text-center p-4 text-secondary">
+              Loading notifications...
             </div>
-            <div className="user-info">
-              <span className="user-name">{name}</span>
-              <span className="user-role">{role}</span>
+          ) : notifications.length === 0 ? (
+            <div className="empty-state text-center p-4 text-secondary">
+              <FontAwesomeIcon icon={faBell} className="icon-xl mb-3 opacity-30" />
+              <p>No notifications yet</p>
             </div>
-          </div>
-        </header>
-
-        <div className="content-area">
-          {activeSection === 'courses' && (
-            <div className="container">
-              <h1>My Courses</h1>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '2rem' }}>
-                View all your enrolled courses
-              </p>
-
-              {loading ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                  Loading your courses...
-                </div>
-              ) : courses.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-secondary)' }}>
-                  <FontAwesomeIcon icon={faBook} style={{ fontSize: '3rem', marginBottom: '1rem', opacity: 0.3 }} />
-                  <p>You are not enrolled in any courses yet.</p>
-                </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                  {courses.map((course) => (
-                    <div 
-                      key={course.course_id} 
-                      style={{
-                        background: 'white',
-                        borderRadius: '8px',
-                        padding: '1.5rem',
-                        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
-                        border: '1px solid var(--border-color)',
-                        transition: 'all 0.3s ease',
-                        cursor: 'pointer'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.boxShadow = '0 8px 16px rgba(0, 0, 0, 0.15)';
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.1)';
-                        e.currentTarget.style.transform = 'translateY(0)';
-                      }}
-                    >
-                      <div style={{ 
-                        background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                        color: 'white',
-                        padding: '0.5rem 1rem',
-                        borderRadius: '8px',
-                        marginBottom: '1rem',
-                        fontSize: '0.875rem',
-                        fontWeight: '600',
-                        display: 'inline-block'
-                      }}>
-                        {course.course_code}
-                      </div>
-                      
-                      <h3 style={{ 
-                        fontSize: '1.25rem', 
-                        fontWeight: '600', 
-                        marginBottom: '0.75rem',
-                        color: 'var(--text-primary)'
-                      }}>
-                        {course.course_name}
-                      </h3>
-                      
-                      <div style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        gap: '0.5rem',
-                        fontSize: '0.9rem',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <FontAwesomeIcon icon={faChalkboardTeacher} />
-                          <span>{course.teacher_name || 'No teacher assigned'}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <FontAwesomeIcon icon={faBook} />
-                          <span>{course.department} - Semester {course.semester}</span>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <FontAwesomeIcon icon={faCalendar} />
-                          <span>Enrolled: {new Date(course.enrolled_on).toLocaleDateString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-          {activeSection === 'assignments' && (
-            <div>
-              <h3>Assignments</h3>
-              <p>Your assignments will appear here.</p>
-            </div>
-          )}
-          {activeSection === 'community' && (
-            <div className="container" style={{ maxWidth: '100%', height: 'calc(100vh - 180px)' }}>
-              <div style={{ display: 'flex', gap: '0', height: '100%', background: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)' }}>
-                {/* Chat List Sidebar */}
-                <div style={{ width: '320px', borderRight: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column' }}>
-                  {/* Search Header */}
-                  <div style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)' }}>
-                    <h2 style={{ margin: '0 0 1rem 0', fontSize: '1.5rem', fontWeight: '600' }}>Chats</h2>
-                    <div style={{ position: 'relative' }}>
-                      <FontAwesomeIcon icon={faSearch} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-secondary)' }} />
-                      <input 
-                        type="text" 
-                        placeholder="Search conversations..."
-                        style={{ 
-                          width: '100%', 
-                          padding: '0.75rem 0.75rem 0.75rem 2.5rem', 
-                          border: '1px solid var(--border-color)', 
-                          borderRadius: '8px',
-                          fontSize: '0.9rem'
-                        }}
-                      />
-                    </div>
+          ) : (
+            <div className="notifications-list">
+              {notifications.map((notification) => (
+                <div 
+                  key={notification.id}
+                  className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
+                  onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
+                >
+                  <div className="notification-icon">
+                    <FontAwesomeIcon icon={faBell} />
                   </div>
-
-                  {/* Chat List */}
-                  <div style={{ flex: 1, overflowY: 'auto' }}>
-                    {chats.map((chat) => (
-                      <div 
-                        key={chat.id}
-                        onClick={() => handleChatSelect(chat)}
-                        style={{
-                          padding: '1rem',
-                          borderBottom: '1px solid var(--border-color)',
-                          cursor: 'pointer',
-                          background: selectedChat?.id === chat.id ? 'var(--bg-secondary)' : 'white',
-                          transition: 'all 0.2s ease'
-                        }}
-                        onMouseOver={(e) => {
-                          if (selectedChat?.id !== chat.id) e.currentTarget.style.background = '#f9fafb';
-                        }}
-                        onMouseOut={(e) => {
-                          if (selectedChat?.id !== chat.id) e.currentTarget.style.background = 'white';
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{
-                            width: '48px',
-                            height: '48px',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: '600',
-                            fontSize: '1.1rem',
-                            flexShrink: 0
-                          }}>
-                            {chat.name.charAt(0)}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: '600', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {chat.name}
-                              </h4>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', flexShrink: 0, marginLeft: '0.5rem' }}>{chat.time}</span>
-                            </div>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                {chat.lastMessage}
-                              </p>
-                              {chat.unread > 0 && (
-                                <span style={{
-                                  background: 'var(--color-primary)',
-                                  color: 'white',
-                                  borderRadius: '50%',
-                                  width: '20px',
-                                  height: '20px',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  fontSize: '0.7rem',
-                                  fontWeight: '600',
-                                  flexShrink: 0,
-                                  marginLeft: '0.5rem'
-                                }}>
-                                  {chat.unread}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
+                  <div className="notification-content">
+                    <h4 className="notification-title">{notification.title}</h4>
+                    <p className="notification-message">{notification.message}</p>
+                    <span className="notification-time">
+                      {new Date(notification.created_at).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </span>
                   </div>
-                </div>
-
-                {/* Chat Area */}
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-                  {selectedChat ? (
-                    <>
-                      {/* Chat Header */}
-                      <div style={{ 
-                        padding: '1rem 1.5rem', 
-                        borderBottom: '1px solid var(--border-color)',
-                        background: 'white',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontWeight: '600'
-                          }}>
-                            {selectedChat.name.charAt(0)}
-                          </div>
-                          <div>
-                            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '600' }}>{selectedChat.name}</h3>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Active now</p>
-                          </div>
-                        </div>
-                        <button style={{ 
-                          background: 'none', 
-                          border: 'none', 
-                          cursor: 'pointer',
-                          padding: '0.5rem',
-                          color: 'var(--text-secondary)',
-                          fontSize: '1.2rem'
-                        }}>
-                          <FontAwesomeIcon icon={faEllipsisV} />
-                        </button>
-                      </div>
-
-                      {/* Messages Area */}
-                      <div style={{ 
-                        flex: 1, 
-                        overflowY: 'auto', 
-                        padding: '1.5rem',
-                        background: 'var(--bg-secondary)'
-                      }}>
-                        {messages.map((msg) => (
-                          <div 
-                            key={msg.id}
-                            style={{
-                              display: 'flex',
-                              justifyContent: msg.sender === 'me' ? 'flex-end' : 'flex-start',
-                              marginBottom: '1rem'
-                            }}
-                          >
-                            <div style={{
-                              maxWidth: '60%',
-                              padding: '0.75rem 1rem',
-                              borderRadius: '8px',
-                              background: msg.sender === 'me' 
-                                ? 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)'
-                                : 'white',
-                              color: msg.sender === 'me' ? 'white' : 'var(--text-primary)',
-                              boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
-                            }}>
-                              {msg.sender !== 'me' && (
-                                <div style={{ fontSize: '0.8rem', fontWeight: '600', marginBottom: '0.25rem', color: 'var(--color-primary)' }}>
-                                  {msg.sender}
-                                </div>
-                              )}
-                              <div style={{ fontSize: '0.95rem', marginBottom: '0.25rem' }}>{msg.text}</div>
-                              <div style={{ 
-                                fontSize: '0.75rem', 
-                                opacity: 0.8,
-                                textAlign: 'right'
-                              }}>
-                                {msg.time}
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Message Input */}
-                      <div style={{ 
-                        padding: '1rem 1.5rem', 
-                        borderTop: '1px solid var(--border-color)',
-                        background: 'white'
-                      }}>
-                        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-                          <input 
-                            type="text"
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Type a message..."
-                            style={{
-                              flex: 1,
-                              padding: '0.75rem 1rem',
-                              border: '1px solid var(--border-color)',
-                              borderRadius: '8px',
-                              fontSize: '0.95rem',
-                              outline: 'none'
-                            }}
-                          />
-                          <button 
-                            onClick={handleSendMessage}
-                            style={{
-                              background: 'linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%)',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '8px',
-                              padding: '0.75rem 1.5rem',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.5rem',
-                              transition: 'all 0.2s ease'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.transform = 'translateY(-2px)';
-                              e.currentTarget.style.boxShadow = '0 4px 12px rgba(75, 85, 99, 0.3)';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.transform = 'translateY(0)';
-                              e.currentTarget.style.boxShadow = 'none';
-                            }}
-                          >
-                            <FontAwesomeIcon icon={faPaperPlane} />
-                            Send
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ 
-                      flex: 1, 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      justifyContent: 'center',
-                      color: 'var(--text-secondary)',
-                      flexDirection: 'column',
-                      gap: '1rem'
-                    }}>
-                      <FontAwesomeIcon icon={faComments} style={{ fontSize: '4rem', opacity: 0.3 }} />
-                      <p style={{ fontSize: '1.1rem' }}>Select a chat to start messaging</p>
-                    </div>
+                  {!notification.is_read && (
+                    <div className="notification-badge">New</div>
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-          {activeSection === 'notifications' && (
-            <div>
-              <h3>Notifications</h3>
-              <p>Your notifications will appear here.</p>
+              ))}
             </div>
           )}
         </div>
-      </div>
-    </div>
+      )}
+
+      {/* Floating Join Button - Only show on courses page */}
+      {activeSection === 'courses' && (
+        <button 
+          className="floating-join-btn"
+          onClick={() => setShowJoinModal(true)}
+          title="Join Community"
+        >
+          <FontAwesomeIcon icon={faPlus} />
+        </button>
+      )}
+
+      {/* Join Community Modal */}
+      {showJoinModal && (
+        <div className="modal-overlay" onClick={() => setShowJoinModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Join Community</h3>
+              <button className="modal-close" onClick={() => setShowJoinModal(false)}>
+                &times;
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted mb-3">
+                Enter the 8-character code provided by your instructor to join a community.
+              </p>
+              <div className="form-group">
+                <label htmlFor="joinCode">Join Code</label>
+                <input
+                  type="text"
+                  id="joinCode"
+                  className="form-control"
+                  placeholder="e.g., CS101ABC"
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  maxLength={8}
+                  disabled={joiningCommunity}
+                  onKeyPress={(e) => e.key === 'Enter' && handleJoinCommunity()}
+                />
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary" 
+                onClick={() => setShowJoinModal(false)}
+                disabled={joiningCommunity}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={handleJoinCommunity}
+                disabled={joiningCommunity || !joinCode.trim()}
+              >
+                {joiningCommunity ? 'Joining...' : 'Join Community'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </DashboardLayout>
   );
 };
-
 export default StudentDashboard;

@@ -4,4 +4,5 @@ export { default as courseApi } from './courses';
 export { default as communityApi } from './communities';
 export { default as notificationApi } from './notifications';
 export { default as dashboardApi } from './dashboard';
+export { default as directMessageApi } from './directMessages';
 export { default as ApiClient } from './client';
