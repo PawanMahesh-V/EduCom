@@ -14,7 +14,7 @@ import {
   faUserPlus,
   faPenToSquare,
   faTrash,
-  faChartLine,
+  faRefresh,
   faExclamationTriangle,
   faUserGraduate,
   faChalkboardTeacher,
@@ -48,6 +48,7 @@ const AdminDashboard = () => {
   });
   
   // User Management states
+  const [userTab, setUserTab] = useState('users'); // 'users' or 'requests'
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [userSearchTerm, setUserSearchTerm] = useState('');
@@ -64,10 +65,12 @@ const AdminDashboard = () => {
     role: 'Student',
     department: 'CS',
     semester: '1',
-    program_year: '1',
-    section: ''
+    program_year: '1'
   });
-  const [sections, setSections] = useState([]);
+  
+  // Registration Requests states
+  const [registrationRequests, setRegistrationRequests] = useState([]);
+  const [requestsLoading, setRequestsLoading] = useState(false);
   
   // Course Management states
   const [courses, setCourses] = useState([]);
@@ -86,7 +89,12 @@ const AdminDashboard = () => {
     semester: '',
     teacher_id: ''
   });
-  const [courseTab, setCourseTab] = useState('courses'); // 'courses' or 'communities'
+  const [courseTab, setCourseTab] = useState('courses'); // 'courses', 'communities', or 'requests'
+  
+  // Course Requests states
+  const [courseRequests, setCourseRequests] = useState([]);
+  const [courseRequestsLoading, setCourseRequestsLoading] = useState(false);
+  
   // Direct message states
   const [conversations, setConversations] = useState([]);
   const [selectedConversation, setSelectedConversation] = useState(null);
@@ -117,15 +125,7 @@ const AdminDashboard = () => {
     message: ''
   });
   
-  // Assign Course states
-  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
-  const [selectedCourseForAssign, setSelectedCourseForAssign] = useState(null);
-  const [students, setStudents] = useState([]);
-  const [selectedStudents, setSelectedStudents] = useState([]);
-  const [studentSearchTerm, setStudentSearchTerm] = useState('');
-  const [assignDepartmentFilter, setAssignDepartmentFilter] = useState('All');
-  const [assignYearFilter, setAssignYearFilter] = useState('All');
-  const [assignSectionFilter, setAssignSectionFilter] = useState('All');
+
   
   // Real-time direct messages
   const userId = currentUser?.id || currentUser?.userId;
@@ -170,49 +170,46 @@ const AdminDashboard = () => {
     }
   }, [activeSection, userId]);
   
-  const [isRemoveModalOpen, setIsRemoveModalOpen] = useState(false);
-  const [selectedCourseForRemove, setSelectedCourseForRemove] = useState(null);
-  const [enrolledStudents, setEnrolledStudents] = useState([]);
-  const [selectedEnrolledStudents, setSelectedEnrolledStudents] = useState([]);
-  const [enrolledSearchTerm, setEnrolledSearchTerm] = useState('');
-  const [removeDepartmentFilter, setRemoveDepartmentFilter] = useState('All');
-  const [removeYearFilter, setRemoveYearFilter] = useState('All');
-  const [removeSectionFilter, setRemoveSectionFilter] = useState('All');
+
   
   const [error, setError] = useState(null);
   useEffect(() => {
     fetchAdminProfile();
-    fetchSections();
     if (activeSection === 'overview') {
       fetchDashboardData();
     } else if (activeSection === 'users') {
       fetchUsers();
+      if (userTab === 'requests') {
+        fetchRegistrationRequests();
+      }
     } else if (activeSection === 'courses') {
       fetchCourses();
       fetchTeachers();
       if (courseTab === 'communities') {
         fetchCommunities();
+      } else if (courseTab === 'requests') {
+        fetchCourseRequests();
       }
     }
   }, [activeSection, courseTab]);
-  const fetchSections = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/sections', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('userToken') || sessionStorage.getItem('userToken')}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setSections(data.sections || []);
-      }
-    } catch (err) {
+  
+  useEffect(() => {
+    console.log('useEffect triggered - activeSection:', activeSection, 'userTab:', userTab);
+    if (activeSection === 'users' && userTab === 'requests') {
+      console.log('Calling fetchRegistrationRequests from useEffect');
+      fetchRegistrationRequests();
     }
-  };
+  }, [userTab, activeSection]);
+  
+  useEffect(() => {
+    if (activeSection === 'courses' && courseTab === 'requests') {
+      fetchCourseRequests();
+    }
+  }, [courseTab, activeSection]);
   const fetchAdminProfile = async () => {
     try {
       const data = await authApi.getCurrentUser();
-      setAdminProfile(data);
+      setAdminProfile(data.user || data);
     } catch (err) {
       setError(err.message);
     }
@@ -316,6 +313,79 @@ const AdminDashboard = () => {
       setUsersLoading(false);
     }
   };
+  
+  const fetchRegistrationRequests = async () => {
+    try {
+      setRequestsLoading(true);
+      console.log('Fetching registration requests...');
+      const response = await authApi.getRegistrationRequests();
+      console.log('Registration requests response:', response);
+      setRegistrationRequests(response.requests || []);
+      console.log('Registration requests set:', response.requests || []);
+      setRequestsLoading(false);
+    } catch (err) {
+      console.error('Error fetching registration requests:', err);
+      showError('Failed to fetch registration requests');
+      setRequestsLoading(false);
+    }
+  };
+  
+  const handleApproveRequest = async (requestId) => {
+    try {
+      await authApi.approveRegistration(requestId);
+      showSuccess('Registration request approved successfully!');
+      fetchRegistrationRequests();
+      fetchUsers(); // Refresh users list
+    } catch (err) {
+      showError(err.message || 'Failed to approve registration');
+    }
+  };
+  
+  const handleRejectRequest = async (requestId) => {
+    try {
+      await authApi.rejectRegistration(requestId);
+      showSuccess('Registration request rejected');
+      fetchRegistrationRequests();
+    } catch (err) {
+      showError(err.message || 'Failed to reject registration');
+    }
+  };
+  
+  // Course Request functions
+  const fetchCourseRequests = async () => {
+    try {
+      setCourseRequestsLoading(true);
+      const response = await courseApi.getCourseRequests();
+      setCourseRequests(response.requests || []);
+      setCourseRequestsLoading(false);
+    } catch (err) {
+      console.error('Error fetching course requests:', err);
+      showError('Failed to fetch course requests');
+      setCourseRequestsLoading(false);
+    }
+  };
+  
+  const handleApproveCourseRequest = async (requestId) => {
+    try {
+      await courseApi.approveCourseRequest(requestId);
+      showSuccess('Course request approved and course created successfully!');
+      fetchCourseRequests();
+      fetchCourses(); // Refresh courses list
+    } catch (err) {
+      showError(err.message || 'Failed to approve course request');
+    }
+  };
+  
+  const handleRejectCourseRequest = async (requestId) => {
+    try {
+      await courseApi.rejectCourseRequest(requestId);
+      showSuccess('Course request rejected');
+      fetchCourseRequests();
+    } catch (err) {
+      showError(err.message || 'Failed to reject course request');
+    }
+  };
+  
   const handleUserInputChange = (e) => {
     setUserFormData({
       ...userFormData,
@@ -324,6 +394,13 @@ const AdminDashboard = () => {
   };
   const handleUserSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate email domain
+    if (!userFormData.email.toLowerCase().endsWith('@szabist.pk')) {
+      showError('Email must end with @szabist.pk');
+      return;
+    }
+    
     try {
       if (selectedUser) {
         await userApi.update(selectedUser.id, userFormData);
@@ -369,8 +446,7 @@ const AdminDashboard = () => {
       role: user.role,
       department: user.department,
       semester: (user.semester && String(user.semester)) || '1',
-      program_year: (user.program_year && String(user.program_year)) || '1',
-      section: user.section || ''
+      program_year: (user.program_year && String(user.program_year)) || '1'
     });
     setIsUserModalOpen(true);
   };
@@ -384,8 +460,7 @@ const AdminDashboard = () => {
       role: 'Student',
       department: 'CS',
       semester: '1',
-      program_year: '1',
-      section: ''
+      program_year: '1'
     });
     setIsUserModalOpen(false);
   };
@@ -551,7 +626,6 @@ const AdminDashboard = () => {
         message: messageFormData.message,
         senderId: currentUser.id,
         senderName: currentUser.name || 'Admin',
-        isAnonymous: false,
         notificationOnly: true
       });
       
@@ -633,211 +707,9 @@ const AdminDashboard = () => {
       setError(err.message);
     }
   };
-  const handleAssignCourse = async (course) => {
-    setSelectedCourseForAssign(course);
-    
-    try {
-      // Fetch all students
-      const data = await userApi.getAll();
-      const allUsers = data.users || data || [];
-      const allStudents = allUsers.filter(user => user.role === 'Student');
-      
-      // Fetch already enrolled students for this course
-      const enrolledStudents = await courseApi.getEnrolledStudents(course.id);
-      const enrolledIds = enrolledStudents.map(s => s.id);
-      
-      // Filter out already enrolled students
-      const availableStudents = allStudents.filter(s => !enrolledIds.includes(s.id));
-      
-      setStudents(availableStudents);
-      setIsAssignModalOpen(true);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-  const handleStudentToggle = (studentId) => {
-    setSelectedStudents(prev => {
-      if (prev.includes(studentId)) {
-        return prev.filter(id => id !== studentId);
-      } else {
-        return [...prev, studentId];
-      }
-    });
-  };
-  const handleAssignSubmit = async () => {
-    if (selectedStudents.length === 0) {
-      setAlertConfig({ message: 'Please select at least one student', type: 'warning' });
-      return;
-    }
-    // Validate department matching
-    const courseDepartment = selectedCourseForAssign.department;
-    const invalidStudents = students.filter(student => 
-      selectedStudents.includes(student.id) && 
-      student.department !== courseDepartment
-    );
-    if (invalidStudents.length > 0) {
-      const invalidNames = invalidStudents.map(s => s.name).join(', ');
-      showError(`Cannot assign ${courseDepartment} course to students from different departments:\n${invalidNames}\n\nPlease select only ${courseDepartment} students.`);
-      return;
-    }
-    try {
-      
-      // Call API to assign course to students
-      const response = await courseApi.assignToStudents(selectedCourseForAssign.id, selectedStudents);
-      
-      const { newEnrollments, totalAttempted } = response;
-      
-      if (newEnrollments > 0) {
-        showSuccess(`Successfully assigned course to ${newEnrollments} student(s)!`);
-        
-        // Send notifications to enrolled students
-        selectedStudents.forEach(studentId => {
-          sendNotification(
-            studentId,
-            'New Course Enrollment',
-            `You have been enrolled in ${selectedCourseForAssign.name} (${selectedCourseForAssign.code})`,
-            'course_update',
-            currentUser?.id
-          );
-        });
-      } else if (totalAttempted > 0 && newEnrollments === 0) {
-        showWarning('All selected students were already enrolled in this course.');
-      }
-      
-      // Remove assigned students from the list
-      setStudents(prev => prev.filter(student => !selectedStudents.includes(student.id)));
-      setSelectedStudents([]);
-      handleCloseAssignModal();
-      
-    } catch (err) {
-      setError(err.message);
-      showError('Failed to assign course: ' + err.message);
-    }
-  };
-  const handleCloseAssignModal = () => {
-    setSelectedCourseForAssign(null);
-    setSelectedStudents([]);
-    setStudentSearchTerm('');
-    setAssignDepartmentFilter('All');
-    setAssignYearFilter('All');
-    setAssignSectionFilter('All');
-    setIsAssignModalOpen(false);
-  };
-  const handleRemoveCourse = async (course) => {
-    setSelectedCourseForRemove(course);
-    
-    try {
-      // Fetch enrolled students for this course
-      const enrolled = await courseApi.getEnrolledStudents(course.id);
-      setEnrolledStudents(enrolled);
-      setIsRemoveModalOpen(true);
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-  const handleEnrolledStudentToggle = (studentId) => {
-    setSelectedEnrolledStudents(prev => {
-      if (prev.includes(studentId)) {
-        return prev.filter(id => id !== studentId);
-      } else {
-        return [...prev, studentId];
-      }
-    });
-  };
-  const handleRemoveSubmit = async () => {
-    if (selectedEnrolledStudents.length === 0) {
-      setAlertConfig({ message: 'Please select at least one student to remove', type: 'warning' });
-      return;
-    }
-    try {
-      
-      const response = await courseApi.removeStudents(selectedCourseForRemove.id, selectedEnrolledStudents);
-      
-      const { removedCount, totalAttempted } = response;
-      
-      if (removedCount > 0) {
-        showSuccess(`Successfully removed ${removedCount} student(s) from the course!`);
-        
-        // Send notifications to removed students
-        selectedEnrolledStudents.forEach(studentId => {
-          sendNotification(
-            studentId,
-            'Course Removal',
-            `You have been removed from ${selectedCourseForRemove.name} (${selectedCourseForRemove.code})`,
-            'course_update',
-            currentUser?.id
-          );
-        });
-      } else {
-        showWarning('No students were removed.');
-      }
-      
-      // Remove students from the enrolled list
-      setEnrolledStudents(prev => prev.filter(student => !selectedEnrolledStudents.includes(student.id)));
-      setSelectedEnrolledStudents([]);
-      handleCloseRemoveModal();
-      
-    } catch (err) {
-      showError(err.message || 'Failed to remove students');
-    }
-  };
-  const handleCloseRemoveModal = () => {
-    setSelectedCourseForRemove(null);
-    setSelectedEnrolledStudents([]);
-    setEnrolledSearchTerm('');
-    setRemoveDepartmentFilter('All');
-    setRemoveYearFilter('All');
-    setRemoveSectionFilter('All');
-    setIsRemoveModalOpen(false);
-  };
-  const filteredStudents = students.filter(student => {
-    // Filter by department
-    if (assignDepartmentFilter !== 'All' && student.department !== assignDepartmentFilter) {
-      return false;
-    }
-    // Filter by year/semester
-    if (assignYearFilter !== 'All' && student.semester !== parseInt(assignYearFilter)) {
-      return false;
-    }
-    // Filter by section
-    if (assignSectionFilter !== 'All' && student.section !== assignSectionFilter) {
-      return false;
-    }
-    // Filter by course department
-    if (selectedCourseForAssign && student.department !== selectedCourseForAssign.department) {
-      return false;
-    }
-    // Then apply search filter
-    if (!studentSearchTerm) return true;
-    const searchLower = studentSearchTerm.toLowerCase();
-    return (
-      student.name.toLowerCase().includes(searchLower) ||
-      student.reg_id.toLowerCase().includes(searchLower) ||
-      student.email.toLowerCase().includes(searchLower)
-    );
-  });
-  const filteredEnrolledStudents = enrolledStudents.filter(student => {
-    // Filter by department
-    if (removeDepartmentFilter !== 'All' && student.department !== removeDepartmentFilter) {
-      return false;
-    }
-    // Filter by year/semester
-    if (removeYearFilter !== 'All' && student.semester !== parseInt(removeYearFilter)) {
-      return false;
-    }
-    // Filter by section
-    if (removeSectionFilter !== 'All' && student.section !== removeSectionFilter) {
-      return false;
-    }
-    // Then apply search filter
-    if (!enrolledSearchTerm) return true;
-    const searchLower = enrolledSearchTerm.toLowerCase();
-    return (
-      student.name.toLowerCase().includes(searchLower) ||
-      student.reg_id.toLowerCase().includes(searchLower) ||
-      student.email.toLowerCase().includes(searchLower)
-    );
-  });
+
+
+
   const menuItems = [
     { id: 'overview', name: 'Overview', icon: faTachometerAlt },
     { id: 'users', name: 'User Management', icon: faUsers },
@@ -872,11 +744,11 @@ const AdminDashboard = () => {
             <>
               <div className="overview-header">
                 <div>
-                  <h2>Dashboard Overview</h2>
-                  <p>Welcome back! Here's what's happening with your platform.</p>
+                  {/* <h2>Dashboard Overview</h2>
+                  <p>Welcome back! Here's what's happening with your platform.</p> */}
                 </div>
                 <button className="btn btn-primary" onClick={fetchDashboardData}>
-                  <FontAwesomeIcon icon={faChartLine} /> Refresh Stats
+                  <FontAwesomeIcon icon={faRefresh} /> 
                 </button>
               </div>
               <div className="stats-grid">
@@ -885,28 +757,28 @@ const AdminDashboard = () => {
                     title: 'Total Users',
                     value: stats?.totalUsers || 0,
                     icon: faUsers,
-                    color: '#452829',
+                    color: '#2563EB',
                     subtitle: `${stats?.usersByRole?.Student || 0} Students, ${stats?.usersByRole?.Teacher || 0} Teachers`
                   },
                   {
                     title: 'Total Courses',
                     value: stats?.totalCourses || 0,
                     icon: faBook,
-                    color: '#57595B',
+                    color: '#3B82F6',
                     subtitle: `${stats?.totalEnrollments || 0} Total Enrollments`
                   },
                   {
                     title: 'Communities',
                     value: stats?.totalCommunities || 0,
                     icon: faComments,
-                    color: '#452829',
+                    color: '#2563EB',
                     subtitle: `${stats?.totalMessages || 0} Messages`
                   },
                   {
                     title: 'Marketplace',
                     value: stats?.totalMarketplaceItems || 0,
                     icon: faStore,
-                    color: '#57595B',
+                    color: '#3B82F6',
                     subtitle: `${stats?.pendingMarketplaceItems || 0} Pending Approval`
                   }
                 ].map((card, index) => (
@@ -961,7 +833,7 @@ const AdminDashboard = () => {
                             <p>{user.role} • {user.department}</p>
                           </div>
                           <span className="activity-time">
-                            {new Date(user.created_at).toLocaleDateString()}
+                            {new Date(user.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' })}
                           </span>
                         </div>
                       ))
@@ -987,7 +859,7 @@ const AdminDashboard = () => {
                             <p>{course.code} • {course.teacher_name || 'No teacher assigned'}</p>
                           </div>
                           <span className="activity-time">
-                            {new Date(course.created_at).toLocaleDateString()}
+                            {new Date(course.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' })}
                           </span>
                         </div>
                       ))
@@ -1003,25 +875,43 @@ const AdminDashboard = () => {
       )}
       {/* User Management Section */}
       {activeSection === 'users' && (
-        <div className="container">
-          <div className="header-actions">
-            <div className="search-container">
-              <input
-                className="search-input"
-                type="text"
-                placeholder="Search users by name, email, role..."
-                value={userSearchTerm}
-                onChange={(e) => setUserSearchTerm(e.target.value)}
-              />
-            </div>
+        <div className="course-management-wrapper">
+          <div className="tabs-container">
             <button 
-              className="button primary icon-button"
-              onClick={() => setIsUserModalOpen(true)}
-              data-tooltip="Add New User"
+              className={`tab-button ${userTab === 'users' ? 'active' : ''}`}
+              onClick={() => setUserTab('users')}
             >
-              <FontAwesomeIcon icon={faUserPlus} />
+              Add New User
+            </button>
+            <button 
+              className={`tab-button ${userTab === 'requests' ? 'active' : ''}`}
+              onClick={() => setUserTab('requests')}
+            >
+              Approve Requests
             </button>
           </div>
+          
+          <div className="tab-content">
+            {userTab === 'users' ? (
+              <div className="container">
+                <div className="header-actions">
+                  <div className="search-container">
+                    <input
+                      className="search-input"
+                      type="text"
+                      placeholder="Search users by name, email, role..."
+                      value={userSearchTerm}
+                      onChange={(e) => setUserSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <button 
+                    className="button primary icon-button"
+                    onClick={() => setIsUserModalOpen(true)}
+                    data-tooltip="Add New User"
+                  >
+                    <FontAwesomeIcon icon={faUserPlus} />
+                  </button>
+                </div>
           
           <div className="filters-container">
             <div className="filter-group">
@@ -1050,14 +940,14 @@ const AdminDashboard = () => {
                 <option value="All">All Departments</option>
                 <option value="CS">CS</option>
                 <option value="BBA">BBA</option>
-                <option value="IT">IT</option>
+                {/* <option value="IT">IT</option> */}
               </select>
             </div>
             
             {(userRoleFilter !== 'All' || userDepartmentFilter !== 'All' || userSearchTerm) && (
               <div className="filter-actions">
                 <button 
-                  className="button secondary filter-button-nowrap"
+                  className="btn secondary filter-button-nowrap"
                   onClick={() => {
                     setUserRoleFilter('All');
                     setUserDepartmentFilter('All');
@@ -1210,6 +1100,9 @@ const AdminDashboard = () => {
                         name="email"
                         value={userFormData.email}
                         onChange={handleUserInputChange}
+                        pattern=".*@szabist\.pk$"
+                        title="Email must end with @szabist.pk"
+                        placeholder="example@szabist.pk"
                         required
                       />
                     </div>
@@ -1286,20 +1179,6 @@ const AdminDashboard = () => {
                         </select>
                       </div>
                     )}
-                    {userFormData.role === 'Student' && (
-                      <div className="form-group">
-                        <label>Section:</label>
-                        <input
-                          type="text"
-                          name="section"
-                          value={userFormData.section}
-                          onChange={handleUserInputChange}
-                          placeholder="Enter section (e.g., A, B, C)"
-                          maxLength="10"
-                          required
-                        />
-                      </div>
-                    )}
                   </div>
                   <div className="modal-actions">
                     <button className="button primary" type="submit">
@@ -1313,6 +1192,137 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+              </div>
+            ) : (
+              <div className="container">
+                {requestsLoading ? (
+                  <div className="loading-container">
+                    <div className="spinner"></div>
+                    <p>Loading registration requests...</p>
+                  </div>
+                ) : (
+                  <div className="table-container">
+                    {/* Desktop Table View */}
+                    <table className="table">
+                      <thead>
+                        <tr>
+                          <th>Registration ID</th>
+                          <th>Name</th>
+                          <th>Email</th>
+                          <th>Role</th>
+                          <th>Department</th>
+                          <th>Semester/Year</th>
+                          <th>Request Date</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registrationRequests.length === 0 ? (
+                          <tr>
+                            <td colSpan="8" className="text-center p-4">
+                              No registration requests available
+                            </td>
+                          </tr>
+                        ) : (
+                          registrationRequests.map((request) => (
+                            <tr key={request.id}>
+                              <td data-label="Registration ID">{request.reg_id}</td>
+                              <td data-label="Name">{request.name}</td>
+                              <td data-label="Email">{request.email}</td>
+                              <td data-label="Role">{request.role}</td>
+                              <td data-label="Department">{request.department}</td>
+                              <td data-label="Semester/Year">
+                                {request.role === 'Student' ? `Semester ${request.semester}` : 
+                                 request.role === 'PM' ? `Year ${request.program_year}` : 
+                                 'N/A'}
+                              </td>
+                              <td data-label="Request Date">{new Date(request.created_at).toLocaleDateString()}</td>
+                              <td data-label="Actions">
+                                <button
+                                  className="btn-approve"
+                                  onClick={() => handleApproveRequest(request.id)}
+                                  title="Approve"
+                                >
+                                  <FontAwesomeIcon icon={faUserCheck} />
+                                </button>
+                                <button
+                                  className="btn-reject ml-2"
+                                  onClick={() => handleRejectRequest(request.id)}
+                                  title="Reject"
+                                >
+                                  <FontAwesomeIcon icon={faUserMinus} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+
+                    {/* Mobile Card View */}
+                    <div className="mobile-cards-view">
+                      {registrationRequests.map((request) => (
+                        <div key={request.id} className="user-card">
+                          <div className="user-card-header">
+                            <div className="user-card-info">
+                              <div className="user-card-label">Registration ID</div>
+                              <div className="user-card-value large">{request.reg_id}</div>
+                            </div>
+                            <div className="user-card-actions">
+                              <button
+                                className="btn-approve"
+                                onClick={() => handleApproveRequest(request.id)}
+                                title="Approve"
+                              >
+                                <FontAwesomeIcon icon={faUserCheck} />
+                              </button>
+                              <button
+                                className="btn-reject"
+                                onClick={() => handleRejectRequest(request.id)}
+                                title="Reject"
+                              >
+                                <FontAwesomeIcon icon={faUserMinus} />
+                              </button>
+                            </div>
+                          </div>
+                          <div className="user-card-body">
+                            <div className="user-card-row">
+                              <div className="user-card-label">Name</div>
+                              <div className="user-card-value">{request.name}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Email</div>
+                              <div className="user-card-value">{request.email}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Role</div>
+                              <div className="user-card-value">{request.role}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Department</div>
+                              <div className="user-card-value">{request.department}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Semester/Year</div>
+                              <div className="user-card-value">
+                                {request.role === 'Student' ? `Semester ${request.semester}` : 
+                                 request.role === 'PM' ? `Year ${request.program_year}` : 
+                                 'N/A'}
+                              </div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Request Date</div>
+                              <div className="user-card-value">{new Date(request.created_at).toLocaleDateString()}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
       {/* Course Management Section */}
@@ -1332,17 +1342,12 @@ const AdminDashboard = () => {
               Communities
             </button>
             <button 
-              className={`tab-button ${courseTab === 'assign' ? 'active' : ''}`}
-              onClick={() => setCourseTab('assign')}
+              className={`tab-button ${courseTab === 'requests' ? 'active' : ''}`}
+              onClick={() => setCourseTab('requests')}
             >
-              Assign Students
+              Approve Courses
             </button>
-            <button 
-              className={`tab-button ${courseTab === 'remove' ? 'active' : ''}`}
-              onClick={() => setCourseTab('remove')}
-            >
-              Remove Students
-            </button>
+
           </div>
           
           <div className="tab-content">
@@ -1404,7 +1409,7 @@ const AdminDashboard = () => {
                     {(courseDepartmentFilter !== 'All' || courseSemesterFilter !== 'All' || courseSearchTerm) && (
                       <div className="filter-actions">
                         <button 
-                          className="button secondary filter-button-nowrap"
+                          className="btn secondary filter-button-nowrap"
                           onClick={() => {
                             setCourseDepartmentFilter('All');
                             setCourseSemesterFilter('All');
@@ -1582,7 +1587,7 @@ const AdminDashboard = () => {
                               <option value="8">Semester 8</option>
                             </select>
                           </div>
-                          <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                          <div className="form-group form-group-full">
                             <label>Teacher:</label>
                             <select
                               name="teacher_id"
@@ -1647,7 +1652,7 @@ const AdminDashboard = () => {
                   {(communityStatusFilter !== 'All' || communitySearchTerm) && (
                     <div className="filter-actions">
                       <button 
-                        className="button secondary filter-button-nowrap"
+                        className="btn secondary filter-button-nowrap"
                       >
                         Clear Filters
                       </button>
@@ -1885,7 +1890,7 @@ const AdminDashboard = () => {
                   </div>
                 )}
               </div>
-            ) : courseTab === 'assign' ? (
+            ) : courseTab === 'requests' ? (
               <div className="container">
                 <div className="table-container">
                   <table className="table">
@@ -1896,215 +1901,40 @@ const AdminDashboard = () => {
                         <th>Department</th>
                         <th>Semester</th>
                         <th>Teacher</th>
-                        <th>Action</th>
+                        <th>Requested By</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {coursesLoading ? (
+                      {courseRequestsLoading ? (
                         <tr>
-                          <td colSpan="6" className="text-center p-4">Loading courses...</td>
+                          <td colSpan="7" className="text-center p-4">Loading course requests...</td>
                         </tr>
-                      ) : courses.length === 0 ? (
+                      ) : courseRequests.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="text-center p-4">No courses available</td>
+                          <td colSpan="7" className="text-center p-4">No pending course requests</td>
                         </tr>
                       ) : (
-                        courses.map((course) => (
-                          <tr key={course.id}>
-                            <td data-label="Course Code">{course.code}</td>
-                            <td data-label="Course Name">{course.name}</td>
-                            <td data-label="Department">{course.department}</td>
-                            <td data-label="Semester">{course.semester}</td>
-                            <td data-label="Teacher">{course.teacher_name || 'No teacher assigned'}</td>
-                            <td data-label="Action">
+                        courseRequests.map((request) => (
+                          <tr key={request.id}>
+                            <td data-label="Course Code">{request.code}</td>
+                            <td data-label="Course Name">{request.name}</td>
+                            <td data-label="Department">{request.department}</td>
+                            <td data-label="Semester">{request.semester}</td>
+                            <td data-label="Teacher">{request.teacher_name || 'N/A'}</td>
+                            <td data-label="Requested By">{request.requested_by_name || 'N/A'}</td>
+                            <td data-label="Actions">
                               <button 
-                                className="button success icon-button small"
-                                onClick={() => handleAssignCourse(course)}
-                                data-tooltip="Assign Students"
+                                className="btn-approve"
+                                onClick={() => handleApproveCourseRequest(request.id)}
+                                title="Approve"
                               >
                                 <FontAwesomeIcon icon={faUserCheck} />
                               </button>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                {isAssignModalOpen && (
-                  <div className="modal">
-                    <div className="modal-content" style={{ maxWidth: '1000px' }}>
-                      <h2>Assign Course to Students</h2>
-                      <p className="modal-description">
-                        <strong>{selectedCourseForAssign?.name}</strong> ({selectedCourseForAssign?.code})
-                        <br />
-                        <span className="text-sm text-primary-color font-semibold">
-                          Department: {selectedCourseForAssign?.department}
-                        </span>
-                      </p>
-                      
-                      <div className="search-container mb-2">
-                        <input
-                          type="text"
-                          className="search-input"
-                          placeholder="Search students by name, ID, email..."
-                          value={studentSearchTerm}
-                          onChange={(e) => setStudentSearchTerm(e.target.value)}
-                        />
-                      </div>
-                      
-                      <div className="grid-3col">
-                        <div className="filter-group">
-                          <label className="filter-label">Department</label>
-                          <select 
-                            className="input filter-select-full"
-                          >
-                            <option value="All">All</option>
-                            <option value="CS">CS</option>
-                            <option value="BBA">BBA</option>
-                            <option value="IT">IT</option>
-                          </select>
-                        </div>
-                        
-                        <div className="filter-group">
-                          <label className="filter-label">Semester</label>
-                          <select 
-                            className="input filter-select-full"
-                          >
-                            <option value="All">All</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                          </select>
-                        </div>
-                        
-                        <div className="filter-group">
-                          <label className="filter-label">Section</label>
-                          <select 
-                            className="input filter-select-full"
-                          >
-                            <option value="All">All</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      {(assignDepartmentFilter !== 'All' || assignYearFilter !== 'All' || assignSectionFilter !== 'All' || studentSearchTerm) && (
-                        <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-                          <button 
-                            className="button secondary"
-                            onClick={() => {
-                              setAssignDepartmentFilter('All');
-                              setAssignYearFilter('All');
-                              setAssignSectionFilter('All');
-                              setStudentSearchTerm('');
-                            }}
-                            style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
-                          >
-                            Clear Filters
-                          </button>
-                        </div>
-                      )}
-                      <div className="max-h-400 overflow-y-auto border border-radius p-3">
-                        {filteredStudents.length === 0 ? (
-                          <p className="text-center text-secondary">
-                            {studentSearchTerm 
-                              ? `No ${selectedCourseForAssign?.department} students found matching your search` 
-                              : `No ${selectedCourseForAssign?.department} students available`}
-                          </p>
-                        ) : (
-                          filteredStudents.map((student) => (
-                            <div 
-                              key={student.id} 
-                              className="student-list-item"
-                              style={{ background: selectedStudents.includes(student.id) ? 'var(--bg-secondary)' : 'transparent' }}
-                              onClick={() => handleStudentToggle(student.id)}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedStudents.includes(student.id)}
-                                onChange={() => handleStudentToggle(student.id)}
-                                className="student-checkbox"
-                              />
-                              <div className="student-details">
-                                <div className="student-name">
-                                  {student.name}
-                                </div>
-                                <div className="student-meta">
-                                  {student.reg_id} • {student.department}{student.semester ? ` • Semester ${student.semester}` : ''} • {student.email}
-                                </div>
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="selection-summary mt-2">
-                        Selected: <strong>{selectedStudents.length}</strong> student(s)
-                      </div>
-                      <div className="modal-actions mt-3">
-                        <button 
-                          type="button" 
-                          className="button primary"
-                          onClick={handleAssignSubmit}
-                        >
-                          Assign Course
-                        </button>
-                        <button 
-                          type="button" 
-                          className="button secondary"
-                          onClick={handleCloseAssignModal}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : courseTab === 'remove' ? (
-              <div className="container">
-                <div className="table-container">
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>Course Code</th>
-                        <th>Course Name</th>
-                        <th>Department</th>
-                        <th>Semester</th>
-                        <th>Teacher</th>
-                        <th>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {coursesLoading ? (
-                        <tr>
-                          <td colSpan="6" className="text-center p-4">Loading courses...</td>
-                        </tr>
-                      ) : courses.length === 0 ? (
-                        <tr>
-                          <td colSpan="6" className="text-center p-4">No courses available</td>
-                        </tr>
-                      ) : (
-                        courses.map((course) => (
-                          <tr key={course.id}>
-                            <td data-label="Course Code">{course.code}</td>
-                            <td data-label="Course Name">{course.name}</td>
-                            <td data-label="Department">{course.department}</td>
-                            <td data-label="Semester">{course.semester}</td>
-                            <td data-label="Teacher">{course.teacher_name || 'No teacher assigned'}</td>
-                            <td data-label="Action">
                               <button 
-                                className="button delete icon-button small"
-                                onClick={() => handleRemoveCourse(course)}
-                                data-tooltip="Remove Students"
+                                className="btn-reject ml-2"
+                                onClick={() => handleRejectCourseRequest(request.id)}
+                                title="Reject"
                               >
                                 <FontAwesomeIcon icon={faUserMinus} />
                               </button>
@@ -2114,158 +1944,75 @@ const AdminDashboard = () => {
                       )}
                     </tbody>
                   </table>
-                </div>
-                {isRemoveModalOpen && (
-                  <div className="modal">
-                    <div className="modal-content" style={{ maxWidth: '1000px' }}>
-                      <h2>Remove Students from Course</h2>
-                      <p className="modal-description">
-                        <strong>{selectedCourseForRemove?.name}</strong> ({selectedCourseForRemove?.code})
-                        <br />
-                        <span className="text-sm text-error font-semibold">
-                          Select students to remove from this course
-                        </span>
-                      </p>
-                      
-                      <div className="search-container mb-2">
-                        <input
-                          type="text"
-                          className="search-input"
-                          placeholder="Search enrolled students..."
-                          value={enrolledSearchTerm}
-                          onChange={(e) => setEnrolledSearchTerm(e.target.value)}
-                        />
+
+                  {/* Mobile Card View */}
+                  <div className="mobile-cards-view">
+                    {courseRequestsLoading ? (
+                      <div className="empty-state">
+                        <p>Loading course requests...</p>
                       </div>
-                      
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-                        <div className="filter-group">
-                          <label style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem', display: 'block' }}>Department</label>
-                          <select 
-                            className="input"
-                            value={removeDepartmentFilter}
-                            onChange={(e) => setRemoveDepartmentFilter(e.target.value)}
-                            style={{ width: '100%' }}
-                          >
-                            <option value="All">All</option>
-                            <option value="CS">CS</option>
-                            <option value="BBA">BBA</option>
-                            <option value="IT">IT</option>
-                          </select>
-                        </div>
-                        
-                        <div className="filter-group">
-                          <label style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem', display: 'block' }}>Semester</label>
-                          <select 
-                            className="input"
-                            value={removeYearFilter}
-                            onChange={(e) => setRemoveYearFilter(e.target.value)}
-                            style={{ width: '100%' }}
-                          >
-                            <option value="All">All</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                          </select>
-                        </div>
-                        
-                        <div className="filter-group">
-                          <label style={{ fontSize: '0.875rem', fontWeight: '500', marginBottom: '0.25rem', display: 'block' }}>Section</label>
-                          <select 
-                            className="input"
-                            value={removeSectionFilter}
-                            onChange={(e) => setRemoveSectionFilter(e.target.value)}
-                            style={{ width: '100%' }}
-                          >
-                            <option value="All">All</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                            <option value="D">D</option>
-                          </select>
-                        </div>
+                    ) : courseRequests.length === 0 ? (
+                      <div className="empty-state">
+                        <p>No pending course requests</p>
                       </div>
-                      
-                      {(removeDepartmentFilter !== 'All' || removeYearFilter !== 'All' || removeSectionFilter !== 'All' || enrolledSearchTerm) && (
-                        <div style={{ marginBottom: '1rem', textAlign: 'right' }}>
-                          <button 
-                            className="button secondary"
-                            onClick={() => {
-                              setRemoveDepartmentFilter('All');
-                              setRemoveYearFilter('All');
-                              setRemoveSectionFilter('All');
-                              setEnrolledSearchTerm('');
-                            }}
-                            style={{ fontSize: '0.875rem', padding: '0.375rem 0.75rem' }}
-                          >
-                            Clear Filters
-                          </button>
-                        </div>
-                      )}
-                      <div className="max-h-400 overflow-y-auto border border-radius p-3">
-                        {filteredEnrolledStudents.length === 0 ? (
-                          <p className="text-center text-secondary">
-                            {enrolledSearchTerm 
-                              ? 'No enrolled students found matching your search' 
-                              : 'No students are currently enrolled in this course'}
-                          </p>
-                        ) : (
-                          filteredEnrolledStudents.map((student) => (
-                            <div 
-                              key={student.id} 
-                              className="student-list-item"
-                              style={{ background: selectedEnrolledStudents.includes(student.id) ? '#fee2e2' : 'transparent' }}
-                              onClick={() => handleEnrolledStudentToggle(student.id)}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={selectedEnrolledStudents.includes(student.id)}
-                                onChange={() => handleEnrolledStudentToggle(student.id)}
-                                className="student-checkbox"
-                              />
-                              <div className="student-details">
-                                <div className="student-name">
-                                  {student.name}
-                                </div>
-                                <div className="student-meta">
-                                  {student.reg_id} • {student.department}{student.semester ? ` • Semester ${student.semester}` : ''} • {student.email}
-                                </div>
-                              </div>
+                    ) : (
+                      courseRequests.map((request) => (
+                        <div key={request.id} className="user-card">
+                          <div className="user-card-header">
+                            <div className="user-card-info">
+                              <div className="user-card-label">Course Code</div>
+                              <div className="user-card-value large">{request.code}</div>
                             </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="selection-summary-remove mt-2">
-                        Selected: <strong>{selectedEnrolledStudents.length}</strong> student(s) will be removed
-                      </div>
-                      <div className="modal-actions mt-3">
-                        <button 
-                          type="button" 
-                          className="button delete"
-                          onClick={handleRemoveSubmit}
-                        >
-                          Remove Students
-                        </button>
-                        <button 
-                          type="button" 
-                          className="button secondary"
-                          onClick={handleCloseRemoveModal}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
+                          </div>
+                          <div className="user-card-body">
+                            <div className="user-card-row">
+                              <div className="user-card-label">Course Name</div>
+                              <div className="user-card-value">{request.name}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Department</div>
+                              <div className="user-card-value">{request.department}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Semester</div>
+                              <div className="user-card-value">{request.semester}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Teacher</div>
+                              <div className="user-card-value">{request.teacher_name || 'N/A'}</div>
+                            </div>
+                            <div className="user-card-row">
+                              <div className="user-card-label">Requested By</div>
+                              <div className="user-card-value">{request.requested_by_name || 'N/A'}</div>
+                            </div>
+                          </div>
+                          <div className="user-card-actions">
+                            <button 
+                              className="btn-approve"
+                              onClick={() => handleApproveCourseRequest(request.id)}
+                              title="Approve"
+                            >
+                              <FontAwesomeIcon icon={faUserCheck} />
+                            </button>
+                            <button 
+                              className="btn-reject"
+                              onClick={() => handleRejectCourseRequest(request.id)}
+                              title="Reject"
+                            >
+                              <FontAwesomeIcon icon={faUserMinus} />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             ) : null}
           </div>
         </div>
       )}
+      {/* Direct Messages Section */}
       {activeSection === 'messages' && (
         <MessageLayout
           mode="direct"

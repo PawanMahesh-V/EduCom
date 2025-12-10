@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSignOutAlt, faBookOpen, faBars, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSignOutAlt, faGraduationCap, faBars, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 
 const DashboardLayout = ({ 
   user, 
@@ -12,7 +12,6 @@ const DashboardLayout = ({
   children 
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
 
   const getInitials = (fullName) => {
     if (!fullName) return 'U';
@@ -37,7 +36,7 @@ const DashboardLayout = ({
         <div className="topnav-container">
           {/* Logo */}
           <div className="topnav-brand">
-            <FontAwesomeIcon icon={faBookOpen} className="brand-icon" />
+            <FontAwesomeIcon icon={faGraduationCap} className="brand-icon" />
             <span className="brand-text">EduCom</span>
           </div>
 
@@ -61,7 +60,6 @@ const DashboardLayout = ({
             <div className="profile-dropdown">
               <button 
                 className="profile-trigger"
-                onClick={() => setIsProfileDropdownOpen(!isProfileDropdownOpen)}
               >
                 <div className="profile-avatar">
                   {getInitials(user?.full_name || user?.name)}
@@ -73,14 +71,12 @@ const DashboardLayout = ({
                 <FontAwesomeIcon icon={faChevronDown} className="dropdown-icon" />
               </button>
               
-              {isProfileDropdownOpen && (
-                <div className="profile-dropdown-menu">
-                  <button className="dropdown-item logout-item" onClick={onLogout}>
-                    <FontAwesomeIcon icon={faSignOutAlt} />
-                    <span>Logout</span>
-                  </button>
-                </div>
-              )}
+              <div className="profile-dropdown-menu">
+                <button className="dropdown-item logout-item" onClick={onLogout}>
+                  <FontAwesomeIcon icon={faSignOutAlt} />
+                  <span>Logout</span>
+                </button>
+              </div>
             </div>
 
             {/* Mobile Menu Toggle */}

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faEllipsisV, faUsers, faEye, faEyeSlash } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare } from '@fortawesome/free-solid-svg-icons';
 
 const MessageLayout = ({
   // Common props
@@ -23,8 +23,6 @@ const MessageLayout = ({
   onStartNewConversation,
   onSendDirectMessage,
   onDMTyping,
-  isAnonymous,
-  setIsAnonymous,
   
   // Community Chat props
   chats,
@@ -44,6 +42,33 @@ const MessageLayout = ({
   mode = 'direct'
 }) => {
   const [chatSearchQuery, setChatSearchQuery] = useState('');
+  const [showDmOptions, setShowDmOptions] = useState(false);
+  const [showCommunityOptions, setShowCommunityOptions] = useState(false);
+
+  const handleOptionClick = (action, mode) => {
+    if (mode === 'dm') {
+      setShowDmOptions(false);
+    } else {
+      setShowCommunityOptions(false);
+    }
+    
+    switch(action) {
+      case 'delete':
+        // Handle delete action
+        console.log('Delete clicked');
+        break;
+      case 'search':
+        // Handle search action
+        console.log('Search clicked');
+        break;
+      case 'select':
+        // Handle select action
+        console.log('Select clicked');
+        break;
+      default:
+        break;
+    }
+  };
 
   const renderDirectMessages = () => (
     <>
@@ -106,8 +131,8 @@ const MessageLayout = ({
           ) : (
             conversations.map((conv) => (
               <div 
-                key={`${conv.user_id}-${conv.is_anonymous ? 'anon' : 'regular'}`}
-                className={`chat-item ${selectedConversation?.user_id === conv.user_id && selectedConversation?.is_anonymous === conv.is_anonymous ? 'active' : ''}`}
+                key={conv.user_id}
+                className={`chat-item ${selectedConversation?.user_id === conv.user_id ? 'active' : ''}`}
                 onClick={() => onSelectConversation(conv)}
               >
                 <div className="flex gap-md">
@@ -132,12 +157,13 @@ const MessageLayout = ({
                       </div>
                       {conv.last_message_time && (
                         <span className="chat-time">
-                          {new Date(conv.last_message_time).toLocaleString([], { 
+                          {new Date(conv.last_message_time).toLocaleString('en-PK', { 
                             month: 'short', 
                             day: 'numeric', 
                             hour: '2-digit', 
                             minute: '2-digit',
-                            hour12: true 
+                            hour12: true,
+                            timeZone: 'Asia/Karachi'
                           })}
                         </span>
                       )}
@@ -170,9 +196,27 @@ const MessageLayout = ({
                   <p className="m-0 text-sm text-secondary">{selectedConversation.user_email}</p>
                 </div>
               </div>
-              <button className="chat-options-button">
-                <FontAwesomeIcon icon={faEllipsisV} />
-              </button>
+              <div className="chat-options-wrapper">
+                <button className="chat-options-btn" onClick={() => setShowDmOptions(!showDmOptions)}>
+                  <FontAwesomeIcon icon={faEllipsisVertical} />
+                </button>
+                {showDmOptions && (
+                  <div className="chat-options-dropdown">
+                    <button className="chat-option-item" onClick={() => handleOptionClick('delete', 'dm')}>
+                      <FontAwesomeIcon icon={faTrash} />
+                      <span>Delete</span>
+                    </button>
+                    <button className="chat-option-item" onClick={() => handleOptionClick('search', 'dm')}>
+                      <FontAwesomeIcon icon={faSearch} />
+                      <span>Search</span>
+                    </button>
+                    <button className="chat-option-item" onClick={() => handleOptionClick('select', 'dm')}>
+                      <FontAwesomeIcon icon={faCheckSquare} />
+                      <span>Select</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="chat-messages">
@@ -184,12 +228,12 @@ const MessageLayout = ({
                   <div className={`chat-message-bubble ${msg.sender_id === userId ? 'sent' : 'received'}`}>
                     {msg.sender_id !== userId && (
                       <div className="chat-message-sender">
-                        {msg.is_anonymous ? 'Anonymous' : msg.sender_name}
+                        {msg.sender_name}
                       </div>
                     )}
                     <div className="chat-message-text">{msg.content}</div>
                     <div className="chat-message-time">
-                      {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })}
                     </div>
                   </div>
                 </div>
@@ -206,28 +250,6 @@ const MessageLayout = ({
 
             <div className="chat-input-wrapper">
               <div className="chat-input-container">
-                {selectedConversation && ['Teacher', 'PM', 'HOD'].includes(selectedConversation.user_role) && selectedConversation.user_role !== 'Anonymous' && !selectedConversation.is_anonymous && (
-                  <button
-                    type="button"
-                    onClick={() => setIsAnonymous(!isAnonymous)}
-                    className="anonymity-toggle-btn"
-                    title={isAnonymous ? 'Anonymous mode active' : 'Click to send anonymously'}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      padding: '8px 12px',
-                      cursor: isAnonymous ? 'default' : 'pointer',
-                      color: isAnonymous ? '#4CAF50' : '#666',
-                      fontSize: '18px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      transition: 'color 0.2s',
-                      opacity: isAnonymous ? 0.7 : 1
-                    }}
-                  >
-                    <FontAwesomeIcon icon={isAnonymous ? faEyeSlash : faEye} />
-                  </button>
-                )}
                 <input
                   type="text"
                   className="chat-input"
@@ -344,9 +366,27 @@ const MessageLayout = ({
                   <p className="m-0 text-sm text-secondary">Course Community</p>
                 </div>
               </div>
-              <button className="chat-options-button">
-                <FontAwesomeIcon icon={faEllipsisV} />
-              </button>
+              <div className="chat-options-wrapper">
+                <button className="chat-options-btn" onClick={() => setShowCommunityOptions(!showCommunityOptions)}>
+                  <FontAwesomeIcon icon={faEllipsisVertical} />
+                </button>
+                {showCommunityOptions && (
+                  <div className="chat-options-dropdown">
+                    <button className="chat-option-item" onClick={() => handleOptionClick('delete', 'community')}>
+                      <FontAwesomeIcon icon={faTrash} />
+                      <span>Delete</span>
+                    </button>
+                    <button className="chat-option-item" onClick={() => handleOptionClick('search', 'community')}>
+                      <FontAwesomeIcon icon={faSearch} />
+                      <span>Search</span>
+                    </button>
+                    <button className="chat-option-item" onClick={() => handleOptionClick('select', 'community')}>
+                      <FontAwesomeIcon icon={faCheckSquare} />
+                      <span>Select</span>
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             
             <div className="chat-messages">

@@ -31,13 +31,12 @@ export const useCommunityMessages = (communityId, onNewMessage, onMessageDeleted
     };
   }, [communityId, onNewMessage, onMessageDeleted]);
   return {
-    sendMessage: (message, senderId, senderName, isAnonymous = false) => {
+    sendMessage: (message, senderId, senderName) => {
       socketService.sendMessage({
         communityId,
         message,
         senderId,
-        senderName,
-        isAnonymous
+        senderName
       });
     },
     deleteMessage: (messageId) => {
@@ -131,13 +130,12 @@ export const useDirectMessages = (userId, onNewMessage) => {
     };
   }, [userId, onNewMessage]);
   return {
-    sendDirectMessage: (receiverId, message, senderName, isAnonymous = false) => {
+    sendDirectMessage: (receiverId, message, senderName) => {
       socketService.sendDirectMessage({
         senderId: userId,
         receiverId,
         message,
-        senderName,
-        isAnonymous
+        senderName
       });
     }
   };

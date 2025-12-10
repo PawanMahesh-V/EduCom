@@ -7,8 +7,8 @@ const directMessageApi = {
     return await ApiClient.get(`${API_BASE_URL}/direct-messages/conversations/${userId}`);
   },
 
-  getMessages: async (userId, otherUserId, isAnonymous = false) => {
-    return await ApiClient.get(`${API_BASE_URL}/direct-messages/messages/${userId}/${otherUserId}?isAnonymous=${isAnonymous}`);
+  getMessages: async (userId, otherUserId) => {
+    return await ApiClient.get(`${API_BASE_URL}/direct-messages/messages/${userId}/${otherUserId}`);
   },
 
   getUsers: async (excludeUserId) => {

@@ -78,9 +78,14 @@ const HomePage = () => {
             Edu<span className="accent">Com</span>
           </span>
         </div>
-        <button className="btn-primary" onClick={() => navigate("/login")}>
-          Sign In
-        </button>
+        <div className="nav-actions">
+          <button className="btn-secondary" onClick={() => navigate("/register")}>
+            Register
+          </button>
+          <button className="btn-primary" onClick={() => navigate("/login")}>
+            Sign In
+          </button>
+        </div>
       </nav>
 
       <section className="hero">
@@ -95,9 +100,15 @@ const HomePage = () => {
           <div className="hero-actions">
             <button
               className="btn-primary"
+              onClick={() => navigate("/register")}
+            >
+              Register Now <FontAwesomeIcon icon={faArrowRight} />
+            </button>
+            <button
+              className="btn-secondary"
               onClick={() => navigate("/login")}
             >
-              Get Started <FontAwesomeIcon icon={faArrowRight} />
+              Sign In
             </button>
           </div>
         </div>

@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faBookOpen, 
+  faGraduationCap, 
   faArrowLeft, 
   faEnvelope, 
   faLock,
@@ -177,7 +177,7 @@ const LoginPage = () => {
         <div className="auth-form-section">
           <div className="auth-brand-header">
             <div className="auth-brand-icon-wrapper">
-              <FontAwesomeIcon icon={faBookOpen} className="auth-brand-icon" />
+              <FontAwesomeIcon icon={faGraduationCap} className="auth-brand-icon" />
             </div>
             <span className="auth-brand-text">
               Edu<span className="auth-brand-accent">Com</span>
@@ -286,9 +286,9 @@ const LoginPage = () => {
               <div className="auth-divider">
                 <span>Don't have an account?</span>
               </div>
-              <p className="auth-contact">
-                Contact your administrator to create an account
-              </p>
+              <Link to="/register" className="auth-link-button">
+                Register
+              </Link>
             </div>
           </form>
           ) : (

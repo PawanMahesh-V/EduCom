@@ -2,7 +2,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
 const pool = require('../config/database');
-const { sendVerificationCode } = require('../config/emailConfig');
+const { sendVerificationCode, sendRegistrationApprovalEmail } = require('../config/emailConfig');
 
 class AuthController {
     static async login(req, res) {
@@ -268,6 +268,177 @@ class AuthController {
 
         } catch (err) {
             res.status(500).json({ message: 'Server error during password reset' });
+        }
+    }
+
+    static async checkEmail(req, res) {
+        try {
+            const { email } = req.body;
+
+            if (!email) {
+                return res.status(400).json({ message: 'Email is required' });
+            }
+
+            // Check if email exists in users table
+            const existingUser = await pool.query(
+                'SELECT id FROM users WHERE email = $1',
+                [email.toLowerCase()]
+            );
+
+            if (existingUser.rows.length > 0) {
+                return res.json({ exists: true, pending: false });
+            }
+
+            // Check if email has a pending registration request
+            const pendingRequest = await pool.query(
+                'SELECT id FROM registration_requests WHERE email = $1 AND status = $2',
+                [email.toLowerCase(), 'pending']
+            );
+
+            if (pendingRequest.rows.length > 0) {
+                return res.json({ exists: false, pending: true });
+            }
+
+            return res.json({ exists: false, pending: false });
+
+        } catch (err) {
+            console.error('Error checking email:', err);
+            res.status(500).json({ message: 'Server error checking email' });
+        }
+    }
+
+    static async register(req, res) {
+        try {
+            const { reg_id, name, email, password, role, department, semester, program_year } = req.body;
+
+            // Validation
+            if (!reg_id || !name || !email || !password || !role || !department) {
+                return res.status(400).json({ message: 'All required fields must be provided' });
+            }
+
+            // Validate email domain
+            if (!email.toLowerCase().endsWith('@szabist.pk')) {
+                return res.status(400).json({ message: 'Only @szabist.pk email addresses are allowed' });
+            }
+
+            // Check if user already exists
+            const existingUser = await pool.query(
+                'SELECT id FROM users WHERE email = $1 OR reg_id = $2',
+                [email.toLowerCase(), reg_id]
+            );
+
+            if (existingUser.rows.length > 0) {
+                return res.status(400).json({ message: 'User with this email or registration ID already exists' });
+            }
+
+            // Check if there's a pending request
+            const existingRequest = await pool.query(
+                'SELECT id FROM registration_requests WHERE (email = $1 OR reg_id = $2) AND status = $3',
+                [email.toLowerCase(), reg_id, 'pending']
+            );
+
+            if (existingRequest.rows.length > 0) {
+                return res.status(400).json({ message: 'A registration request is already pending for this email or ID' });
+            }
+
+            // Hash password
+            const hashedPassword = await bcrypt.hash(password, 10);
+
+            // Insert into registration_requests table
+            await pool.query(
+                `INSERT INTO registration_requests 
+                 (reg_id, name, email, password, role, department, semester, program_year, status, created_at) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)`,
+                [reg_id, name, email.toLowerCase(), hashedPassword, role, department, semester || null, program_year || null]
+            );
+
+            res.status(201).json({ message: 'Registration request submitted successfully. Please wait for admin approval.' });
+
+        } catch (err) {
+            console.error('Registration error:', err);
+            res.status(500).json({ message: 'Server error during registration' });
+        }
+    }
+
+    static async getRegistrationRequests(req, res) {
+        try {
+            const result = await pool.query(
+                `SELECT id, reg_id, name, email, role, department, semester, program_year, status, created_at 
+                 FROM registration_requests 
+                 WHERE status = 'pending'
+                 ORDER BY created_at DESC`
+            );
+
+            res.json({ requests: result.rows });
+        } catch (err) {
+            console.error('Error fetching registration requests:', err);
+            res.status(500).json({ message: 'Server error' });
+        }
+    }
+
+    static async approveRegistration(req, res) {
+        try {
+            const { requestId } = req.params;
+
+            // Get the request
+            const request = await pool.query(
+                'SELECT * FROM registration_requests WHERE id = $1 AND status = $2',
+                [requestId, 'pending']
+            );
+
+            if (request.rows.length === 0) {
+                return res.status(404).json({ message: 'Registration request not found' });
+            }
+
+            const reqData = request.rows[0];
+
+            // Create user
+            await pool.query(
+                `INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, created_at) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
+                [reqData.reg_id, reqData.name, reqData.email, reqData.password, reqData.role, reqData.department, reqData.semester, reqData.program_year]
+            );
+
+            // Update request status
+            await pool.query(
+                'UPDATE registration_requests SET status = $1 WHERE id = $2',
+                ['approved', requestId]
+            );
+
+            // Send approval email
+            try {
+                await sendRegistrationApprovalEmail(reqData.email, reqData.name);
+            } catch (emailError) {
+                console.error('Error sending approval email:', emailError);
+                // Continue even if email fails
+            }
+
+            res.json({ message: 'Registration approved successfully' });
+
+        } catch (err) {
+            console.error('Error approving registration:', err);
+            res.status(500).json({ message: 'Server error' });
+        }
+    }
+
+    static async rejectRegistration(req, res) {
+        try {
+            const { requestId } = req.params;
+
+            const result = await pool.query(
+                'UPDATE registration_requests SET status = $1 WHERE id = $2 AND status = $3 RETURNING id',
+                ['rejected', requestId, 'pending']
+            );
+
+            if (result.rows.length === 0) {
+                return res.status(404).json({ message: 'Registration request not found' });
+            }
+
+            res.json({ message: 'Registration rejected' });
+
+        } catch (err) {
+            console.error('Error rejecting registration:', err);
+            res.status(500).json({ message: 'Server error' });
         }
     }
 }

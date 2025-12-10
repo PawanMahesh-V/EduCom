@@ -48,6 +48,23 @@ const courseApi = {
       student_ids: studentIds
     });
   },
+
+  // Course Request endpoints
+  submitCourseRequest: async (courseData) => {
+    return await ApiClient.post(`${API_ENDPOINTS.COURSES.BASE}/request`, courseData);
+  },
+
+  getCourseRequests: async () => {
+    return await ApiClient.get(`${API_ENDPOINTS.COURSES.BASE}/requests/all`);
+  },
+
+  approveCourseRequest: async (requestId) => {
+    return await ApiClient.post(`${API_ENDPOINTS.COURSES.BASE}/requests/${requestId}/approve`);
+  },
+
+  rejectCourseRequest: async (requestId) => {
+    return await ApiClient.post(`${API_ENDPOINTS.COURSES.BASE}/requests/${requestId}/reject`);
+  },
 };
 
 export default courseApi;

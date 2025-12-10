@@ -82,21 +82,6 @@ const ResetPasswordPage = () => {
     }
   };
 
-  const getPasswordStrength = (password) => {
-    if (password.length === 0) return { text: '', color: '', width: '0%' };
-    if (password.length < 6) return { text: 'Too short', color: '#f44336', width: '25%' };
-    if (password.length < 8) return { text: 'Weak', color: '#ff9800', width: '50%' };
-    if (password.length < 12 && /[A-Z]/.test(password) && /[0-9]/.test(password)) {
-      return { text: 'Good', color: '#4caf50', width: '75%' };
-    }
-    if (password.length >= 12 && /[A-Z]/.test(password) && /[0-9]/.test(password) && /[!@#$%^&*]/.test(password)) {
-      return { text: 'Strong', color: '#2196f3', width: '100%' };
-    }
-    return { text: 'Fair', color: '#ffc107', width: '60%' };
-  };
-
-  const strength = getPasswordStrength(newPassword);
-
   return (
     <>
       {/* Success Modal */}
@@ -176,19 +161,6 @@ const ResetPasswordPage = () => {
                     <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
                   </button>
                 </div>
-                {newPassword && (
-                  <div className="auth-password-strength">
-                    <div className="auth-strength-bar">
-                      <div 
-                        className="auth-strength-fill password-strength-bar" 
-                        style={{ width: strength.width, backgroundColor: strength.color }}
-                      ></div>
-                    </div>
-                    <span className="auth-strength-text password-strength-text" style={{ color: strength.color }}>
-                      {strength.text}
-                    </span>
-                  </div>
-                )}
               </div>
 
               <div className="auth-form-group">

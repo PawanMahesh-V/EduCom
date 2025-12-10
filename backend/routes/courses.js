@@ -430,4 +430,172 @@ router.post('/:id/assign', auth, async (req, res) => {
     }
 });
 
+// Submit course request
+router.post('/request', auth, async (req, res) => {
+    try {
+        const { code, name, department, semester, teacher_id } = req.body;
+        const requested_by = req.user.userId || req.user.id;
+
+        // Check if course code already exists
+        const existingCourse = await pool.query(
+            'SELECT id FROM courses WHERE code = $1',
+            [code]
+        );
+
+        if (existingCourse.rows.length > 0) {
+            return res.status(400).json({ message: 'Course code already exists' });
+        }
+
+        // Check if there's already a pending request for this code
+        const existingRequest = await pool.query(
+            'SELECT id FROM course_requests WHERE code = $1 AND status = $2',
+            [code, 'pending']
+        );
+
+        if (existingRequest.rows.length > 0) {
+            return res.status(400).json({ message: 'A request for this course code is already pending' });
+        }
+
+        const result = await pool.query(
+            `INSERT INTO course_requests (code, name, department, semester, teacher_id, requested_by, status)
+             VALUES ($1, $2, $3, $4, $5, $6, 'pending')
+             RETURNING *`,
+            [code, name, department, semester, teacher_id, requested_by]
+        );
+
+        res.status(201).json({ 
+            message: 'Course request submitted successfully',
+            request: result.rows[0]
+        });
+    } catch (err) {
+        console.error('Error submitting course request:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get all course requests (admin only)
+router.get('/requests/all', auth, async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT cr.*, 
+                    u.name as teacher_name,
+                    u.email as teacher_email,
+                    req.name as requested_by_name
+             FROM course_requests cr
+             LEFT JOIN users u ON cr.teacher_id = u.id
+             LEFT JOIN users req ON cr.requested_by = req.id
+             WHERE cr.status = 'pending'
+             ORDER BY cr.created_at DESC`
+        );
+
+        res.json({ requests: result.rows });
+    } catch (err) {
+        console.error('Error fetching course requests:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Approve course request (admin only)
+router.post('/requests/:id/approve', auth, async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+
+        await client.query('BEGIN');
+
+        // Get the request details
+        const requestResult = await client.query(
+            'SELECT * FROM course_requests WHERE id = $1 AND status = $2',
+            [id, 'pending']
+        );
+
+        if (requestResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Request not found or already processed' });
+        }
+
+        const request = requestResult.rows[0];
+
+        // Create the course
+        const courseResult = await client.query(
+            `INSERT INTO courses (code, name, department, semester, teacher_id)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING *`,
+            [request.code, request.name, request.department, request.semester, request.teacher_id]
+        );
+
+        const newCourse = courseResult.rows[0];
+
+        // Generate unique join code for the community
+        const joinCode = generateJoinCode();
+        const communityName = `${request.code} Community`;
+        
+        const communityResult = await client.query(
+            `INSERT INTO communities (course_id, name, join_code, status) 
+             VALUES ($1, $2, $3, 'active')
+             RETURNING *`,
+            [newCourse.id, communityName, joinCode]
+        );
+
+        // Add join_code to the response
+        newCourse.join_code = communityResult.rows[0].join_code;
+
+        // Update request status
+        await client.query(
+            'UPDATE course_requests SET status = $1 WHERE id = $2',
+            ['approved', id]
+        );
+
+        // Send notification to teacher
+        await client.query(
+            `INSERT INTO notifications (user_id, title, message, type, sender_id)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [
+                request.teacher_id,
+                'Course Request Approved',
+                `Your course request for ${request.name} (${request.code}) has been approved! Join code: ${joinCode}`,
+                'course_update',
+                req.user.userId || req.user.id
+            ]
+        );
+
+        await client.query('COMMIT');
+
+        res.json({ 
+            message: 'Course request approved and course created',
+            course: newCourse
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error approving course request:', err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+});
+
+// Reject course request (admin only)
+router.post('/requests/:id/reject', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        const result = await pool.query(
+            'UPDATE course_requests SET status = $1 WHERE id = $2 AND status = $3 RETURNING *',
+            ['rejected', id, 'pending']
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ message: 'Request not found or already processed' });
+        }
+
+        res.json({ 
+            message: 'Course request rejected',
+            request: result.rows[0]
+        });
+    } catch (err) {
+        console.error('Error rejecting course request:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

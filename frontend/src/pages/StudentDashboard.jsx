@@ -36,7 +36,6 @@ const StudentDashboard = () => {
   const messagesEndRef = useRef(null);
   const [chats, setChats] = useState([]);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [unreadCounts, setUnreadCounts] = useState({});
   const addedMessageIds = useRef(new Set());
   // Direct message states
   const [conversations, setConversations] = useState([]);
@@ -46,7 +45,6 @@ const StudentDashboard = () => {
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
 
   // Join community modal states
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -60,28 +58,53 @@ const StudentDashboard = () => {
     setNotifications(prev => [notification, ...prev]);
   });
 
-  // Global listener for all community messages (for unread tracking)
+  // Join all communities on page load and listen for new messages
   useEffect(() => {
     if (!userId) return;
     
     const socket = socketService.connect(userId);
     
-    const handleGlobalMessage = (newMessage) => {
-      // If message is for a community we're not currently viewing, increment unread
-      if (newMessage.community_id && newMessage.community_id !== selectedChat?.id) {
-        setUnreadCounts(prev => ({
-          ...prev,
-          [newMessage.community_id]: (prev[newMessage.community_id] || 0) + 1
-        }));
+    // Fetch and join all communities immediately
+    const joinAllCommunities = async () => {
+      try {
+        const communities = await communityApi.getStudentCommunities(userId);
+        communities.forEach(community => {
+          socket.emit('join-community', community.id);
+        });
+      } catch (err) {
+        console.error('Failed to join communities:', err);
+      }
+    };
+    
+    joinAllCommunities();
+    
+    // Listen for new messages and refresh community list
+    const handleGlobalCommunityMessage = (newMessage) => {
+      if (newMessage.community_id) {
+        // Refresh communities to update unread counts
+        communityApi.getStudentCommunities(userId).then(communities => {
+          const formattedChats = communities.map(community => ({
+            id: community.id,
+            name: community.course_name || community.name,
+            courseId: community.course_id,
+            courseName: community.course_name,
+            courseCode: community.course_code,
+            lastMessage: 'Start chatting...',
+            time: new Date(community.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
+            unread: community.unread_count || 0
+          }));
+          setChats(formattedChats);
+        }).catch(() => {});
       }
     };
 
-    socket.on('new-message', handleGlobalMessage);
+    socket.on('new-message', handleGlobalCommunityMessage);
 
     return () => {
-      socket.off('new-message', handleGlobalMessage);
+      socket.off('new-message', handleGlobalCommunityMessage);
     };
-  }, [userId, selectedChat?.id]);
+  }, [userId]);
+
   // Real-time direct messages
   const { sendDirectMessage } = useDirectMessages(userId, (newMessage) => {
     
@@ -136,10 +159,9 @@ const StudentDashboard = () => {
           return [...prev, {
             id: newMessage.id,
             text: newMessage.content,
-            sender: newMessage.is_anonymous ? 'Anonymous' : newMessage.sender_name,
+            sender: newMessage.sender_name,
             senderId: newMessage.sender_id,
-            time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isAnonymous: newMessage.is_anonymous
+            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
           }];
         });
         scrollToBottom();
@@ -187,16 +209,6 @@ const StudentDashboard = () => {
     }
   }, [activeSection, userId]);
 
-  // Update chat unread counts when they change
-  useEffect(() => {
-    if (chats.length > 0) {
-      setChats(prevChats => prevChats.map(chat => ({
-        ...chat,
-        unread: unreadCounts[chat.id] || 0
-      })));
-    }
-  }, [unreadCounts]);
-
   const fetchNotifications = async () => {
     try {
       setLoading(true);
@@ -238,12 +250,6 @@ const StudentDashboard = () => {
       }));
       
       setChats(formattedChats);
-      
-      // Join all communities to receive messages
-      const socket = socketService.connect(userId);
-      communities.forEach(community => {
-        socket.emit('join-community', community.id);
-      });
     } catch (err) {
       setChats([]);
     } finally {
@@ -310,7 +316,7 @@ const StudentDashboard = () => {
           courseName: course.name,
           courseCode: course.code,
           lastMessage: 'Start chatting...',
-          time: new Date(courseCommunity.created_at).toLocaleDateString(),
+          time: new Date(courseCommunity.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
           unread: 0
         };
         
@@ -346,8 +352,7 @@ const StudentDashboard = () => {
       sendDirectMessage(
         selectedConversation.user_id,
         message,
-        user?.name || 'Student',
-        isAnonymous
+        user?.name || 'Student'
       );
       
       setMessage('');
@@ -362,8 +367,7 @@ const StudentDashboard = () => {
   const handleSelectConversation = async (conversation) => {
     setSelectedConversation(conversation);
     setDmMessages([]);
-    setIsAnonymous(conversation.is_anonymous || false);
-    await loadDirectMessages(conversation.user_id, conversation.is_anonymous || false);
+    await loadDirectMessages(conversation.user_id, false);
     // Refresh conversations to update unread count
     await fetchConversations();
   };
@@ -392,24 +396,20 @@ const StudentDashboard = () => {
     setMessages([]);
     addedMessageIds.current.clear();
     
-    // Reset unread count for this chat
-    setUnreadCounts(prev => ({
-      ...prev,
-      [chat.id]: 0
-    }));
+    // Reset unread count for this chat in the UI
+    setChats(prev => prev.map(c => 
+      c.id === chat.id ? { ...c, unread_count: 0 } : c
+    ));
     
     // Fetch existing messages for this community
     try {
       const messages = await communityApi.getMessages(chat.id, userId);
-      // Refresh communities to update unread counts
-      await fetchCommunities();
       const formattedMessages = messages.map(msg => ({
         id: msg.id,
         text: msg.content,
-        sender: msg.is_anonymous ? 'Anonymous' : msg.sender_name,
+        sender: msg.sender_name,
         senderId: msg.sender_id,
-        time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isAnonymous: msg.is_anonymous
+        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
       }));
       setMessages(formattedMessages);
     } catch (err) {
@@ -441,7 +441,14 @@ const StudentDashboard = () => {
         await fetchCommunities();
       }
     } catch (err) {
-      showAlert('Error', err.response?.data?.message || 'Failed to join community', 'error');
+      // err is already a string message from ApiClient
+      const errorMessage = typeof err === 'string' ? err : (err.message || 'Failed to join community');
+      // Show info alert if already a member, otherwise show error
+      if (errorMessage.toLowerCase().includes('already')) {
+        showAlert('Already Enrolled', errorMessage, 'info');
+      } else {
+        showAlert('Error', errorMessage, 'error');
+      }
     } finally {
       setJoiningCommunity(false);
     }
@@ -510,7 +517,7 @@ const StudentDashboard = () => {
                     </div>
                     <div className="course-card-meta-item">
                       <FontAwesomeIcon icon={faCalendar} />
-                      <span>Enrolled: {new Date(course.enrolled_on).toLocaleDateString()}</span>
+                      <span>Enrolled: {new Date(course.enrolled_on).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' })}</span>
                     </div>
                   </div>
                 </div>
@@ -545,8 +552,6 @@ const StudentDashboard = () => {
           onStartNewConversation={handleStartNewConversation}
           onSendDirectMessage={handleSendDirectMessage}
           onDMTyping={handleDMTyping}
-          isAnonymous={isAnonymous}
-          setIsAnonymous={setIsAnonymous}
           loading={loading}
         />
       )}
@@ -598,12 +603,13 @@ const StudentDashboard = () => {
                     <h4 className="notification-title">{notification.title}</h4>
                     <p className="notification-message">{notification.message}</p>
                     <span className="notification-time">
-                      {new Date(notification.created_at).toLocaleString('en-US', {
+                      {new Date(notification.created_at).toLocaleString('en-PK', {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
-                        hour12: true
+                        hour12: true,
+                        timeZone: 'Asia/Karachi'
                       })}
                     </span>
                   </div>

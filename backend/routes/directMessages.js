@@ -55,49 +55,8 @@ router.get('/conversations/:userId', auth, async (req, res) => {
             [userId]
         );
 
-        // Get anonymous conversations
-        const anonymousConversations = await pool.query(
-            `SELECT 
-                other_user_id as user_id,
-                'Anonymous' as user_name,
-                'anonymous@hidden.com' as user_email,
-                'Anonymous' as user_role,
-                last_message_time,
-                unread_count,
-                last_message,
-                is_anonymous
-            FROM (
-                SELECT DISTINCT ON (other_user_id)
-                    CASE 
-                        WHEN m.sender_id = $1 THEN m.receiver_id
-                        ELSE m.sender_id
-                    END as other_user_id,
-                    m.created_at as last_message_time,
-                    COALESCE(
-                        (SELECT COUNT(*)::integer 
-                         FROM messages 
-                         WHERE community_id IS NULL 
-                           AND receiver_id = $1 
-                           AND sender_id = CASE WHEN m.sender_id = $1 THEN m.receiver_id ELSE m.sender_id END
-                           AND is_anonymous = true
-                           AND is_read = FALSE),
-                        0
-                    ) as unread_count,
-                    m.content as last_message,
-                    true as is_anonymous
-                FROM messages m
-                WHERE m.community_id IS NULL 
-                  AND (m.sender_id = $1 OR m.receiver_id = $1)
-                  AND m.is_anonymous = true
-                ORDER BY other_user_id, m.created_at DESC
-            ) conversations
-            ORDER BY last_message_time DESC`,
-            [userId]
-        );
-
-        // Combine both results
-        const allConversations = [...regularConversations.rows, ...anonymousConversations.rows]
-            .sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
+        // Return regular conversations
+        const allConversations = regularConversations.rows;
 
         res.json(allConversations);
     } catch (err) {
@@ -109,22 +68,20 @@ router.get('/conversations/:userId', auth, async (req, res) => {
 router.get('/messages/:userId/:otherUserId', auth, async (req, res) => {
     try {
         const { userId, otherUserId } = req.params;
-        const { limit = 50, isAnonymous } = req.query;
-
-        const isAnon = isAnonymous === 'true';
+        const { limit = 50 } = req.query;
 
         const result = await pool.query(
-            `SELECT m.*, 
+            `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
+                    (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
              WHERE m.community_id IS NULL
                AND ((m.sender_id = $1 AND m.receiver_id = $2)
                  OR (m.sender_id = $2 AND m.receiver_id = $1))
-               AND m.is_anonymous = $4
              ORDER BY m.created_at ASC
              LIMIT $3`,
-            [userId, otherUserId, limit, isAnon]
+            [userId, otherUserId, limit]
         );
 
         // Mark messages as read
@@ -134,9 +91,8 @@ router.get('/messages/:userId/:otherUserId', auth, async (req, res) => {
              WHERE community_id IS NULL 
                AND receiver_id = $1 
                AND sender_id = $2 
-               AND is_anonymous = $3
                AND is_read = FALSE`,
-            [userId, otherUserId, isAnon]
+            [userId, otherUserId]
         );
 
         res.json(result.rows);

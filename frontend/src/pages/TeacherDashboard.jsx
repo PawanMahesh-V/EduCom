@@ -48,7 +48,6 @@ const TeacherDashboard = () => {
   const messagesEndRef = useRef(null);
   const [chats, setChats] = useState([]);
   const [chatSearchQuery, setChatSearchQuery] = useState('');
-  const [unreadCounts, setUnreadCounts] = useState({});
   const addedMessageIds = useRef(new Set());
   // Direct message states
   const [conversations, setConversations] = useState([]);
@@ -58,7 +57,16 @@ const TeacherDashboard = () => {
   const [showUserSearch, setShowUserSearch] = useState(false);
   const [availableUsers, setAvailableUsers] = useState([]);
   const [userSearchQuery, setUserSearchQuery] = useState('');
-  const [isAnonymous, setIsAnonymous] = useState(false);
+  
+  // Course request modal states
+  const [isCourseRequestModalOpen, setIsCourseRequestModalOpen] = useState(false);
+  const [courseRequestData, setCourseRequestData] = useState({
+    code: '',
+    name: '',
+    department: 'CS',
+    semester: ''
+  });
+  
   // Real-time notifications
   useNotifications((notification) => {
     showAlert(notification.title, notification.message, notification.type || 'info');
@@ -70,28 +78,53 @@ const TeacherDashboard = () => {
     }
   });
 
-  // Global listener for all community messages (for unread tracking)
+  // Join all communities on page load and listen for new messages
   useEffect(() => {
     if (!userId) return;
     
     const socket = socketService.connect(userId);
     
-    const handleGlobalMessage = (newMessage) => {
-      // If message is for a community we're not currently viewing, increment unread
-      if (newMessage.community_id && newMessage.community_id !== selectedChat?.id) {
-        setUnreadCounts(prev => ({
-          ...prev,
-          [newMessage.community_id]: (prev[newMessage.community_id] || 0) + 1
-        }));
+    // Fetch and join all communities immediately
+    const joinAllCommunities = async () => {
+      try {
+        const communities = await communityApi.getTeacherCommunities(userId);
+        communities.forEach(community => {
+          socket.emit('join-community', community.id);
+        });
+      } catch (err) {
+        console.error('Failed to join communities:', err);
+      }
+    };
+    
+    joinAllCommunities();
+    
+    // Listen for new messages and refresh community list
+    const handleGlobalCommunityMessage = (newMessage) => {
+      if (newMessage.community_id) {
+        // Refresh communities to update unread counts
+        communityApi.getTeacherCommunities(userId).then(communities => {
+          const formattedChats = communities.map(community => ({
+            id: community.id,
+            name: community.course_name || community.name,
+            courseId: community.course_id,
+            courseName: community.course_name,
+            courseCode: community.course_code,
+            lastMessage: 'Start chatting...',
+            time: new Date(community.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
+            unread: community.unread_count || 0
+          }));
+          setChats(formattedChats);
+        }).catch(() => {});
       }
     };
 
-    socket.on('new-message', handleGlobalMessage);
+    socket.on('new-message', handleGlobalCommunityMessage);
 
     return () => {
-      socket.off('new-message', handleGlobalMessage);
+      socket.off('new-message', handleGlobalCommunityMessage);
     };
-  }, [userId, selectedChat?.id]);
+  }, [userId]);
+
   // Real-time direct messages
   const { sendDirectMessage } = useDirectMessages(userId, (newMessage) => {
     fetchConversations();
@@ -142,10 +175,9 @@ const TeacherDashboard = () => {
           return [...prev, {
             id: newMessage.id,
             text: newMessage.content,
-            sender: newMessage.is_anonymous ? 'Anonymous' : newMessage.sender_name,
+            sender: newMessage.sender_name,
             senderId: newMessage.sender_id,
-            time: new Date(newMessage.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isAnonymous: newMessage.is_anonymous
+            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
           }];
         });
         scrollToBottom();
@@ -187,6 +219,7 @@ const TeacherDashboard = () => {
   useEffect(() => {
     if (activeSection === 'courses' && userId) {
       fetchMyCourses();
+      fetchTeacherStats();
     } else if (activeSection === 'community' && userId) {
       fetchCommunities();
     } else if (activeSection === 'messages' && userId) {
@@ -197,15 +230,6 @@ const TeacherDashboard = () => {
     }
   }, [activeSection, userId]);
 
-  // Update chat unread counts when they change
-  useEffect(() => {
-    if (chats.length > 0) {
-      setChats(prevChats => prevChats.map(chat => ({
-        ...chat,
-        unread: unreadCounts[chat.id] || 0
-      })));
-    }
-  }, [unreadCounts]);
   const fetchCommunities = async () => {
     try {
       setLoading(true);
@@ -223,12 +247,6 @@ const TeacherDashboard = () => {
       }));
       
       setChats(formattedChats);
-      
-      // Join all communities to receive messages
-      const socket = socketService.connect(userId);
-      teacherCommunities.forEach(community => {
-        socket.emit('join-community', community.id);
-      });
     } catch (err) {
       setChats([]);
     } finally {
@@ -242,6 +260,46 @@ const TeacherDashboard = () => {
     } catch (err) {
     }
   };
+  
+  const handleCourseRequestInputChange = (e) => {
+    setCourseRequestData({
+      ...courseRequestData,
+      [e.target.name]: e.target.value
+    });
+  };
+  
+  const handleCourseRequestSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      // Automatically set teacher_id to current user
+      const requestData = {
+        ...courseRequestData,
+        teacher_id: userId
+      };
+      await courseApi.submitCourseRequest(requestData);
+      showAlert('Success', 'Course request submitted successfully! Waiting for admin approval.', 'success');
+      setCourseRequestData({
+        code: '',
+        name: '',
+        department: 'CS',
+        semester: ''
+      });
+      setIsCourseRequestModalOpen(false);
+    } catch (err) {
+      showAlert('Error', err.message || 'Failed to submit course request', 'error');
+    }
+  };
+  
+  const handleCloseCourseRequestModal = () => {
+    setIsCourseRequestModalOpen(false);
+    setCourseRequestData({
+      code: '',
+      name: '',
+      department: 'CS',
+      semester: ''
+    });
+  };
+  
   const fetchMyCourses = async () => {
     try {
       setLoading(true);
@@ -359,23 +417,19 @@ const TeacherDashboard = () => {
     setMessages([]);
     addedMessageIds.current.clear();
     
-    // Reset unread count for this chat
-    setUnreadCounts(prev => ({
-      ...prev,
-      [chat.id]: 0
-    }));
+    // Reset unread count for this chat in the UI
+    setChats(prev => prev.map(c => 
+      c.id === chat.id ? { ...c, unread_count: 0 } : c
+    ));
     
     try {
       const messages = await communityApi.getMessages(chat.id, userId);
-      // Refresh communities to update unread counts
-      await fetchCommunities();
       const formattedMessages = messages.map(msg => ({
         id: msg.id,
         text: msg.content,
-        sender: msg.is_anonymous ? 'Anonymous' : msg.sender_name,
+        sender: msg.sender_name,
         senderId: msg.sender_id,
-        time: new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        isAnonymous: msg.is_anonymous
+        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
       }));
       setMessages(formattedMessages);
     } catch (err) {
@@ -395,8 +449,7 @@ const TeacherDashboard = () => {
       sendDirectMessage(
         selectedConversation.user_id,
         message,
-        user?.name || 'Teacher',
-        isAnonymous
+        user?.name || 'Teacher'
       );
       
       setMessage('');
@@ -411,8 +464,7 @@ const TeacherDashboard = () => {
   const handleSelectConversation = async (conversation) => {
     setSelectedConversation(conversation);
     setDmMessages([]);
-    setIsAnonymous(conversation.is_anonymous || false);
-    await loadDirectMessages(conversation.user_id, conversation.is_anonymous || false);
+    await loadDirectMessages(conversation.user_id, false);
     // Refresh conversations to update unread count
     await fetchConversations();
   };
@@ -474,6 +526,16 @@ const TeacherDashboard = () => {
     >
       {activeSection === 'courses' && (
         <div className="container">
+          <div className="header-actions mb-3">
+            <h2 className="section-title">My Courses</h2>
+            <button 
+              className="floating-join-btn"
+              onClick={() => setIsCourseRequestModalOpen(true)}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+            </button>
+          </div>
+          
           {loading ? (
             <div className="text-center p-4 text-secondary">
               Loading your courses...
@@ -536,6 +598,101 @@ const TeacherDashboard = () => {
               ))}
             </div>
           )}
+          
+          {isCourseRequestModalOpen && (
+            <div className="modal">
+              <div className="modal-content modal-content-medium">
+                <h2>Request New Course</h2>
+                <p className="modal-description">Submit a request for a new course. Admin will review and approve.</p>
+                <form onSubmit={handleCourseRequestSubmit}>
+                  <div className="grid-2col">
+                    <div className="form-group">
+                      <label>Course Code:</label>
+                      <input
+                        type="text"
+                        name="code"
+                        value={courseRequestData.code}
+                        onChange={handleCourseRequestInputChange}
+                        placeholder="e.g., CS101"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Course Name:</label>
+                      <input
+                        type="text"
+                        name="name"
+                        value={courseRequestData.name}
+                        onChange={handleCourseRequestInputChange}
+                        placeholder="e.g., Introduction to Programming"
+                        required
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Department:</label>
+                      <select
+                        name="department"
+                        value={courseRequestData.department}
+                        onChange={handleCourseRequestInputChange}
+                        required
+                      >
+                        <option value="CS">CS</option>
+                        <option value="BBA">BBA</option>
+                        <option value="IT">IT</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>Semester:</label>
+                      <select
+                        name="semester"
+                        value={courseRequestData.semester}
+                        onChange={handleCourseRequestInputChange}
+                        required
+                      >
+                        <option value="">Select Semester</option>
+                        <option value="1">Semester 1</option>
+                        <option value="2">Semester 2</option>
+                        <option value="3">Semester 3</option>
+                        <option value="4">Semester 4</option>
+                        <option value="5">Semester 5</option>
+                        <option value="6">Semester 6</option>
+                        <option value="7">Semester 7</option>
+                        <option value="8">Semester 8</option>
+                      </select>
+                    </div>
+                    <div className="form-group form-group-full">
+                      <label>Teacher:</label>
+                      <input
+                        type="text"
+                        value={user?.name || 'Current User'}
+                        disabled
+                        className="input-disabled"
+                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
+                      />
+                      <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                        This course will be assigned to you
+                      </small>
+                    </div>
+                  </div>
+                  <div className="modal-actions">
+                    <button 
+                      type="submit" 
+                      className="button primary"
+                    >
+                      Submit Request
+                    </button>
+                    <button 
+                      type="button" 
+                      className="button secondary"
+                      onClick={handleCloseCourseRequestModal}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {activeSection === 'community' && (
@@ -595,8 +752,6 @@ const TeacherDashboard = () => {
           onStartNewConversation={handleStartNewConversation}
           onSendDirectMessage={handleSendDirectMessage}
           onDMTyping={handleDMTyping}
-          isAnonymous={isAnonymous}
-          setIsAnonymous={setIsAnonymous}
           loading={loading}
         />
       )}
@@ -631,12 +786,13 @@ const TeacherDashboard = () => {
                     <h4 className="notification-title">{notification.title}</h4>
                     <p className="notification-message">{notification.message}</p>
                     <span className="notification-time">
-                      {new Date(notification.created_at).toLocaleString('en-US', {
+                      {new Date(notification.created_at).toLocaleString('en-PK', {
                         month: 'short',
                         day: 'numeric',
                         hour: '2-digit',
                         minute: '2-digit',
-                        hour12: true
+                        hour12: true,
+                        timeZone: 'Asia/Karachi'
                       })}
                     </span>
                   </div>

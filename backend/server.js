@@ -28,7 +28,6 @@ const courseRoutes = require('./routes/courses');
 const dashboardRoutes = require('./routes/dashboard');
 const communityRoutes = require('./routes/communities');
 const notificationRoutes = require('./routes/notifications');
-const sectionRoutes = require('./routes/sections');
 const directMessageRoutes = require('./routes/directMessages');
 
 app.use(cors());
@@ -40,7 +39,6 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/communities', communityRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/sections', sectionRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
 
 app.get('/api/health', (req, res) => {
@@ -72,7 +70,7 @@ io.on('connection', (socket) => {
 
     // Send message to community
     socket.on('send-message', async (data) => {
-        const { communityId, message, senderId, senderName, isAnonymous, notificationOnly } = data;
+        const { communityId, message, senderId, senderName, notificationOnly } = data;
         
         try {
             // Check if sender is Admin
@@ -89,10 +87,11 @@ io.on('connection', (socket) => {
             } else {
                 // Save message to database and broadcast to chat (normal chat behavior)
                 const result = await pool.query(
-                    `INSERT INTO messages (community_id, sender_id, content, is_anonymous, status)
-                     VALUES ($1, $2, $3, $4, 'approved')
-                     RETURNING id, community_id, sender_id, content, is_anonymous, status, created_at`,
-                    [communityId, senderId, message, isAnonymous]
+                    `INSERT INTO messages (community_id, sender_id, content, status)
+                     VALUES ($1, $2, $3, 'approved')
+                     RETURNING id, community_id, sender_id, content, status, 
+                               (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at`,
+                    [communityId, senderId, message]
                 );
 
                 const newMessage = result.rows[0];
@@ -100,7 +99,7 @@ io.on('connection', (socket) => {
                 // Broadcast to all users in the community
                 io.to(`community-${communityId}`).emit('new-message', {
                     ...newMessage,
-                    sender_name: isAnonymous ? 'Anonymous' : senderName
+                    sender_name: senderName
                 });
             }
 
@@ -262,15 +261,16 @@ io.on('connection', (socket) => {
 
     // Direct message events
     socket.on('send-direct-message', async (data) => {
-        const { senderId, receiverId, message, senderName, isAnonymous = false } = data;
+        const { senderId, receiverId, message, senderName } = data;
         
         try {
             // Save message to database (community_id is NULL for direct messages)
             const result = await pool.query(
-                `INSERT INTO messages (sender_id, receiver_id, content, is_read, community_id, is_anonymous, status)
-                 VALUES ($1, $2, $3, false, NULL, $4, 'approved')
-                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at`,
-                [senderId, receiverId, message, isAnonymous]
+                `INSERT INTO messages (sender_id, receiver_id, content, is_read, community_id, status)
+                 VALUES ($1, $2, $3, false, NULL, 'approved')
+                 RETURNING id, sender_id, receiver_id, content, is_read, 
+                           (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at`,
+                [senderId, receiverId, message]
             );
 
             const newMessage = result.rows[0];
@@ -280,14 +280,14 @@ io.on('connection', (socket) => {
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
-                    sender_name: isAnonymous ? 'Anonymous' : senderName
+                    sender_name: senderName
                 });
             }
 
             // Send confirmation to sender
             socket.emit('direct-message-sent', {
                 ...newMessage,
-                sender_name: isAnonymous ? 'Anonymous' : senderName
+                sender_name: senderName
             });
         } catch (error) {
             // Error event removed: not handled on frontend
@@ -324,5 +324,4 @@ const HOST = process.env.HOST || '0.0.0.0';
 server.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
     console.log(`Socket.IO is ready for connections`);
-    console.log(`Access from network: http://192.168.1.107:${PORT}`);
 });

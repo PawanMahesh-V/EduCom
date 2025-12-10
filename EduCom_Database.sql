@@ -1,4 +1,4 @@
-DROP TABLE IF EXISTS reports, anonymous_feedback, notifications, transactions, marketplace_items, submissions, assignments, messages, communities, enrollments, courses, users, password_reset_codes, login_verification_codes CASCADE;
+DROP TABLE IF EXISTS reports, anonymous_feedback, notifications, transactions, marketplace_items, submissions, assignments, messages, communities, enrollments, courses, users, password_reset_codes, login_verification_codes, registration_requests, course_requests CASCADE;
 
 -- ===================================
 -- USERS TABLE
@@ -31,6 +31,42 @@ CREATE INDEX idx_users_department ON users(department);
 CREATE INDEX idx_users_email ON users(email);
 
 -- ===================================
+-- REGISTRATION REQUESTS TABLE
+CREATE TABLE registration_requests (
+  id SERIAL PRIMARY KEY,
+  reg_id VARCHAR(20) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(100) NOT NULL,
+  password VARCHAR(72) NOT NULL,
+  role VARCHAR(20) CHECK (role IN ('Teacher', 'Student', 'HOD', 'PM')),
+  department VARCHAR(50),
+  semester SMALLINT CHECK (semester BETWEEN 1 AND 8),
+  program_year SMALLINT CHECK (program_year BETWEEN 1 AND 4),
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_registration_requests_status ON registration_requests(status);
+CREATE INDEX idx_registration_requests_email ON registration_requests(email);
+
+-- ===================================
+-- COURSE REQUESTS TABLE
+CREATE TABLE course_requests (
+  id SERIAL PRIMARY KEY,
+  code VARCHAR(20) NOT NULL,
+  name VARCHAR(100) NOT NULL,
+  department VARCHAR(50),
+  semester VARCHAR(20),
+  teacher_id INT REFERENCES users(id) ON DELETE SET NULL,
+  requested_by INT REFERENCES users(id) ON DELETE SET NULL,
+  status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_course_requests_status ON course_requests(status);
+CREATE INDEX idx_course_requests_teacher ON course_requests(teacher_id);
+
+-- ===================================
 -- COURSES TABLE
 CREATE TABLE courses (
   id SERIAL PRIMARY KEY,
@@ -42,8 +78,6 @@ CREATE TABLE courses (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP
 );
-
-
 
 -- Create indexes for courses table
 CREATE INDEX idx_courses_teacher ON courses(teacher_id);
@@ -63,8 +97,6 @@ CREATE TABLE enrollments (
   UNIQUE(course_id, student_id)
 );
 
-
-
 -- Create indexes for enrollments table
 CREATE INDEX idx_enrollments_student ON enrollments(student_id);
 CREATE INDEX idx_enrollments_course ON enrollments(course_id);
@@ -80,8 +112,6 @@ CREATE TABLE communities (
   status VARCHAR(20) DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-
 
 -- ===================================
 -- MESSAGES TABLE
@@ -108,8 +138,6 @@ CREATE INDEX idx_messages_sender ON messages(sender_id);
 CREATE INDEX idx_messages_receiver ON messages(receiver_id);
 CREATE INDEX idx_messages_direct ON messages(sender_id, receiver_id) WHERE community_id IS NULL;
 
-
-
 -- ===================================
 -- ASSIGNMENTS TABLE
 CREATE TABLE assignments (
@@ -122,8 +150,6 @@ CREATE TABLE assignments (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
 -- ===================================
 -- SUBMISSIONS TABLE
 CREATE TABLE submissions (
@@ -135,8 +161,6 @@ CREATE TABLE submissions (
   grade VARCHAR(10),
   feedback TEXT
 );
-
-
 
 -- ===================================
 -- MARKETPLACE TABLE
@@ -151,8 +175,6 @@ CREATE TABLE marketplace_items (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
 -- ===================================
 -- TRANSACTIONS TABLE
 CREATE TABLE transactions (
@@ -164,8 +186,6 @@ CREATE TABLE transactions (
   status VARCHAR(20),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-
 
 -- ===================================
 -- NOTIFICATIONS TABLE
@@ -185,8 +205,6 @@ CREATE TABLE notifications (
 CREATE INDEX idx_notifications_user_id ON notifications(user_id);
 CREATE INDEX idx_notifications_is_read ON notifications(is_read);
 
-
-
 -- ===================================
 -- ANONYMOUS FEEDBACK TABLE
 CREATE TABLE anonymous_feedback (
@@ -199,8 +217,6 @@ CREATE TABLE anonymous_feedback (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-
-
 -- ===================================
 -- REPORTS TABLE
 CREATE TABLE reports (
@@ -211,8 +227,6 @@ CREATE TABLE reports (
   status VARCHAR(20) DEFAULT 'Pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-
-
 
 -- ===================================
 -- PASSWORD RESET CODES

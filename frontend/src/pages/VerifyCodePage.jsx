@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowLeft, 
   faShieldHalved,
   faExclamationCircle,
-  faRotate
+  faRotate,
+  faClock
 } from '@fortawesome/free-solid-svg-icons';
 
 const VerifyCodePage = () => {
@@ -14,6 +15,32 @@ const VerifyCodePage = () => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
+  const timerRef = useRef(null);
+
+  // Format seconds to MM:SS
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Start/Reset timer
+  const startTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    setTimeLeft(600); // Reset to 10 minutes
+    timerRef.current = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
 
   useEffect(() => {
     const storedEmail = sessionStorage.getItem('resetEmail');
@@ -21,7 +48,15 @@ const VerifyCodePage = () => {
       navigate('/forgot-password');
     } else {
       setEmail(storedEmail);
+      startTimer(); // Start timer when page loads
     }
+
+    // Cleanup timer on unmount
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
   }, [navigate]);
 
   const handleChange = (index, value) => {
@@ -107,7 +142,7 @@ const VerifyCodePage = () => {
       });
 
       if (response.ok) {
-        alert('New code sent to your email!');
+        startTimer(); // Reset timer to 10:00
         setCode(['', '', '', '', '', '']);
         document.getElementById('code-0')?.focus();
       }
@@ -151,6 +186,12 @@ const VerifyCodePage = () => {
           <div className="auth-welcome">
             <h2>Enter Verification Code</h2>
             <p>We sent a 6-digit code to <strong className="color-primary">{email}</strong></p>
+          </div>
+
+          {/* Timer Display */}
+          <div className={`auth-timer ${timeLeft <= 60 ? 'auth-timer--warning' : ''} ${timeLeft === 0 ? 'auth-timer--expired' : ''}`}>
+            <FontAwesomeIcon icon={faClock} />
+            <span>Code expires in: <strong>{formatTime(timeLeft)}</strong></span>
           </div>
 
           {/* Form */}

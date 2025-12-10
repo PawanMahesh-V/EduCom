@@ -252,7 +252,8 @@ router.get('/:id/messages', auth, async (req, res) => {
         const { limit = 50, userId } = req.query;
 
         const result = await pool.query(
-            `SELECT m.id, m.community_id, m.sender_id, m.content, m.is_anonymous, m.status, m.created_at,
+            `SELECT m.id, m.community_id, m.sender_id, m.content, m.is_anonymous, m.status, 
+                    (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id

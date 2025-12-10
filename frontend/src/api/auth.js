@@ -43,6 +43,33 @@ const authApi = {
       throw new Error(error || 'Failed to get current user');
     }
   },
+
+  getRegistrationRequests: async () => {
+    try {
+      const data = await ApiClient.get('http://localhost:5000/api/auth/registration-requests');
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to fetch registration requests');
+    }
+  },
+
+  approveRegistration: async (requestId) => {
+    try {
+      const data = await ApiClient.post(`http://localhost:5000/api/auth/registration-requests/${requestId}/approve`);
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to approve registration');
+    }
+  },
+
+  rejectRegistration: async (requestId) => {
+    try {
+      const data = await ApiClient.post(`http://localhost:5000/api/auth/registration-requests/${requestId}/reject`);
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to reject registration');
+    }
+  },
 };
 
 export default authApi;
