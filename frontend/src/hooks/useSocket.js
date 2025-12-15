@@ -130,13 +130,17 @@ export const useDirectMessages = (userId, onNewMessage) => {
     };
   }, [userId, onNewMessage]);
   return {
-    sendDirectMessage: (receiverId, message, senderName) => {
-      socketService.sendDirectMessage({
+    sendDirectMessage: (receiverId, message, senderName, isAnonymous = false) => {
+      console.log('[useSocket] sendDirectMessage called with isAnonymous:', isAnonymous);
+      const data = {
         senderId: userId,
         receiverId,
         message,
-        senderName
-      });
+        senderName,
+        isAnonymous
+      };
+      console.log('[useSocket] Sending data to socket:', data);
+      socketService.sendDirectMessage(data);
     }
   };
 };

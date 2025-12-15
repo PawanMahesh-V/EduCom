@@ -86,15 +86,15 @@ const ResetPasswordPage = () => {
     <>
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="auth-success-modal-overlay">
-          <div className="auth-success-modal">
-            <div className="auth-success-modal-icon">
+        <div className="reset-success-modal-overlay">
+          <div className="reset-success-modal">
+            <div className="reset-success-modal-icon">
               <FontAwesomeIcon icon={faCheckCircle} />
             </div>
             <h2>Password Reset Successfully!</h2>
             <p>You can now login with your new password.</p>
             <button 
-              className="auth-success-modal-button"
+              className="reset-success-modal-button"
               onClick={() => navigate('/login')}
             >
               Go to Login
@@ -103,48 +103,46 @@ const ResetPasswordPage = () => {
         </div>
       )}
 
-      <div className="auth-container">
+      <div className="reset-page">
         {/* Animated Background */}
-        <div className="auth-background">
-          <div className="gradient-orb gradient-orb--1"></div>
-          <div className="gradient-orb gradient-orb--2"></div>
+        <div className="reset-background">
+          <div className="reset-orb reset-orb--1"></div>
+          <div className="reset-orb reset-orb--2"></div>
+          <div className="reset-orb reset-orb--3"></div>
         </div>
 
         {/* Header Bar */}
-        <div className="auth-header">
-          <button className="auth-back-button" onClick={() => navigate('/')}>
+        <header className="reset-header">
+          <button className="reset-back-button" onClick={() => navigate('/')}>
             <FontAwesomeIcon icon={faArrowLeft} />
-            <span>Back to Home</span>
+            <span>Back</span>
           </button>
-        </div>
+          <div className="reset-brand">
+            <FontAwesomeIcon icon={faCheckCircle} className="reset-brand-icon" />
+            <span className="reset-brand-text">
+              Edu<span className="reset-brand-accent">Com</span>
+            </span>
+          </div>
+        </header>
 
-        {/* Main Card */}
-        <div className="auth-card auth-card--narrow">
-          <div className="auth-form-section">
-            {/* Brand Header */}
-            <div className="auth-brand-header">
-              <div className="auth-brand-icon-wrapper auth-brand-icon-wrapper--green">
-                <FontAwesomeIcon icon={faCheckCircle} className="auth-brand-icon" />
-              </div>
-              <div className="auth-brand-text">
-                Edu<span className="auth-brand-accent">Com</span>
-              </div>
-            </div>
-
+        <div className="reset-content">
+          <div className="reset-container">
             {/* Welcome Section */}
-            <div className="auth-welcome">
-              <h2>Create New Password</h2>
-              <p>Your identity has been verified. Set your new password below.</p>
+            <div className="reset-welcome">
+              <h1 className="reset-title">Create New Password</h1>
+              <p className="reset-subtitle">Your identity has been verified. Set your new password below.</p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmit} className="auth-form">
-              <div className="auth-form-group">
-                <label htmlFor="newPassword" className="auth-label">New Password</label>
-                <div className="auth-input-wrapper">
-                  <FontAwesomeIcon icon={faLock} className="auth-input-icon" />
+            <form onSubmit={handleSubmit} className="reset-form">
+              <div className="reset-form-group">
+                <label htmlFor="newPassword" className="reset-label">New Password</label>
+                <div className="reset-input-wrapper">
+                  <div className="reset-input-icon">
+                    <FontAwesomeIcon icon={faLock} />
+                  </div>
                   <input
-                    className="auth-input"
+                    className="reset-input"
                     type={showPassword ? 'text' : 'password'}
                     id="newPassword"
                     value={newPassword}
@@ -155,7 +153,7 @@ const ResetPasswordPage = () => {
                   />
                   <button
                     type="button"
-                    className="auth-password-toggle"
+                    className="reset-password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
                   >
                     <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
@@ -163,12 +161,14 @@ const ResetPasswordPage = () => {
                 </div>
               </div>
 
-              <div className="auth-form-group">
-                <label htmlFor="confirmPassword" className="auth-label">Confirm Password</label>
-                <div className="auth-input-wrapper">
-                  <FontAwesomeIcon icon={faLock} className="auth-input-icon" />
+              <div className="reset-form-group">
+                <label htmlFor="confirmPassword" className="reset-label">Confirm Password</label>
+                <div className="reset-input-wrapper">
+                  <div className="reset-input-icon">
+                    <FontAwesomeIcon icon={faLock} />
+                  </div>
                   <input
-                    className="auth-input"
+                    className="reset-input"
                     type={showConfirmPassword ? 'text' : 'password'}
                     id="confirmPassword"
                     value={confirmPassword}
@@ -179,7 +179,7 @@ const ResetPasswordPage = () => {
                   />
                   <button
                     type="button"
-                    className="auth-password-toggle"
+                    className="reset-password-toggle"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
@@ -188,13 +188,13 @@ const ResetPasswordPage = () => {
               </div>
 
               {error && (
-                <div className="auth-error-message fade-in">
+                <div className="reset-error-message fade-in">
                   <FontAwesomeIcon icon={faExclamationCircle} />
                   <span>{error}</span>
                 </div>
               )}
 
-              <button type="submit" className="auth-submit-button" disabled={loading}>
+              <button type="submit" className="reset-submit-button" disabled={loading}>
                 {loading ? (
                   <>
                     <div className="spinner-small"></div>
@@ -210,11 +210,11 @@ const ResetPasswordPage = () => {
             </form>
 
             {/* Footer */}
-            <div className="auth-footer">
-              <div className="auth-divider">
+            <div className="reset-footer">
+              <div className="reset-divider">
                 <span>or</span>
               </div>
-              <button className="auth-back-link" onClick={() => navigate('/login')}>
+              <button className="reset-back-link" onClick={() => navigate('/login')}>
                 <FontAwesomeIcon icon={faArrowLeft} />
                 <span>Back to Login</span>
               </button>

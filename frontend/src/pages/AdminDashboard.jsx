@@ -2017,6 +2017,7 @@ const AdminDashboard = () => {
         <MessageLayout
           mode="direct"
           userId={userId}
+          userRole={user?.role}
           messagesEndRef={messagesEndRef}
           conversations={conversations}
           selectedConversation={selectedConversation}

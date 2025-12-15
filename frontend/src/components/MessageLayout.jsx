@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret } from '@fortawesome/free-solid-svg-icons';
 
 const MessageLayout = ({
   // Common props
   userId,
+  userRole,
   messagesEndRef,
   
   // Direct Messages props
@@ -44,6 +45,12 @@ const MessageLayout = ({
   const [chatSearchQuery, setChatSearchQuery] = useState('');
   const [showDmOptions, setShowDmOptions] = useState(false);
   const [showCommunityOptions, setShowCommunityOptions] = useState(false);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+
+  // Check if current user is a student messaging a teacher
+  const canSendAnonymously = userRole === 'Student' && 
+    selectedConversation && 
+    ['Teacher', 'HOD', 'PM'].includes(selectedConversation.user_role);
 
   const handleOptionClick = (action, mode) => {
     if (mode === 'dm') {
@@ -225,15 +232,27 @@ const MessageLayout = ({
                   key={index}
                   className={`chat-message ${msg.sender_id === userId ? 'sent' : 'received'}`}
                 >
-                  <div className={`chat-message-bubble ${msg.sender_id === userId ? 'sent' : 'received'}`}>
+                  <div className={`chat-message-bubble ${msg.sender_id === userId ? 'sent' : 'received'} ${msg.is_anonymous ? 'anonymous-message' : ''}`}>
                     {msg.sender_id !== userId && (
                       <div className="chat-message-sender">
-                        {msg.sender_name}
+                        {msg.is_anonymous ? (
+                          <>
+                            <FontAwesomeIcon icon={faUserSecret} style={{ marginRight: '6px' }} />
+                            Anonymous Student
+                          </>
+                        ) : (
+                          msg.sender_name
+                        )}
                       </div>
                     )}
                     <div className="chat-message-text">{msg.content}</div>
                     <div className="chat-message-time">
                       {new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {msg.is_anonymous && msg.sender_id === userId && (
+                        <span className="anonymous-indicator" title="Sent anonymously">
+                          <FontAwesomeIcon icon={faUserSecret} style={{ marginLeft: '6px', fontSize: '0.75rem' }} />
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -249,32 +268,63 @@ const MessageLayout = ({
             </div>
 
             <div className="chat-input-wrapper">
-              <div className="chat-input-container">
-                <input
-                  type="text"
-                  className="chat-input"
-                  placeholder="Type a message..."
-                  value={dmMessage}
-                  onChange={(e) => {
-                    setDmMessage(e.target.value);
-                    if (onDMTyping) onDMTyping();
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      onSendDirectMessage();
-                    }
-                  }}
-                />
-                <button 
-                  className="chat-send-button"
-                  onClick={onSendDirectMessage}
-                  disabled={!dmMessage.trim()}
-                >
-                  <FontAwesomeIcon icon={faPaperPlane} />
-                  Send
-                </button>
-              </div>
+              {canSendAnonymously && (
+                <div className="anonymous-toggle-container">
+                  <button 
+                    className={`anonymous-toggle-btn ${isAnonymous ? 'active' : ''}`}
+                    onClick={() => setIsAnonymous(!isAnonymous)}
+                    title={isAnonymous ? 'Sending anonymously' : 'Send anonymously'}
+                  >
+                    <FontAwesomeIcon icon={faUserSecret} />
+                    <span>{isAnonymous ? 'Anonymous Mode ON' : 'Send Anonymously'}</span>
+                  </button>
+                  {isAnonymous && (
+                    <span className="anonymous-note">Your identity will be hidden from the teacher</span>
+                  )}
+                </div>
+              )}
+              {/* Disable input for teachers in anonymous conversation */}
+              {selectedConversation.user_id === 'anonymous' ? (
+                <div className="anonymous-reply-disabled">
+                  <p style={{ textAlign: 'center', color: '#6c757d', padding: '20px', fontStyle: 'italic' }}>
+                    <FontAwesomeIcon icon={faUserSecret} style={{ marginRight: '8px' }} />
+                    You cannot reply to anonymous messages. Students will remain anonymous.
+                  </p>
+                </div>
+              ) : (
+                <div className="chat-input-container">
+                  <input
+                    type="text"
+                    className="chat-input"
+                    placeholder={isAnonymous ? "Type an anonymous message..." : "Type a message..."}
+                    value={dmMessage}
+                    onChange={(e) => {
+                      setDmMessage(e.target.value);
+                      if (onDMTyping) onDMTyping();
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        console.log('[MessageLayout] Sending message with isAnonymous:', isAnonymous);
+                        onSendDirectMessage(isAnonymous);
+                        setIsAnonymous(false);
+                      }
+                    }}
+                  />
+                  <button 
+                    className="chat-send-button"
+                    onClick={() => {
+                      console.log('[MessageLayout] Send button clicked with isAnonymous:', isAnonymous);
+                      onSendDirectMessage(isAnonymous);
+                      setIsAnonymous(false);
+                    }}
+                    disabled={!dmMessage.trim()}
+                  >
+                    <FontAwesomeIcon icon={faPaperPlane} />
+                    Send
+                  </button>
+                </div>
+              )}
             </div>
           </>
         ) : (

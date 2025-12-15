@@ -160,47 +160,45 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-background">
-        <div className="gradient-orb gradient-orb--1"></div>
-        <div className="gradient-orb gradient-orb--2"></div>
+    <div className="login-page">
+      <div className="login-background">
+        <div className="login-orb login-orb--1"></div>
+        <div className="login-orb login-orb--2"></div>
+        <div className="login-orb login-orb--3"></div>
       </div>
 
-      <header className="auth-header">
-        <button className="auth-back-button" onClick={() => navigate('/')}>
+      <header className="login-header">
+        <button className="login-back-button" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faArrowLeft} />
-          <span>Back to Home</span>
+          <span>Back</span>
         </button>
+        <div className="login-brand">
+          <FontAwesomeIcon icon={faGraduationCap} className="login-brand-icon" />
+          <span className="login-brand-text">
+            Edu<span className="login-brand-accent">Com</span>
+          </span>
+        </div>
       </header>
 
-      <div className="auth-card glass">
-        <div className="auth-form-section">
-          <div className="auth-brand-header">
-            <div className="auth-brand-icon-wrapper">
-              <FontAwesomeIcon icon={faGraduationCap} className="auth-brand-icon" />
-            </div>
-            <span className="auth-brand-text">
-              Edu<span className="auth-brand-accent">Com</span>
-            </span>
-          </div>
-
-          <div className="auth-welcome">
-            <h2>{showVerification ? 'Verify Your Login' : 'Welcome Back!'}</h2>
-            <p>{showVerification ? 'Enter the 6-digit code sent to your email' : 'Sign in to your account to continue your learning journey'}</p>
+      <div className="login-content">
+        <div className="login-container">
+          <div className="login-welcome">
+            <h1 className="login-title">{showVerification ? 'Verify Your Login' : 'Welcome Back!'}</h1>
+            <p className="login-subtitle">{showVerification ? 'Enter the 6-digit code sent to your email' : 'Sign in to your account to continue your learning journey'}</p>
           </div>
 
           {!showVerification ? (
-            <form className="auth-form" onSubmit={handleSubmit}>
-            <div className="auth-form-group">
-              <label className="auth-label" htmlFor="identifier">
+            <form className="login-form" onSubmit={handleSubmit}>
+            <div className="login-form-group">
+              <label className="login-label" htmlFor="identifier">
                 Email or Registration ID
               </label>
-              <div className="auth-input-wrapper">
-                <div className="auth-input-icon">
+              <div className="login-input-wrapper">
+                <div className="login-input-icon">
                   <FontAwesomeIcon icon={faEnvelope} />
                 </div>
                 <input
-                  className="auth-input"
+                  className="login-input"
                   type="text"
                   id="identifier"
                   name="identifier"
@@ -211,7 +209,7 @@ const LoginPage = () => {
                 />
               </div>
               {fieldErrors.identifier && (
-                <div className="auth-error-message fade-in mt-2">
+                <div className="login-error-message fade-in mt-2">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
@@ -220,17 +218,17 @@ const LoginPage = () => {
               )}
             </div>
 
-            <div className="auth-form-group">
-              <div className="auth-label-row">
-                <label className="auth-label" htmlFor="password">Password</label>
-                <Link to="/forgot-password" className="auth-forgot-link">Forgot password?</Link>
+            <div className="login-form-group">
+              <div className="login-label-row">
+                <label className="login-label" htmlFor="password">Password</label>
+                <Link to="/forgot-password" className="login-forgot-link">Forgot password?</Link>
               </div>
-              <div className="auth-input-wrapper">
-                <div className="auth-input-icon">
+              <div className="login-input-wrapper">
+                <div className="login-input-icon">
                   <FontAwesomeIcon icon={faLock} />
                 </div>
                 <input
-                  className="auth-input"
+                  className="login-input"
                   type={showPassword ? 'text' : 'password'}
                   id="password"
                   name="password"
@@ -241,7 +239,7 @@ const LoginPage = () => {
                 />
                 <button
                   type="button"
-                  className="auth-password-toggle"
+                  className="login-password-toggle"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
@@ -249,7 +247,7 @@ const LoginPage = () => {
                 </button>
               </div>
               {fieldErrors.password && (
-                <div className="auth-error-message fade-in mt-2">
+                <div className="login-error-message fade-in mt-2">
                   <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
@@ -259,7 +257,7 @@ const LoginPage = () => {
             </div>
 
             {error && (
-              <div className="auth-error-message fade-in">
+              <div className="login-error-message fade-in">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
@@ -268,7 +266,7 @@ const LoginPage = () => {
             )}
             
             <button 
-              className="auth-submit-button" 
+              className="login-submit-button" 
               type="submit"
               disabled={loading}
             >
@@ -282,27 +280,27 @@ const LoginPage = () => {
               )}
             </button>
 
-            <div className="auth-footer">
-              <div className="auth-divider">
+            <div className="login-footer">
+              <div className="login-divider">
                 <span>Don't have an account?</span>
               </div>
-              <Link to="/register" className="auth-link-button">
+              <Link to="/register" className="login-link-button">
                 Register
               </Link>
             </div>
           </form>
           ) : (
-            <form className="auth-form" onSubmit={handleVerificationSubmit}>
-            <div className="auth-form-group">
-              <label className="auth-label" htmlFor="code">
+            <form className="login-form" onSubmit={handleVerificationSubmit}>
+            <div className="login-form-group">
+              <label className="login-label" htmlFor="code">
                 Verification Code
               </label>
-              <div className="auth-input-wrapper">
-                <div className="auth-input-icon">
+              <div className="login-input-wrapper">
+                <div className="login-input-icon">
                   <FontAwesomeIcon icon={faLock} />
                 </div>
                 <input
-                  className="auth-input"
+                  className="login-input"
                   type="text"
                   id="code"
                   name="code"
@@ -320,7 +318,7 @@ const LoginPage = () => {
             </div>
 
             {error && (
-              <div className="auth-error-message fade-in">
+              <div className="login-error-message fade-in">
                 <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
@@ -329,7 +327,7 @@ const LoginPage = () => {
             )}
             
             <button 
-              className="auth-submit-button" 
+              className="login-submit-button" 
               type="submit"
               disabled={loading}
             >
@@ -343,10 +341,10 @@ const LoginPage = () => {
               )}
             </button>
 
-            <div className="auth-footer">
+            <div className="login-footer">
               <button 
                 type="button"
-                className="auth-back-link"
+                className="login-back-link"
                 onClick={() => {
                   setShowVerification(false);
                   setVerificationCode('');
@@ -358,18 +356,6 @@ const LoginPage = () => {
             </div>
           </form>
           )}
-        </div>
-
-        <div className="auth-image-section">
-          <div className="auth-illustration-container">
-            <div className="auth-illustration-wrapper">
-              <img 
-                src={loginImage} 
-                alt="Welcome to EduCom" 
-                className="auth-illustration"
-              />
-            </div>
-          </div>
         </div>
       </div>
     </div>

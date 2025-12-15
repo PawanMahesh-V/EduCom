@@ -154,49 +154,45 @@ const VerifyCodePage = () => {
   };
 
   return (
-    <div className="auth-container">
+    <div className="verify-page">
       {/* Animated Background */}
-      <div className="auth-background">
-        <div className="gradient-orb gradient-orb--1"></div>
-        <div className="gradient-orb gradient-orb--2"></div>
+      <div className="verify-background">
+        <div className="verify-orb verify-orb--1"></div>
+        <div className="verify-orb verify-orb--2"></div>
+        <div className="verify-orb verify-orb--3"></div>
       </div>
 
       {/* Header Bar */}
-      <div className="auth-header">
-        <button className="auth-back-button" onClick={() => navigate('/')}>
+      <header className="verify-header">
+        <button className="verify-back-button" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faArrowLeft} />
-          <span>Back to Home</span>
+          <span>Back</span>
         </button>
-      </div>
+        <div className="verify-brand">
+          <FontAwesomeIcon icon={faShieldHalved} className="verify-brand-icon" />
+          <span className="verify-brand-text">
+            Edu<span className="verify-brand-accent">Com</span>
+          </span>
+        </div>
+      </header>
 
-      {/* Main Card */}
-      <div className="auth-card auth-card--medium">
-        <div className="auth-form-section">
-          {/* Brand Header */}
-          <div className="auth-brand-header">
-            <div className="auth-brand-icon-wrapper">
-              <FontAwesomeIcon icon={faShieldHalved} className="auth-brand-icon" />
-            </div>
-            <div className="auth-brand-text">
-              Edu<span className="auth-brand-accent">Com</span>
-            </div>
-          </div>
-
+      <div className="verify-content">
+        <div className="verify-container">
           {/* Welcome Section */}
-          <div className="auth-welcome">
-            <h2>Enter Verification Code</h2>
-            <p>We sent a 6-digit code to <strong className="color-primary">{email}</strong></p>
+          <div className="verify-welcome">
+            <h1 className="verify-title">Enter Verification Code</h1>
+            <p className="verify-subtitle">We sent a 6-digit code to <strong className="color-primary">{email}</strong></p>
           </div>
 
           {/* Timer Display */}
-          <div className={`auth-timer ${timeLeft <= 60 ? 'auth-timer--warning' : ''} ${timeLeft === 0 ? 'auth-timer--expired' : ''}`}>
+          <div className={`verify-timer ${timeLeft <= 60 ? 'verify-timer--warning' : ''} ${timeLeft === 0 ? 'verify-timer--expired' : ''}`}>
             <FontAwesomeIcon icon={faClock} />
             <span>Code expires in: <strong>{formatTime(timeLeft)}</strong></span>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="auth-form">
-            <div className="auth-code-inputs" onPaste={handlePaste}>
+          <form onSubmit={handleSubmit} className="verify-form">
+            <div className="verify-code-inputs" onPaste={handlePaste}>
               {code.map((digit, index) => (
                 <input
                   key={index}
@@ -207,20 +203,20 @@ const VerifyCodePage = () => {
                   onChange={(e) => handleChange(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(index, e)}
                   disabled={loading}
-                  className="auth-code-input"
+                  className="verify-code-input"
                   autoFocus={index === 0}
                 />
               ))}
             </div>
 
             {error && (
-              <div className="auth-error-message fade-in">
+              <div className="verify-error-message fade-in">
                 <FontAwesomeIcon icon={faExclamationCircle} />
                 <span>{error}</span>
               </div>
             )}
 
-            <button type="submit" className="auth-submit-button" disabled={loading || code.join('').length !== 6}>
+            <button type="submit" className="verify-submit-button" disabled={loading || code.join('').length !== 6}>
               {loading ? (
                 <>
                   <div className="spinner-small"></div>
@@ -234,11 +230,11 @@ const VerifyCodePage = () => {
               )}
             </button>
 
-            <div className="auth-resend-section">
+            <div className="verify-resend-section">
               <p>Didn't receive the code?</p>
               <button 
                 type="button" 
-                className="auth-resend-button" 
+                className="verify-resend-button" 
                 onClick={handleResendCode}
                 disabled={loading}
               >
@@ -249,11 +245,11 @@ const VerifyCodePage = () => {
           </form>
 
           {/* Footer */}
-          <div className="auth-footer">
-            <div className="auth-divider">
+          <div className="verify-footer">
+            <div className="verify-divider">
               <span>or</span>
             </div>
-            <button className="auth-back-link" onClick={() => navigate('/login')}>
+            <button className="verify-back-link" onClick={() => navigate('/login')}>
               <FontAwesomeIcon icon={faArrowLeft} />
               <span>Back to Login</span>
             </button>

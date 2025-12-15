@@ -173,7 +173,7 @@ const RegisterPage = () => {
   const renderFieldError = (fieldName) => {
     if (!fieldErrors[fieldName]) return null;
     return (
-      <div className="auth-error-message fade-in mt-1">
+      <div className="register-error-message fade-in mt-1">
         <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
         </svg>
@@ -223,49 +223,47 @@ const RegisterPage = () => {
   };
 
   return (
-    <div className="auth-container">
-      <div className="auth-background">
-        <div className="gradient-orb gradient-orb--1"></div>
-        <div className="gradient-orb gradient-orb--2"></div>
+    <div className="register-page">
+      <div className="register-background">
+        <div className="register-orb register-orb--1"></div>
+        <div className="register-orb register-orb--2"></div>
+        <div className="register-orb register-orb--3"></div>
       </div>
 
-      <header className="auth-header">
-        <button className="auth-back-button" onClick={() => navigate('/')}>
+      <header className="register-header">
+        <button className="register-back-button" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faArrowLeft} />
-          <span>Back to Home</span>
+          <span>Back</span>
         </button>
+        <div className="register-brand">
+          <FontAwesomeIcon icon={faGraduationCap} className="register-brand-icon" />
+          <span className="register-brand-text">
+            Edu<span className="register-brand-accent">Com</span>
+          </span>
+        </div>
       </header>
 
-      <div className="auth-card auth-card--wide glass">
-        <div className="auth-form-section auth-form-section--wide">
-          <div className="auth-brand-header">
-            <div className="auth-brand-icon-wrapper">
-              <FontAwesomeIcon icon={faGraduationCap} className="auth-brand-icon" />
-            </div>
-            <span className="auth-brand-text">
-              Edu<span className="auth-brand-accent">Com</span>
-            </span>
-          </div>
-
+      <div className="register-content">
+        <div className="register-container">
           {step === 1 ? (
             <>
-              <div className="auth-welcome">
-                <h2>Register</h2>
-                <p>Register to join the EduCom learning community</p>
+              <div className="register-welcome">
+                <h1 className="register-title">Create Your Account</h1>
+                <p className="register-subtitle">Join the EduCom learning community and start your journey</p>
               </div>
 
-              <form className="auth-form" onSubmit={handleSubmit}>
-                <div className="auth-form-grid">
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="reg_id">
+              <form className="register-form" onSubmit={handleSubmit}>
+                <div className="register-form-grid">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="reg_id">
                       Registration ID
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faIdCard} />
                       </div>
                       <input
-                        className={`auth-input ${fieldErrors.reg_id ? 'auth-input--error' : ''}`}
+                        className={`register-input ${fieldErrors.reg_id ? 'register-input--error' : ''}`}
                         type="text"
                         id="reg_id"
                         name="reg_id"
@@ -278,16 +276,16 @@ const RegisterPage = () => {
                     {renderFieldError('reg_id')}
                   </div>
 
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="name">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="name">
                       Full Name
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faUser} />
                       </div>
                       <input
-                        className={`auth-input ${fieldErrors.name ? 'auth-input--error' : ''}`}
+                        className={`register-input ${fieldErrors.name ? 'register-input--error' : ''}`}
                         type="text"
                         id="name"
                         name="name"
@@ -300,16 +298,16 @@ const RegisterPage = () => {
                     {renderFieldError('name')}
                   </div>
 
-                  <div className="auth-form-group auth-form-group--full">
-                    <label className="auth-label" htmlFor="email">
+                  <div className="register-form-group register-form-group--full">
+                    <label className="register-label" htmlFor="email">
                       Email Address
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faEnvelope} />
                       </div>
                       <input
-                        className={`auth-input ${fieldErrors.email ? 'auth-input--error' : ''} ${emailValid === true ? 'auth-input--success' : ''}`}
+                        className={`register-input ${fieldErrors.email ? 'register-input--error' : ''} ${emailValid === true ? 'register-input--success' : ''}`}
                         type="email"
                         id="email"
                         name="email"
@@ -320,12 +318,12 @@ const RegisterPage = () => {
                         disabled={loading}
                       />
                       {emailChecking && (
-                        <div className="auth-input-status">
+                        <div className="register-input-status">
                           <FontAwesomeIcon icon={faSpinner} spin />
                         </div>
                       )}
                       {emailValid === true && !emailChecking && (
-                        <div className="auth-input-status auth-input-status--success">
+                        <div className="register-input-status register-input-status--success">
                           <FontAwesomeIcon icon={faCheckCircle} />
                         </div>
                       )}
@@ -333,16 +331,16 @@ const RegisterPage = () => {
                     {renderFieldError('email')}
                   </div>
 
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="password">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="password">
                       Password
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faLock} />
                       </div>
                       <input
-                        className={`auth-input ${fieldErrors.password ? 'auth-input--error' : ''}`}
+                        className={`register-input ${fieldErrors.password ? 'register-input--error' : ''}`}
                         type={showPassword ? 'text' : 'password'}
                         id="password"
                         name="password"
@@ -353,7 +351,7 @@ const RegisterPage = () => {
                       />
                       <button
                         type="button"
-                        className="auth-password-toggle"
+                        className="register-password-toggle"
                         onClick={() => setShowPassword(!showPassword)}
                       >
                         <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
@@ -362,16 +360,16 @@ const RegisterPage = () => {
                     {renderFieldError('password')}
                   </div>
 
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="confirmPassword">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="confirmPassword">
                       Confirm Password
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faLock} />
                       </div>
                       <input
-                        className={`auth-input ${fieldErrors.confirmPassword ? 'auth-input--error' : ''}`}
+                        className={`register-input ${fieldErrors.confirmPassword ? 'register-input--error' : ''}`}
                         type={showConfirmPassword ? 'text' : 'password'}
                         id="confirmPassword"
                         name="confirmPassword"
@@ -382,7 +380,7 @@ const RegisterPage = () => {
                       />
                       <button
                         type="button"
-                        className="auth-password-toggle"
+                        className="register-password-toggle"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                       >
                         <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
@@ -391,16 +389,16 @@ const RegisterPage = () => {
                     {renderFieldError('confirmPassword')}
                   </div>
 
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="role">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="role">
                       Role
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faUserGraduate} />
                       </div>
                       <select
-                        className="auth-input auth-select"
+                        className="register-input register-select"
                         id="role"
                         name="role"
                         value={formData.role}
@@ -415,16 +413,16 @@ const RegisterPage = () => {
                     </div>
                   </div>
 
-                  <div className="auth-form-group">
-                    <label className="auth-label" htmlFor="department">
+                  <div className="register-form-group">
+                    <label className="register-label" htmlFor="department">
                       Department
                     </label>
-                    <div className="auth-input-wrapper">
-                      <div className="auth-input-icon">
+                    <div className="register-input-wrapper">
+                      <div className="register-input-icon">
                         <FontAwesomeIcon icon={faBuilding} />
                       </div>
                       <select
-                        className="auth-input auth-select"
+                        className="register-input register-select"
                         id="department"
                         name="department"
                         value={formData.department}
@@ -439,16 +437,16 @@ const RegisterPage = () => {
                   </div>
 
                   {formData.role === 'Student' && (
-                    <div className="auth-form-group">
-                      <label className="auth-label" htmlFor="semester">
+                    <div className="register-form-group">
+                      <label className="register-label" htmlFor="semester">
                         Semester
                       </label>
-                      <div className="auth-input-wrapper">
-                        <div className="auth-input-icon">
+                      <div className="register-input-wrapper">
+                        <div className="register-input-icon">
                           <FontAwesomeIcon icon={faGraduationCap} />
                         </div>
                         <select
-                          className={`auth-input auth-select ${fieldErrors.semester ? 'auth-input--error' : ''}`}
+                          className={`register-input register-select ${fieldErrors.semester ? 'register-input--error' : ''}`}
                           id="semester"
                           name="semester"
                           value={formData.semester}
@@ -470,16 +468,16 @@ const RegisterPage = () => {
                   )}
 
                   {formData.role === 'PM' && (
-                    <div className="auth-form-group">
-                      <label className="auth-label" htmlFor="program_year">
+                    <div className="register-form-group">
+                      <label className="register-label" htmlFor="program_year">
                         Program Year
                       </label>
-                      <div className="auth-input-wrapper">
-                        <div className="auth-input-icon">
+                      <div className="register-input-wrapper">
+                        <div className="register-input-icon">
                           <FontAwesomeIcon icon={faGraduationCap} />
                         </div>
                         <select
-                          className={`auth-input auth-select ${fieldErrors.program_year ? 'auth-input--error' : ''}`}
+                          className={`register-input register-select ${fieldErrors.program_year ? 'register-input--error' : ''}`}
                           id="program_year"
                           name="program_year"
                           value={formData.program_year}
@@ -498,7 +496,7 @@ const RegisterPage = () => {
                 </div>
 
                 {error && (
-                  <div className="auth-error-message fade-in">
+                  <div className="register-error-message fade-in">
                     <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                     </svg>
@@ -507,7 +505,7 @@ const RegisterPage = () => {
                 )}
                 
                 <button 
-                  className="auth-submit-button" 
+                  className="register-submit-button" 
                   type="submit"
                   disabled={loading || emailChecking}
                 >
@@ -521,28 +519,28 @@ const RegisterPage = () => {
                   )}
                 </button>
 
-                <div className="auth-footer">
-                  <div className="auth-divider">
+                <div className="register-footer">
+                  <div className="register-divider">
                     <span>Already have an account?</span>
                   </div>
-                  <Link to="/login" className="auth-link-button">
+                  <Link to="/login" className="register-link-button">
                     Sign In
                   </Link>
                 </div>
               </form>
             </>
           ) : (
-            <div className="auth-success-state">
-              <div className="auth-success-icon">
+            <div className="register-success-state">
+              <div className="register-success-icon">
                 <FontAwesomeIcon icon={faCheckCircle} />
               </div>
               <h2>Registration Submitted!</h2>
               <p>Your registration request has been submitted successfully.</p>
-              <p className="auth-success-note">
+              <p className="register-success-note">
                 Please wait for admin approval. You will be notified via email once your account is activated.
               </p>
               <button 
-                className="auth-submit-button"
+                className="register-submit-button"
                 onClick={() => navigate('/login')}
               >
                 Go to Login

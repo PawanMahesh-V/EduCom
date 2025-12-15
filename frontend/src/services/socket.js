@@ -132,9 +132,12 @@ class SocketService {
   }
   // Direct Message methods
   sendDirectMessage(data) {
+    console.log('[SocketService] sendDirectMessage called with data:', data);
     if (this.socket) {
+      console.log('[SocketService] Emitting send-direct-message event');
       this.socket.emit('send-direct-message', data);
     } else {
+      console.error('[SocketService] Socket not connected');
     }
   }
   onNewDirectMessage(callback) {

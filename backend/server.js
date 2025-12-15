@@ -261,36 +261,60 @@ io.on('connection', (socket) => {
 
     // Direct message events
     socket.on('send-direct-message', async (data) => {
-        const { senderId, receiverId, message, senderName } = data;
+        console.log('[Backend] Received send-direct-message event with data:', data);
+        const { senderId, receiverId, message, senderName, isAnonymous = false } = data;
+        console.log('[Backend] Extracted isAnonymous:', isAnonymous);
         
         try {
+            // Validate anonymous messages: only students can send anonymous to teachers/HODs/PMs
+            if (isAnonymous) {
+                console.log('[Backend] Message is anonymous, validating roles...');
+                const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
+                const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
+                
+                if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {
+                    socket.emit('message-error', { error: 'User not found' });
+                    return;
+                }
+                
+                const senderRole = senderResult.rows[0].role;
+                const receiverRole = receiverResult.rows[0].role;
+                
+                // Only allow students to send anonymous messages to teachers/HODs/PMs
+                if (senderRole !== 'Student' || !['Teacher', 'HOD', 'PM'].includes(receiverRole)) {
+                    socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers' });
+                    return;
+                }
+            }
+            
             // Save message to database (community_id is NULL for direct messages)
             const result = await pool.query(
-                `INSERT INTO messages (sender_id, receiver_id, content, is_read, community_id, status)
-                 VALUES ($1, $2, $3, false, NULL, 'approved')
-                 RETURNING id, sender_id, receiver_id, content, is_read, 
+                `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
+                 VALUES ($1, $2, $3, false, $4, NULL, 'approved')
+                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous,
                            (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at`,
-                [senderId, receiverId, message]
+                [senderId, receiverId, message, isAnonymous]
             );
 
             const newMessage = result.rows[0];
             
-            // Send to receiver if online
+            // Send to receiver if online (hide sender name if anonymous)
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
-                    sender_name: senderName
+                    sender_name: isAnonymous ? 'Anonymous Student' : senderName
                 });
             }
 
-            // Send confirmation to sender
+            // Send confirmation to sender (always show real name to sender)
             socket.emit('direct-message-sent', {
                 ...newMessage,
                 sender_name: senderName
             });
         } catch (error) {
-            // Error event removed: not handled on frontend
+            console.error('Error sending direct message:', error);
+            socket.emit('message-error', { error: 'Failed to send message' });
         }
     });
 

@@ -72,50 +72,48 @@ const ForgotPasswordPage = () => {
   };
 
   return (
-    <div className="auth-container">
+    <div className="forgot-page">
       {/* Animated Background */}
-      <div className="auth-background">
-        <div className="gradient-orb gradient-orb--1"></div>
-        <div className="gradient-orb gradient-orb--2"></div>
+      <div className="forgot-background">
+        <div className="forgot-orb forgot-orb--1"></div>
+        <div className="forgot-orb forgot-orb--2"></div>
+        <div className="forgot-orb forgot-orb--3"></div>
       </div>
 
       {/* Header Bar */}
-      <div className="auth-header">
-        <button className="auth-back-button" onClick={() => navigate('/')}>
+      <header className="forgot-header">
+        <button className="forgot-back-button" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faArrowLeft} />
-          <span>Back to Home</span>
+          <span>Back</span>
         </button>
-      </div>
+        <div className="forgot-brand">
+          <FontAwesomeIcon icon={faKey} className="forgot-brand-icon" />
+          <span className="forgot-brand-text">
+            Edu<span className="forgot-brand-accent">Com</span>
+          </span>
+        </div>
+      </header>
 
-      {/* Main Card */}
-      <div className="auth-card auth-card--narrow">
-        <div className="auth-form-section">
-          {/* Brand Header */}
-          <div className="auth-brand-header">
-            <div className="auth-brand-icon-wrapper">
-              <FontAwesomeIcon icon={faKey} className="auth-brand-icon" />
-            </div>
-            <div className="auth-brand-text">
-              Edu<span className="auth-brand-accent">Com</span>
-            </div>
-          </div>
-
+      <div className="forgot-content">
+        <div className="forgot-container">
           {/* Welcome Section */}
-          <div className="auth-welcome">
-            <h2>Forgot Password?</h2>
-            <p>Enter your email address and we'll send you a verification code to reset your password.</p>
+          <div className="forgot-welcome">
+            <h1 className="forgot-title">Forgot Password?</h1>
+            <p className="forgot-subtitle">Enter your email address and we'll send you a verification code to reset your password.</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="auth-form">
-            <div className="auth-form-group">
-              <label htmlFor="email" className="auth-label">Email Address</label>
-              <div className="auth-input-wrapper">
-                <FontAwesomeIcon icon={faEnvelope} className="auth-input-icon" />
+          <form onSubmit={handleSubmit} className="forgot-form">
+            <div className="forgot-form-group">
+              <label htmlFor="email" className="forgot-label">Email Address</label>
+              <div className="forgot-input-wrapper">
+                <div className="forgot-input-icon">
+                  <FontAwesomeIcon icon={faEnvelope} />
+                </div>
                 <input
                   type="email"
                   id="email"
-                  className="auth-input"
+                  className="forgot-input"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
@@ -127,7 +125,7 @@ const ForgotPasswordPage = () => {
                 />
               </div>
               {fieldError && (
-                <div className="auth-error-message fade-in mt-2">
+                <div className="forgot-error-message fade-in mt-2">
                   <FontAwesomeIcon icon={faExclamationCircle} />
                   <span>{fieldError}</span>
                 </div>
@@ -135,20 +133,20 @@ const ForgotPasswordPage = () => {
             </div>
 
             {error && (
-              <div className="auth-error-message fade-in">
+              <div className="forgot-error-message fade-in">
                 <FontAwesomeIcon icon={faExclamationCircle} />
                 <span>{error}</span>
               </div>
             )}
             
             {message && (
-              <div className="auth-success-message fade-in">
+              <div className="forgot-success-message fade-in">
                 <FontAwesomeIcon icon={faCircleCheck} />
                 <span>{message}</span>
               </div>
             )}
 
-            <button type="submit" className="auth-submit-button" disabled={loading}>
+            <button type="submit" className="forgot-submit-button" disabled={loading}>
               {loading ? (
                 <>
                   <div className="spinner-small"></div>
@@ -164,11 +162,11 @@ const ForgotPasswordPage = () => {
           </form>
 
           {/* Footer */}
-          <div className="auth-footer">
-            <div className="auth-divider">
+          <div className="forgot-footer">
+            <div className="forgot-divider">
               <span>or</span>
             </div>
-            <button className="auth-back-link" onClick={() => navigate('/login')}>
+            <button className="forgot-back-link" onClick={() => navigate('/login')}>
               <FontAwesomeIcon icon={faArrowLeft} />
               <span>Back to Login</span>
             </button>

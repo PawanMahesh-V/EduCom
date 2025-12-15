@@ -347,12 +347,15 @@ const StudentDashboard = () => {
       stopTyping();
     }
   };
-  const handleSendDirectMessage = () => {
+  const handleSendDirectMessage = (isAnonymous = false) => {
+    console.log('[StudentDashboard] handleSendDirectMessage called with isAnonymous:', isAnonymous);
     if (message.trim() && selectedConversation) {
+      console.log('[StudentDashboard] Calling sendDirectMessage with isAnonymous:', isAnonymous);
       sendDirectMessage(
         selectedConversation.user_id,
         message,
-        user?.name || 'Student'
+        user?.name || 'Student',
+        isAnonymous
       );
       
       setMessage('');
@@ -536,6 +539,7 @@ const StudentDashboard = () => {
         <MessageLayout
           mode="direct"
           userId={userId}
+          userRole={user?.role}
           messagesEndRef={messagesEndRef}
           conversations={conversations}
           selectedConversation={selectedConversation}
