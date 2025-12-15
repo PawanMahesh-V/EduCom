@@ -235,6 +235,13 @@ const AdminDashboard = () => {
   };
   const handleSelectConversation = async (conversation) => {
     setSelectedConversation(conversation);
+    
+    // If conversation is null (back button clicked), just clear messages and return
+    if (!conversation) {
+      setDmMessages([]);
+      return;
+    }
+    
     setDmMessages([]);
     await loadDirectMessages(conversation.user_id);
     // Refresh conversations to update unread count

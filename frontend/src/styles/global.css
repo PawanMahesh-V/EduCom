@@ -5453,7 +5453,7 @@ button {
 }
 
 .chat-message-bubble.received {
-  background: #f0f0f0;
+  background: var(--bg-secondary);
   color: #1a1a1a;
   border-bottom-left-radius: 4px;
   border: none;
@@ -5568,8 +5568,20 @@ button {
     grid-template-columns: 1fr;
   }
 
-  .chat-sidebar {
+  .chat-sidebar.mobile-hidden {
     display: none;
+  }
+
+  .chat-sidebar.mobile-visible {
+    display: flex;
+  }
+
+  .chat-main.mobile-hidden {
+    display: none;
+  }
+
+  .chat-main.mobile-visible {
+    display: flex;
   }
 
   .course-card-grid {
@@ -7056,10 +7068,22 @@ window.alert {
     width: 100%;
     justify-content: flex-start;
     padding: 1rem 1.25rem;
+    color: #ffffff;
+  }
+
+  .topnav-item:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .topnav-item.active {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.15);
   }
 
   .topnav-item .item-text {
     display: inline;
+    color: #ffffff;
   }
 
   .topnav-item::before {
@@ -7632,4 +7656,34 @@ window.alert {
 
 .anonymous-reply-disabled p {
   margin: 0;
+}
+
+/* Chat Back Button for Mobile */
+.chat-back-btn {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #3B82F6;
+  font-size: 1.25rem;
+  cursor: pointer;
+  padding: 8px;
+  margin-right: 12px;
+  border-radius: 50%;
+  transition: background-color 0.2s ease;
+}
+
+.chat-back-btn:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.chat-back-btn:active {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+
+@media (max-width: 768px) {
+  .chat-back-btn {
+    display: flex;
+  }
 }

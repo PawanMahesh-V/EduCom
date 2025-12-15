@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 const MessageLayout = ({
   // Common props
@@ -80,7 +80,7 @@ const MessageLayout = ({
   const renderDirectMessages = () => (
     <>
       {/* Conversations List Sidebar */}
-      <div className="chat-sidebar">
+      <div className={`chat-sidebar ${selectedConversation ? 'mobile-hidden' : 'mobile-visible'}`}>
         <div className="chat-header">
           <h2 className="chat-title">Messages</h2>
           <div className="user-search-section">
@@ -192,10 +192,13 @@ const MessageLayout = ({
       </div>
 
       {/* Chat Main Area */}
-      <div className="chat-main">
+      <div className={`chat-main ${selectedConversation ? 'mobile-visible' : 'mobile-hidden'}`}>
         {selectedConversation ? (
           <>
             <div className="chat-main-header">
+              <button className="chat-back-btn" onClick={() => onSelectConversation(null)}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+              </button>
               <div className="chat-user-info">
                 <div className="chat-avatar">{selectedConversation.user_name.charAt(0)}</div>
                 <div>
@@ -341,7 +344,7 @@ const MessageLayout = ({
   const renderCommunityChat = () => (
     <>
       {/* Chat List Sidebar */}
-      <div className="chat-sidebar">
+      <div className={`chat-sidebar ${selectedChat ? 'mobile-hidden' : 'mobile-visible'}`}>
         <div className="chat-header">
           <h2 className="chat-title">Community Chats</h2>
           <div className="chat-search-wrapper">
@@ -405,10 +408,13 @@ const MessageLayout = ({
       </div>
       
       {/* Chat Area */}
-      <div className="chat-main">
+      <div className={`chat-main ${selectedChat ? 'mobile-visible' : 'mobile-hidden'}`}>
         {selectedChat ? (
           <>
             <div className="chat-main-header">
+              <button className="chat-back-btn" onClick={() => onSelectChat(null)}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+              </button>
               <div className="chat-user-info">
                 <div className="chat-avatar">{selectedChat.name.charAt(0)}</div>
                 <div>
