@@ -98,8 +98,7 @@ router.post('/', auth, async (req, res) => {
             return res.status(400).json({ message: 'Missing required fields' });
         }
 
-        const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
-    const validDepartments = ['CS', 'BBA', 'IT'];
+        const { ROLES: validRoles, DEPARTMENTS: validDepartments } = require('../config/constants');
         let semesterValue = null;
         let programYearValue = null;
         
@@ -180,8 +179,7 @@ router.put('/:id', auth, async (req, res) => {
             programYearValue = py;
         }
 
-        const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
-        const validDepartments = ['CS', 'BBA', 'IT'];
+        const { ROLES: validRoles, DEPARTMENTS: validDepartments } = require('../config/constants');
         
         if (!validRoles.includes(role)) {
             return res.status(400).json({ message: `Invalid role. Must be one of: ${validRoles.join(', ')}` });

@@ -1,47 +1,45 @@
 import ApiClient from './client';
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { API_ENDPOINTS } from '../config/api';
 
 const communityApi = {
   getAll: async () => {
-    return await ApiClient.get(`${API_BASE_URL}/communities`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.BASE);
   },
 
   getById: async (id) => {
-    return await ApiClient.get(`${API_BASE_URL}/communities/${id}`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.BY_ID(id));
   },
 
   create: async (communityData) => {
-    return await ApiClient.post(`${API_BASE_URL}/communities`, communityData);
+    return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.BASE, communityData);
   },
 
   update: async (id, communityData) => {
-    return await ApiClient.put(`${API_BASE_URL}/communities/${id}`, communityData);
+    return await ApiClient.put(API_ENDPOINTS.COMMUNITIES.BY_ID(id), communityData);
   },
 
   delete: async (id) => {
-    return await ApiClient.delete(`${API_BASE_URL}/communities/${id}`);
+    return await ApiClient.delete(API_ENDPOINTS.COMMUNITIES.BY_ID(id));
   },
 
   getMembers: async (id) => {
-    return await ApiClient.get(`${API_BASE_URL}/communities/${id}/members`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.MEMBERS(id));
   },
 
   getMessages: async (id, userId) => {
-    const params = userId ? `?userId=${userId}` : '';
-    return await ApiClient.get(`${API_BASE_URL}/communities/${id}/messages${params}`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.MESSAGES(id, userId));
   },
 
   getStudentCommunities: async (studentId) => {
-    return await ApiClient.get(`${API_BASE_URL}/communities/student/${studentId}`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.STUDENT(studentId));
   },
 
   getTeacherCommunities: async (teacherId) => {
-    return await ApiClient.get(`${API_BASE_URL}/communities/teacher/${teacherId}`);
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.TEACHER(teacherId));
   },
 
   joinCommunity: async (joinCode, studentId) => {
-    return await ApiClient.post(`${API_BASE_URL}/communities/join`, { joinCode, studentId });
+    return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.JOIN, { joinCode, studentId });
   },
 };
 

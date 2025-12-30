@@ -1,3 +1,4 @@
+import { authApi } from '../api';
 import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -103,21 +104,12 @@ const VerifyCodePage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-reset-code', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, code: verificationCode }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      const data = await authApi.verifyResetCode(email, verificationCode);
+      if (data && data.resetToken) {
         sessionStorage.setItem('resetToken', data.resetToken);
         navigate('/reset-password');
       } else {
-        setError(data.message || 'Invalid verification code');
+        setError('Invalid verification code');
         setCode(['', '', '', '', '', '']);
         document.getElementById('code-0')?.focus();
       }
@@ -133,15 +125,8 @@ const VerifyCodePage = () => {
     setError('');
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      if (response.ok) {
+      const data = await authApi.forgotPassword(email);
+      if (data) {
         startTimer(); // Reset timer to 10:00
         setCode(['', '', '', '', '', '']);
         document.getElementById('code-0')?.focus();

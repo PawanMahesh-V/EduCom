@@ -1,3 +1,4 @@
+import { authApi } from '../api';
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -15,6 +16,7 @@ import {
   faCheckCircle,
   faSpinner
 } from '@fortawesome/free-solid-svg-icons';
+import { ROLES, DEPARTMENTS } from '../constants';
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -77,15 +79,7 @@ const RegisterPage = () => {
     setEmailChecking(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/check-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
+      const data = await authApi.checkEmail(email);
 
       if (data.exists) {
         setFieldErrors(prev => ({
@@ -191,28 +185,16 @@ const RegisterPage = () => {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reg_id: formData.reg_id,
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          role: formData.role,
-          department: formData.department,
-          semester: formData.role === 'Student' ? formData.semester : null,
-          program_year: formData.role === 'PM' ? formData.program_year : null
-        }),
+      const data = await authApi.register({
+        reg_id: formData.reg_id,
+        name: formData.name,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        department: formData.department,
+        semester: formData.role === 'Student' ? formData.semester : null,
+        program_year: formData.role === 'PM' ? formData.program_year : null
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Registration failed');
-      }
 
       setStep(2); // Show success message
     } catch (err) {
@@ -405,10 +387,11 @@ const RegisterPage = () => {
                         onChange={handleInputChange}
                         disabled={loading}
                       >
-                        <option value="Student">Student</option>
-                        <option value="Teacher">Teacher</option>
-                        <option value="HOD">HOD</option>
-                        <option value="PM">PM (Program Manager)</option>
+                        {ROLES.filter(r => r !== 'Admin').map(r => (
+                          <option key={r} value={r}>
+                            {r === 'PM' ? 'PM (Program Manager)' : r}
+                          </option>
+                        ))}
                       </select>
                     </div>
                   </div>
@@ -429,9 +412,9 @@ const RegisterPage = () => {
                         onChange={handleInputChange}
                         disabled={loading}
                       >
-                        <option value="CS">CS</option>
-                        <option value="BBA">BBA</option>
-                        <option value="IT">IT</option>
+                        {DEPARTMENTS.map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

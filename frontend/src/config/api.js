@@ -1,10 +1,19 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://172.16.165.165:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 export const API_ENDPOINTS = {
   AUTH: {
     LOGIN: `${API_BASE_URL}/auth/login`,
     LOGOUT: `${API_BASE_URL}/auth/logout`,
     ME: `${API_BASE_URL}/auth/me`,
+    VERIFY_LOGIN: `${API_BASE_URL}/auth/verify-login`,
+    CHECK_EMAIL: `${API_BASE_URL}/auth/check-email`,
+    REGISTER: `${API_BASE_URL}/auth/register`,
+    FORGOT_PASSWORD: `${API_BASE_URL}/auth/forgot-password`,
+    VERIFY_RESET_CODE: `${API_BASE_URL}/auth/verify-reset-code`,
+    RESET_PASSWORD: `${API_BASE_URL}/auth/reset-password`,
+    REGISTRATION_REQUESTS: `${API_BASE_URL}/auth/registration-requests`,
+    REGISTRATION_APPROVE: (id) => `${API_BASE_URL}/auth/registration-requests/${id}/approve`,
+    REGISTRATION_REJECT: (id) => `${API_BASE_URL}/auth/registration-requests/${id}/reject`,
   },
 
   USERS: {
@@ -22,6 +31,11 @@ export const API_ENDPOINTS = {
   COMMUNITIES: {
     BASE: `${API_BASE_URL}/communities`,
     BY_ID: (id) => `${API_BASE_URL}/communities/${id}`,
+    MEMBERS: (id) => `${API_BASE_URL}/communities/${id}/members`,
+    MESSAGES: (id, userId) => `${API_BASE_URL}/communities/${id}/messages${userId ? `?userId=${userId}` : ''}`,
+    STUDENT: (studentId) => `${API_BASE_URL}/communities/student/${studentId}`,
+    TEACHER: (teacherId) => `${API_BASE_URL}/communities/teacher/${teacherId}`,
+    JOIN: `${API_BASE_URL}/communities/join`,
   },
   NOTIFICATIONS: {
     BASE: `${API_BASE_URL}/notifications`,
@@ -36,6 +50,14 @@ export const API_ENDPOINTS = {
     RECENT_COURSES: `${API_BASE_URL}/dashboard/admin/recent-courses`,
     ACTIVITY: `${API_BASE_URL}/dashboard/admin/activity`,
   },
+  DIRECT_MESSAGES: {
+    CONVERSATIONS: (userId) => `${API_BASE_URL}/direct-messages/conversations/${userId}`,
+    MESSAGES: (userId, otherUserId) => `${API_BASE_URL}/direct-messages/messages/${userId}/${otherUserId}`,
+    USERS: (excludeUserId) => `${API_BASE_URL}/direct-messages/users${excludeUserId ? `?exclude=${excludeUserId}` : ''}`,
+    SEARCH: (userId, otherUserId, query) => `${API_BASE_URL}/direct-messages/messages/${userId}/${otherUserId}/search?q=${encodeURIComponent(query)}`,
+    DELETE: (messageId) => `${API_BASE_URL}/direct-messages/message/${messageId}`,
+    DELETE_MULTIPLE: `${API_BASE_URL}/direct-messages/message/delete-multiple`,
+  }
 };
 
 export default API_BASE_URL;

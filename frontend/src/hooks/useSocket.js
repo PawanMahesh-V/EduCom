@@ -1,35 +1,50 @@
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import socketService from '../services/socket';
 export const useSocket = () => {
   return socketService;
 };
 export const useCommunityMessages = (communityId, onNewMessage, onMessageDeleted) => {
+  // Use refs to avoid stale closures - callbacks always use latest version
+  const onNewMessageRef = useRef(onNewMessage);
+  const onMessageDeletedRef = useRef(onMessageDeleted);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+  
+  useEffect(() => {
+    onMessageDeletedRef.current = onMessageDeleted;
+  }, [onMessageDeleted]);
+  
   useEffect(() => {
     if (!communityId) {
       return;
     }
     // Only join/leave community room - listeners are managed globally in dashboards
     socketService.joinCommunity(communityId);
-    // Setup message listener for this specific chat
-    const messageHandler = onNewMessage;
-    const deleteHandler = onMessageDeleted;
-    if (messageHandler) {
-      socketService.socket?.on('new-message', messageHandler);
-    }
-    if (deleteHandler) {
-      socketService.socket?.on('message-deleted', deleteHandler);
-    }
+    // Setup message listener using refs to avoid stale closures
+    const messageHandler = (data) => {
+      if (onNewMessageRef.current) {
+        onNewMessageRef.current(data);
+      }
+    };
+    const deleteHandler = (data) => {
+      if (onMessageDeletedRef.current) {
+        onMessageDeletedRef.current(data);
+      }
+    };
+    
+    socketService.socket?.on('new-message', messageHandler);
+    socketService.socket?.on('message-deleted', deleteHandler);
+    
     // Cleanup
     return () => {
       socketService.leaveCommunity(communityId);
-      if (messageHandler) {
-        socketService.socket?.off('new-message', messageHandler);
-      }
-      if (deleteHandler) {
-        socketService.socket?.off('message-deleted', deleteHandler);
-      }
+      socketService.socket?.off('new-message', messageHandler);
+      socketService.socket?.off('message-deleted', deleteHandler);
     };
-  }, [communityId, onNewMessage, onMessageDeleted]);
+  }, [communityId]); // Only depend on communityId, not callbacks
   return {
     sendMessage: (message, senderId, senderName) => {
       socketService.sendMessage({
@@ -110,25 +125,30 @@ export const useUserStatus = (onUserStatus) => {
   }, [onUserStatus]);
 };
 export const useDirectMessages = (userId, onNewMessage) => {
+  // Use ref to avoid stale closures
+  const onNewMessageRef = useRef(onNewMessage);
+  
+  useEffect(() => {
+    onNewMessageRef.current = onNewMessage;
+  }, [onNewMessage]);
+  
   useEffect(() => {
     if (!userId) return;
+    
     const handleNewMessage = (message) => {
-      if (onNewMessage) {
-        onNewMessage(message);
+      if (onNewMessageRef.current) {
+        onNewMessageRef.current(message);
       }
     };
-    const handleMessageSent = (message) => {
-      if (onNewMessage) {
-        onNewMessage(message);
-      }
-    };
+    
+    // Only listen for incoming messages, not sent ones (to avoid duplicates)
     socketService.onNewDirectMessage(handleNewMessage);
-    socketService.onDirectMessageSent(handleMessageSent);
+    
     return () => {
       socketService.offNewDirectMessage();
-      socketService.offDirectMessageSent();
     };
-  }, [userId, onNewMessage]);
+  }, [userId]); // Only depend on userId
+  
   return {
     sendDirectMessage: (receiverId, message, senderName, isAnonymous = false) => {
       console.log('[useSocket] sendDirectMessage called with isAnonymous:', isAnonymous);
@@ -145,17 +165,34 @@ export const useDirectMessages = (userId, onNewMessage) => {
   };
 };
 export const useDMTypingIndicator = (receiverId, senderName) => {
+  // Use refs to avoid stale closures
+  const receiverIdRef = useRef(receiverId);
+  const senderNameRef = useRef(senderName);
+  const typingCallbackRef = useRef(null);
+  
+  useEffect(() => {
+    receiverIdRef.current = receiverId;
+    senderNameRef.current = senderName;
+  }, [receiverId, senderName]);
+  
   useEffect(() => {
     if (!receiverId) return;
-    let typingTimeout;
+    
     return () => {
-      clearTimeout(typingTimeout);
       socketService.offDMUserTyping();
     };
-  }, [receiverId, senderName]);
+  }, [receiverId]);
+  
   return {
-    onTyping: (callback) => socketService.onDMUserTyping(callback),
-    startTyping: () => socketService.sendDMTyping(receiverId, senderName, true),
-    stopTyping: () => socketService.sendDMTyping(receiverId, senderName, false)
+    onTyping: (callback) => {
+      // Store callback and register listener
+      if (typingCallbackRef.current !== callback) {
+        socketService.offDMUserTyping();
+        typingCallbackRef.current = callback;
+        socketService.onDMUserTyping(callback);
+      }
+    },
+    startTyping: () => socketService.sendDMTyping(receiverIdRef.current, senderNameRef.current, true),
+    stopTyping: () => socketService.sendDMTyping(receiverIdRef.current, senderNameRef.current, false)
   };
 };

@@ -28,7 +28,7 @@ import {
 import { authApi, dashboardApi, userApi, courseApi, communityApi, directMessageApi } from '../api';
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+  const raw = sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
   
   const [adminProfile, setAdminProfile] = useState({
@@ -135,7 +135,26 @@ const AdminDashboard = () => {
     if (selectedConversation && 
         (newMessage.sender_id === selectedConversation.user_id || 
          newMessage.receiver_id === selectedConversation.user_id)) {
-      setDmMessages(prev => [...prev, newMessage]);
+      setDmMessages(prev => {
+        // Check if message already exists (avoid duplicates from optimistic updates)
+        const exists = prev.some(msg => 
+          msg.id === newMessage.id || 
+          (String(msg.id).startsWith('temp-') && 
+           msg.content === newMessage.content && 
+           msg.sender_id === newMessage.sender_id)
+        );
+        if (exists) {
+          // Replace temp message with real one
+          return prev.map(msg => 
+            String(msg.id).startsWith('temp-') && 
+            msg.content === newMessage.content && 
+            msg.sender_id === newMessage.sender_id
+              ? newMessage
+              : msg
+          );
+        }
+        return [...prev, newMessage];
+      });
       scrollToBottom();
     }
   });
@@ -224,6 +243,41 @@ const AdminDashboard = () => {
   // Direct Message handlers
   const handleSendDirectMessage = () => {
     if (dmMessage.trim() && selectedConversation) {
+      // Optimistic update - add message to UI immediately
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        sender_id: userId,
+        receiver_id: selectedConversation.user_id,
+        content: dmMessage,
+        is_read: false,
+        is_anonymous: false,
+        created_at: new Date().toISOString(),
+        sender_name: currentUser?.name || 'Admin'
+      };
+      setDmMessages(prev => [...prev, optimisticMessage]);
+      scrollToBottom();
+      
+      // Also update conversations list immediately
+      setConversations(prev => {
+        const existingIndex = prev.findIndex(c => c.user_id === selectedConversation.user_id);
+        const updatedConversation = {
+          ...selectedConversation,
+          last_message: dmMessage,
+          last_message_time: new Date().toISOString(),
+          unread_count: 0
+        };
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation and move to top
+          const updated = [...prev];
+          updated.splice(existingIndex, 1);
+          return [updatedConversation, ...updated];
+        } else {
+          // Add new conversation at top
+          return [updatedConversation, ...prev];
+        }
+      });
+      
       sendDirectMessage(
         selectedConversation.user_id,
         dmMessage,
@@ -267,6 +321,20 @@ const AdminDashboard = () => {
       dmTypingIndicator.startTyping();
     }
   };
+
+  // Handle message deletion - remove from local state and refresh conversations
+  const handleMessageDeleted = (messageId) => {
+    const idToRemove = Number(messageId);
+    console.log('[AdminDashboard] handleMessageDeleted called with:', messageId, 'as number:', idToRemove);
+    setDmMessages(prev => {
+      const newMessages = prev.filter(msg => Number(msg.id) !== idToRemove);
+      console.log('[AdminDashboard] Messages before:', prev.length, 'after:', newMessages.length);
+      return newMessages;
+    });
+    // Refresh conversations to update last message preview
+    fetchConversations();
+  };
+
   // Dashboard Overview functions
   const fetchDashboardData = async () => {
     try {
@@ -338,22 +406,31 @@ const AdminDashboard = () => {
   };
   
   const handleApproveRequest = async (requestId) => {
+    // Optimistic update - remove from pending list immediately
+    setRegistrationRequests(prev => prev.filter(r => r.id !== requestId));
+    
     try {
       await authApi.approveRegistration(requestId);
       showSuccess('Registration request approved successfully!');
-      fetchRegistrationRequests();
       fetchUsers(); // Refresh users list
+      fetchDashboardData(); // Update stats
     } catch (err) {
+      // Revert on error
+      fetchRegistrationRequests();
       showError(err.message || 'Failed to approve registration');
     }
   };
   
   const handleRejectRequest = async (requestId) => {
+    // Optimistic update - remove from pending list immediately
+    setRegistrationRequests(prev => prev.filter(r => r.id !== requestId));
+    
     try {
       await authApi.rejectRegistration(requestId);
       showSuccess('Registration request rejected');
-      fetchRegistrationRequests();
     } catch (err) {
+      // Revert on error
+      fetchRegistrationRequests();
       showError(err.message || 'Failed to reject registration');
     }
   };
@@ -433,13 +510,19 @@ const AdminDashboard = () => {
       setError(err.message);
     }
   };
-  const handleUserDelete = async (userId) => {
+  const handleUserDelete = async (userIdToDelete) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
+      // Optimistic update - remove from UI immediately
+      setUsers(prev => prev.filter(u => u.id !== userIdToDelete));
+      setFilteredUsers(prev => prev.filter(u => u.id !== userIdToDelete));
+      
       try {
-        await userApi.delete(userId);
-        fetchUsers();
+        await userApi.delete(userIdToDelete);
+        showSuccess('User deleted successfully');
       } catch (err) {
-        setError(err.message);
+        // Revert on error
+        fetchUsers();
+        showError(err.message || 'Failed to delete user');
       }
     }
   };
@@ -673,11 +756,17 @@ const AdminDashboard = () => {
   };
   const handleCourseDelete = async (courseId) => {
     if (window.confirm('Are you sure you want to delete this course?')) {
+      // Optimistic update - remove from UI immediately
+      setCourses(prev => prev.filter(c => c.id !== courseId));
+      setFilteredCourses(prev => prev.filter(c => c.id !== courseId));
+      
       try {
         await courseApi.delete(courseId);
-        fetchCourses();
+        showSuccess('Course deleted successfully');
       } catch (err) {
-        setError(err.message);
+        // Revert on error
+        fetchCourses();
+        showError(err.message || 'Failed to delete course');
       }
     }
   };
@@ -1649,6 +1738,8 @@ const AdminDashboard = () => {
                     <label className="filter-label">Status</label>
                     <select 
                       className="input filter-select-min"
+                      value={communityStatusFilter}
+                      onChange={(e) => setCommunityStatusFilter(e.target.value)}
                     >
                       <option value="All">All Status</option>
                       <option value="active">Active</option>
@@ -1660,6 +1751,10 @@ const AdminDashboard = () => {
                     <div className="filter-actions">
                       <button 
                         className="btn secondary filter-button-nowrap"
+                        onClick={() => {
+                          setCommunityStatusFilter('All');
+                          setCommunitySearchTerm('');
+                        }}
                       >
                         Clear Filters
                       </button>
@@ -2024,7 +2119,7 @@ const AdminDashboard = () => {
         <MessageLayout
           mode="direct"
           userId={userId}
-          userRole={user?.role}
+          userRole={currentUser?.role}
           messagesEndRef={messagesEndRef}
           conversations={conversations}
           selectedConversation={selectedConversation}
@@ -2041,6 +2136,7 @@ const AdminDashboard = () => {
           onStartNewConversation={handleStartNewConversation}
           onSendDirectMessage={handleSendDirectMessage}
           onDMTyping={handleDMTyping}
+          onMessageDeleted={handleMessageDeleted}
           loading={false}
         />
       )}

@@ -1,3 +1,4 @@
+import { authApi } from '../api';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -44,17 +45,8 @@ const ForgotPasswordPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/forgot-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      const data = await authApi.forgotPassword(email);
+      if (data) {
         setMessage('Verification code sent! Check your email.');
         // Store email and navigate to verify page
         sessionStorage.setItem('resetEmail', email);
@@ -62,7 +54,7 @@ const ForgotPasswordPage = () => {
           navigate('/verify-code');
         }, 2000);
       } else {
-        setError(data.message || 'Failed to process request');
+        setError('Failed to process request');
       }
     } catch (err) {
       setError('Network error. Please try again.');

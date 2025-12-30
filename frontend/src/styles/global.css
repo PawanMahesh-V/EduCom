@@ -7687,3 +7687,259 @@ window.alert {
     display: flex;
   }
 }
+
+/* ============================================
+   Chat Search & Delete Features
+   ============================================ */
+
+/* Search Mode Header */
+.chat-search-mode {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  background: var(--color-light);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+}
+
+.chat-message-search-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: none;
+  background: transparent;
+  font-size: var(--font-base);
+  color: var(--color-dark);
+  outline: none;
+}
+
+.chat-message-search-input::placeholder {
+  color: var(--color-medium-dark);
+}
+
+.search-navigation {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.search-count {
+  font-size: var(--font-sm);
+  color: var(--color-medium-dark);
+  padding: 0 0.5rem;
+}
+
+.search-nav-btn {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-medium-dark);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.search-nav-btn:hover {
+  background: var(--color-medium-light);
+  color: var(--color-dark);
+}
+
+.search-close-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-medium-dark);
+  cursor: pointer;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-fast);
+}
+
+.search-close-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--color-error);
+}
+
+/* Search Highlight Animation */
+.chat-message.search-highlight .chat-message-bubble {
+  animation: highlightPulse 2s ease-out;
+}
+
+@keyframes highlightPulse {
+  0%, 100% {
+    box-shadow: none;
+  }
+  25%, 75% {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+  }
+}
+
+/* Select Mode Header */
+.chat-select-mode {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1;
+}
+
+.select-count {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-dark);
+  flex: 1;
+}
+
+.select-delete-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-error);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.select-delete-btn:hover:not(:disabled) {
+  background: #dc2626;
+}
+
+.select-delete-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.select-cancel-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--color-light);
+  color: var(--color-dark);
+  border: 1px solid var(--color-medium-light);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.select-cancel-btn:hover {
+  background: var(--color-medium-light);
+}
+
+/* Message Selection */
+.chat-message.selected .chat-message-bubble {
+  border: 2px solid var(--color-accent);
+  background: rgba(59, 130, 246, 0.15) !important;
+}
+
+.chat-message.selectable {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.chat-message.selectable:hover {
+  transform: scale(1.02);
+}
+
+.chat-message.selectable:active {
+  transform: scale(0.98);
+}
+
+.message-checkbox {
+  display: flex;
+  align-items: center;
+  margin-right: 0.75rem;
+  padding: 0.25rem;
+}
+
+.message-checkbox input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  accent-color: var(--color-accent);
+  border-radius: 4px;
+}
+
+/* Context Menu */
+.message-context-menu {
+  position: fixed;
+  background: var(--color-white);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  min-width: 150px;
+  overflow: hidden;
+  animation: fadeInScale 0.15s ease-out;
+}
+
+@keyframes fadeInScale {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.message-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: var(--color-error);
+  font-size: var(--font-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.message-context-menu button:hover {
+  background: rgba(239, 68, 68, 0.1);
+}
+
+/* Mobile Adjustments */
+@media (max-width: 768px) {
+  .chat-search-mode {
+    padding: 0.375rem 0.75rem;
+  }
+  
+  .chat-message-search-input {
+    font-size: var(--font-sm);
+  }
+  
+  .search-count {
+    font-size: var(--font-xs);
+  }
+  
+  .chat-select-mode {
+    gap: 0.5rem;
+  }
+  
+  .select-delete-btn,
+  .select-cancel-btn {
+    padding: 0.375rem 0.75rem;
+    font-size: var(--font-xs);
+  }
+  
+  .select-delete-btn span,
+  .select-cancel-btn span {
+    display: none;
+  }
+}

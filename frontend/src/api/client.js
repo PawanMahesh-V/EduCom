@@ -1,6 +1,7 @@
  
 const getAuthToken = () => {
-  return localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
+  // Standardize on sessionStorage for auth token
+  return sessionStorage.getItem('userToken');
 };
 
 const getAuthHeaders = () => {

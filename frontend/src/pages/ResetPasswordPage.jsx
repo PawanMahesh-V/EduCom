@@ -1,3 +1,4 @@
+import { authApi } from '../api';
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -56,24 +57,13 @@ const ResetPasswordPage = () => {
     setLoading(true);
 
     try {
-      const response = await fetch('http://localhost:5000/api/auth/reset-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ resetToken, newPassword }),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
+      const data = await authApi.resetPassword(resetToken, newPassword);
+      if (data) {
         sessionStorage.clear();
-        localStorage.removeItem('user');
-        localStorage.removeItem('userToken');
         
         setShowSuccessModal(true);
       } else {
-        setError(data.message || 'Failed to reset password');
+        setError('Failed to reset password');
       }
     } catch (err) {
       setError('Network error. Please try again.');

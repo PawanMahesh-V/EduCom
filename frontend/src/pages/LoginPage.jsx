@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api';
+import { API_ENDPOINTS } from '../config/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faGraduationCap, 
@@ -112,22 +113,7 @@ const LoginPage = () => {
     setLoading(true);
     
     try {
-      const response = await fetch('http://localhost:5000/api/auth/verify-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: userEmail,
-          code: verificationCode
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Verification failed');
-      }
+      const data = await authApi.verifyLogin(userEmail, verificationCode);
 
       sessionStorage.setItem('user', JSON.stringify(data.user));
       

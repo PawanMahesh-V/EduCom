@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { TEACHING_ROLES } from '../constants';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft, faTimes, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import directMessageApi from '../api/directMessages';
 
 const MessageLayout = ({
   // Common props
@@ -24,6 +26,7 @@ const MessageLayout = ({
   onStartNewConversation,
   onSendDirectMessage,
   onDMTyping,
+  onMessageDeleted,
   
   // Community Chat props
   chats,
@@ -46,11 +49,174 @@ const MessageLayout = ({
   const [showDmOptions, setShowDmOptions] = useState(false);
   const [showCommunityOptions, setShowCommunityOptions] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  
+  // Search feature state
+  const [isSearchMode, setIsSearchMode] = useState(false);
+  const [messageSearchQuery, setMessageSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
+  const [isSearching, setIsSearching] = useState(false);
+  
+  // Delete feature state
+  const [selectedMessages, setSelectedMessages] = useState([]);
+  const [isSelectMode, setIsSelectMode] = useState(false);
+  const [contextMenuMessage, setContextMenuMessage] = useState(null);
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
 
   // Check if current user is a student messaging a teacher
   const canSendAnonymously = userRole === 'Student' && 
     selectedConversation && 
-    ['Teacher', 'HOD', 'PM'].includes(selectedConversation.user_role);
+    TEACHING_ROLES.includes(selectedConversation.user_role);
+
+  // Search messages in conversation
+  const handleSearch = useCallback(async () => {
+    if (!messageSearchQuery.trim() || !selectedConversation) return;
+    
+    setIsSearching(true);
+    try {
+      const results = await directMessageApi.searchMessages(
+        userId,
+        selectedConversation.user_id,
+        messageSearchQuery
+      );
+      setSearchResults(results);
+      setCurrentSearchIndex(0);
+      
+      // Scroll to first result
+      if (results.length > 0) {
+        const element = document.getElementById(`message-${results[0].id}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.classList.add('search-highlight');
+          setTimeout(() => element.classList.remove('search-highlight'), 2000);
+        }
+      }
+    } catch (err) {
+      console.error('Search error:', err);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [messageSearchQuery, selectedConversation, userId]);
+
+  // Navigate search results
+  const navigateSearchResult = (direction) => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex = currentSearchIndex + direction;
+    if (newIndex < 0) newIndex = searchResults.length - 1;
+    if (newIndex >= searchResults.length) newIndex = 0;
+    
+    setCurrentSearchIndex(newIndex);
+    
+    const element = document.getElementById(`message-${searchResults[newIndex].id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('search-highlight');
+      setTimeout(() => element.classList.remove('search-highlight'), 2000);
+    }
+  };
+
+  // Close search
+  const closeSearch = () => {
+    setIsSearchMode(false);
+    setMessageSearchQuery('');
+    setSearchResults([]);
+    setCurrentSearchIndex(0);
+  };
+
+  // Delete single message
+  const handleDeleteMessage = async (messageId) => {
+    // Don't allow deletion of optimistic/temporary messages
+    if (String(messageId).startsWith('temp-')) {
+      console.log('[MessageLayout] Cannot delete temporary message:', messageId);
+      alert('Please wait for the message to be sent before deleting');
+      return;
+    }
+    
+    console.log('[MessageLayout] Deleting message:', messageId);
+    try {
+      const result = await directMessageApi.deleteMessage(messageId);
+      console.log('[MessageLayout] Delete result:', result);
+      
+      // Call callback immediately to update UI
+      if (onMessageDeleted) {
+        console.log('[MessageLayout] Calling onMessageDeleted with:', messageId);
+        onMessageDeleted(messageId);
+      }
+      setContextMenuMessage(null);
+    } catch (err) {
+      console.error('[MessageLayout] Delete error:', err);
+      alert(err.message || err || 'Failed to delete message');
+    }
+  };
+
+  // Delete selected messages
+  const handleDeleteSelected = async () => {
+    if (selectedMessages.length === 0) return;
+    
+    // Filter out temporary message IDs
+    const realMessageIds = selectedMessages.filter(id => !String(id).startsWith('temp-'));
+    
+    if (realMessageIds.length === 0) {
+      alert('Please wait for messages to be sent before deleting');
+      setSelectedMessages([]);
+      setIsSelectMode(false);
+      return;
+    }
+    
+    console.log('[MessageLayout] Deleting multiple messages:', realMessageIds);
+    try {
+      const result = await directMessageApi.deleteMultipleMessages(realMessageIds);
+      console.log('[MessageLayout] Delete multiple result:', result);
+      
+      // Call callback for each deleted message to update UI
+      if (onMessageDeleted) {
+        // Use deletedIds from response if available, otherwise use all selected
+        const idsToRemove = result.deletedIds?.length > 0 ? result.deletedIds : realMessageIds;
+        console.log('[MessageLayout] Calling onMessageDeleted for IDs:', idsToRemove);
+        idsToRemove.forEach(id => onMessageDeleted(id));
+      }
+      setSelectedMessages([]);
+      setIsSelectMode(false);
+    } catch (err) {
+      console.error('[MessageLayout] Delete multiple error:', err);
+      alert(err.message || err || 'Failed to delete messages');
+    }
+  };
+
+  // Toggle message selection
+  const toggleMessageSelection = (messageId) => {
+    setSelectedMessages(prev => 
+      prev.includes(messageId) 
+        ? prev.filter(id => id !== messageId)
+        : [...prev, messageId]
+    );
+  };
+
+  // Right-click context menu
+  const handleMessageContextMenu = (e, msg) => {
+    if (msg.sender_id !== userId) return; // Only own messages
+    e.preventDefault();
+    setContextMenuMessage(msg);
+    setContextMenuPosition({ x: e.clientX, y: e.clientY });
+  };
+
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClick = () => setContextMenuMessage(null);
+    if (contextMenuMessage) {
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenuMessage]);
+
+  // Reset states when conversation changes
+  useEffect(() => {
+    closeSearch();
+    setSelectedMessages([]);
+    setIsSelectMode(false);
+    setContextMenuMessage(null);
+  }, [selectedConversation?.user_id]);
 
   const handleOptionClick = (action, mode) => {
     if (mode === 'dm') {
@@ -61,16 +227,16 @@ const MessageLayout = ({
     
     switch(action) {
       case 'delete':
-        // Handle delete action
-        console.log('Delete clicked');
+        setIsSelectMode(true);
+        setSelectedMessages([]);
         break;
       case 'search':
-        // Handle search action
-        console.log('Search clicked');
+        setIsSearchMode(true);
+        setMessageSearchQuery('');
         break;
       case 'select':
-        // Handle select action
-        console.log('Select clicked');
+        setIsSelectMode(true);
+        setSelectedMessages([]);
         break;
       default:
         break;
@@ -199,42 +365,101 @@ const MessageLayout = ({
               <button className="chat-back-btn" onClick={() => onSelectConversation(null)}>
                 <FontAwesomeIcon icon={faArrowLeft} />
               </button>
-              <div className="chat-user-info">
-                <div className="chat-avatar">{selectedConversation.user_name.charAt(0)}</div>
-                <div>
-                  <h3 className="m-0 font-semibold">{selectedConversation.user_name}</h3>
-                  <p className="m-0 text-sm text-secondary">{selectedConversation.user_email}</p>
+              
+              {isSearchMode ? (
+                // Search Mode Header
+                <div className="chat-search-mode">
+                  <input
+                    type="text"
+                    className="chat-message-search-input"
+                    placeholder="Search in conversation..."
+                    value={messageSearchQuery}
+                    onChange={(e) => setMessageSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    autoFocus
+                  />
+                  {searchResults.length > 0 && (
+                    <div className="search-navigation">
+                      <span className="search-count">{currentSearchIndex + 1}/{searchResults.length}</span>
+                      <button onClick={() => navigateSearchResult(-1)} className="search-nav-btn">
+                        <FontAwesomeIcon icon={faChevronUp} />
+                      </button>
+                      <button onClick={() => navigateSearchResult(1)} className="search-nav-btn">
+                        <FontAwesomeIcon icon={faChevronDown} />
+                      </button>
+                    </div>
+                  )}
+                  <button className="search-close-btn" onClick={closeSearch}>
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
                 </div>
-              </div>
-              <div className="chat-options-wrapper">
-                <button className="chat-options-btn" onClick={() => setShowDmOptions(!showDmOptions)}>
-                  <FontAwesomeIcon icon={faEllipsisVertical} />
-                </button>
-                {showDmOptions && (
-                  <div className="chat-options-dropdown">
-                    <button className="chat-option-item" onClick={() => handleOptionClick('delete', 'dm')}>
-                      <FontAwesomeIcon icon={faTrash} />
-                      <span>Delete</span>
-                    </button>
-                    <button className="chat-option-item" onClick={() => handleOptionClick('search', 'dm')}>
-                      <FontAwesomeIcon icon={faSearch} />
-                      <span>Search</span>
-                    </button>
-                    <button className="chat-option-item" onClick={() => handleOptionClick('select', 'dm')}>
-                      <FontAwesomeIcon icon={faCheckSquare} />
-                      <span>Select</span>
-                    </button>
+              ) : isSelectMode ? (
+                // Select Mode Header
+                <div className="chat-select-mode">
+                  <span className="select-count">{selectedMessages.length} selected</span>
+                  <button 
+                    className="select-delete-btn" 
+                    onClick={handleDeleteSelected}
+                    disabled={selectedMessages.length === 0}
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                    Delete
+                  </button>
+                  <button className="select-cancel-btn" onClick={() => { setIsSelectMode(false); setSelectedMessages([]); }}>
+                    <FontAwesomeIcon icon={faTimes} />
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                // Normal Header
+                <>
+                  <div className="chat-user-info">
+                    <div className="chat-avatar">{selectedConversation.user_name.charAt(0)}</div>
+                    <div>
+                      <h3 className="m-0 font-semibold">{selectedConversation.user_name}</h3>
+                      <p className="m-0 text-sm text-secondary">{selectedConversation.user_email}</p>
+                    </div>
                   </div>
-                )}
-              </div>
+                  <div className="chat-options-wrapper">
+                    <button className="chat-options-btn" onClick={() => setShowDmOptions(!showDmOptions)}>
+                      <FontAwesomeIcon icon={faEllipsisVertical} />
+                    </button>
+                    {showDmOptions && (
+                      <div className="chat-options-dropdown">
+                        <button className="chat-option-item" onClick={() => handleOptionClick('search', 'dm')}>
+                          <FontAwesomeIcon icon={faSearch} />
+                          <span>Search</span>
+                        </button>
+                        <button className="chat-option-item" onClick={() => handleOptionClick('select', 'dm')}>
+                          <FontAwesomeIcon icon={faCheckSquare} />
+                          <span>Select Messages</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="chat-messages">
               {dmMessages.map((msg, index) => (
                 <div 
                   key={index}
-                  className={`chat-message ${msg.sender_id === userId ? 'sent' : 'received'}`}
+                  id={`message-${msg.id}`}
+                  className={`chat-message ${msg.sender_id === userId ? 'sent' : 'received'} ${selectedMessages.includes(msg.id) ? 'selected' : ''} ${isSelectMode && msg.sender_id === userId ? 'selectable' : ''}`}
+                  onClick={isSelectMode && msg.sender_id === userId ? (e) => { e.stopPropagation(); toggleMessageSelection(msg.id); } : undefined}
+                  onContextMenu={(e) => handleMessageContextMenu(e, msg)}
+                  style={isSelectMode && msg.sender_id === userId ? { cursor: 'pointer' } : {}}
                 >
+                  {isSelectMode && msg.sender_id === userId && (
+                    <div className="message-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedMessages.includes(msg.id)}
+                        onChange={(e) => { e.stopPropagation(); toggleMessageSelection(msg.id); }}
+                      />
+                    </div>
+                  )}
                   <div className={`chat-message-bubble ${msg.sender_id === userId ? 'sent' : 'received'} ${msg.is_anonymous ? 'anonymous-message' : ''}`}>
                     {msg.sender_id !== userId && (
                       <div className="chat-message-sender">
@@ -260,6 +485,19 @@ const MessageLayout = ({
                   </div>
                 </div>
               ))}
+              
+              {/* Context Menu for message deletion */}
+              {contextMenuMessage && (
+                <div 
+                  className="message-context-menu"
+                  style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
+                >
+                  <button onClick={() => handleDeleteMessage(contextMenuMessage.id)}>
+                    <FontAwesomeIcon icon={faTrash} />
+                    Delete Message
+                  </button>
+                </div>
+              )}
               
               {dmTypingUsers.length > 0 && (
                 <div className="chat-typing-indicator">

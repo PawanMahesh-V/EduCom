@@ -55,8 +55,7 @@ class UserController {
             if (!reg_id || !name || !email || !password) {
                 return res.status(400).json({ message: 'Missing required fields' });
             }
-            const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
-            const validDepartments = ['CS', 'BBA', 'IT'];
+            const { ROLES: validRoles, DEPARTMENTS: validDepartments } = require('../config/constants');
 
             if (!validRoles.includes(role)) {
                 return res.status(400).json({ 
@@ -102,8 +101,7 @@ class UserController {
         try {
             const { id } = req.params;
             const { reg_id, name, email, password, role, department, semester, program_year, section } = req.body;
-            const validRoles = ['Admin', 'Teacher', 'Student', 'HOD', 'PM'];
-            const validDepartments = ['CS', 'BBA', 'IT'];
+            const { ROLES: validRoles, DEPARTMENTS: validDepartments } = require('../config/constants');
 
             if (!validRoles.includes(role)) {
                 return res.status(400).json({ 

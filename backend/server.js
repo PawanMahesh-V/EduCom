@@ -15,7 +15,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
     cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
-        methods: ["GET", "POST"],
+        methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
         credentials: true
     }
 });
@@ -30,7 +30,10 @@ const communityRoutes = require('./routes/communities');
 const notificationRoutes = require('./routes/notifications');
 const directMessageRoutes = require('./routes/directMessages');
 
-app.use(cors());
+app.use(cors({
+    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    credentials: true
+}));
 app.use(express.json());
 
 app.use('/api/auth', authRoutes);
@@ -281,7 +284,8 @@ io.on('connection', (socket) => {
                 const receiverRole = receiverResult.rows[0].role;
                 
                 // Only allow students to send anonymous messages to teachers/HODs/PMs
-                if (senderRole !== 'Student' || !['Teacher', 'HOD', 'PM'].includes(receiverRole)) {
+                const { TEACHING_ROLES } = require('./config/constants');
+                if (senderRole !== 'Student' || !TEACHING_ROLES.includes(receiverRole)) {
                     socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers' });
                     return;
                 }

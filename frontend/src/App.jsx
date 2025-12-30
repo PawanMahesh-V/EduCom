@@ -9,12 +9,13 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import AdminDashboard from './pages/AdminDashboard';
 import TeacherDashboard from './pages/TeacherDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
+import { TEACHING_ROLES } from './constants';
 import StudentDashboard from './pages/StudentDashboard';
 import socketService from './services/socket';
 import './styles/global.css';
 function App() {
   useEffect(() => {
-    const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
+    const userStr = sessionStorage.getItem('user');
     
     if (userStr) {
       const user = JSON.parse(userStr);
@@ -57,7 +58,7 @@ function App() {
           <Route
             path="/teacher"
             element={
-              <ProtectedRoute allowedRoles={['Teacher', 'HOD', 'PM']}>
+              <ProtectedRoute allowedRoles={TEACHING_ROLES}>
                 <TeacherDashboard />
               </ProtectedRoute>
             }

@@ -9,9 +9,7 @@ const authApi = {
       };
 
       const data = await ApiClient.post(API_ENDPOINTS.AUTH.LOGIN, payload);
-      if (data.token) {
-        localStorage.setItem('userToken', data.token);
-      }
+      // Login step only sends verification email; token should be set after verify step
 
       return data;
     } catch (error) {
@@ -22,10 +20,11 @@ const authApi = {
   logout: async () => {
     try {
       await ApiClient.post(API_ENDPOINTS.AUTH.LOGOUT);
-      localStorage.removeItem('userToken');
       sessionStorage.removeItem('userToken');
-      localStorage.removeItem('user');
       sessionStorage.removeItem('user');
+      // Backward-compat cleanup
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('user');
     } catch (error) {
       localStorage.removeItem('userToken');
       sessionStorage.removeItem('userToken');
@@ -44,9 +43,63 @@ const authApi = {
     }
   },
 
+  verifyLogin: async (email, code) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.VERIFY_LOGIN, { email, code });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to verify code');
+    }
+  },
+
+  checkEmail: async (email) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.CHECK_EMAIL, { email });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to check email');
+    }
+  },
+
+  register: async (payload) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.REGISTER, payload);
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to register');
+    }
+  },
+
+  forgotPassword: async (email) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.FORGOT_PASSWORD, { email });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to request password reset');
+    }
+  },
+
+  verifyResetCode: async (email, code) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.VERIFY_RESET_CODE, { email, code });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to verify reset code');
+    }
+  },
+
+  resetPassword: async (resetToken, newPassword) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.RESET_PASSWORD, { resetToken, newPassword });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to reset password');
+    }
+  },
+
   getRegistrationRequests: async () => {
     try {
-      const data = await ApiClient.get('http://localhost:5000/api/auth/registration-requests');
+      const data = await ApiClient.get(API_ENDPOINTS.AUTH.REGISTRATION_REQUESTS);
       return data;
     } catch (error) {
       throw new Error(error || 'Failed to fetch registration requests');
@@ -55,7 +108,7 @@ const authApi = {
 
   approveRegistration: async (requestId) => {
     try {
-      const data = await ApiClient.post(`http://localhost:5000/api/auth/registration-requests/${requestId}/approve`);
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.REGISTRATION_APPROVE(requestId));
       return data;
     } catch (error) {
       throw new Error(error || 'Failed to approve registration');
@@ -64,7 +117,7 @@ const authApi = {
 
   rejectRegistration: async (requestId) => {
     try {
-      const data = await ApiClient.post(`http://localhost:5000/api/auth/registration-requests/${requestId}/reject`);
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.REGISTRATION_REJECT(requestId));
       return data;
     } catch (error) {
       throw new Error(error || 'Failed to reject registration');

@@ -11,9 +11,9 @@ router.get('/conversations/:userId', auth, async (req, res) => {
         // Get user role
         const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [userId]);
         const userRole = userResult.rows[0]?.role;
-
+        const { TEACHING_ROLES } = require('../config/constants');
         // For teachers/HODs/PMs, separate anonymous messages into a special conversation
-        const isTeacher = ['Teacher', 'HOD', 'PM'].includes(userRole);
+        const isTeacher = TEACHING_ROLES.includes(userRole);
 
         // Get regular (non-anonymous) conversations
         const regularConversations = await pool.query(
@@ -206,6 +206,139 @@ router.get('/users', auth, async (req, res) => {
         const result = await pool.query(query, params);
         res.json(result.rows);
     } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Search messages in a conversation
+router.get('/messages/:userId/:otherUserId/search', auth, async (req, res) => {
+    try {
+        const { userId, otherUserId } = req.params;
+        const { q } = req.query;
+
+        if (!q || q.trim().length === 0) {
+            return res.json([]);
+        }
+
+        const searchTerm = `%${q.trim().toLowerCase()}%`;
+
+        // Special handling for anonymous conversation
+        if (otherUserId === 'anonymous') {
+            const result = await pool.query(
+                `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
+                        (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                        'Anonymous Student' as sender_name
+                 FROM messages m
+                 WHERE m.community_id IS NULL
+                   AND m.receiver_id = $1
+                   AND m.is_anonymous = true
+                   AND LOWER(m.content) LIKE $2
+                 ORDER BY m.created_at DESC
+                 LIMIT 50`,
+                [userId, searchTerm]
+            );
+            return res.json(result.rows);
+        }
+
+        // Regular conversation search
+        const result = await pool.query(
+            `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
+                    (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                    u.name as sender_name
+             FROM messages m
+             LEFT JOIN users u ON m.sender_id = u.id
+             WHERE m.community_id IS NULL
+               AND ((m.sender_id = $1 AND m.receiver_id = $2)
+                 OR (m.sender_id = $2 AND m.receiver_id = $1))
+               AND (m.is_anonymous = false OR m.sender_id = $1)
+               AND LOWER(m.content) LIKE $3
+             ORDER BY m.created_at DESC
+             LIMIT 50`,
+            [userId, otherUserId, searchTerm]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        console.error('Search messages error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete a message (only own messages)
+router.delete('/message/:messageId', auth, async (req, res) => {
+    try {
+        const { messageId } = req.params;
+        const userId = req.user.userId;
+
+        // Check if message exists and belongs to the user
+        const messageCheck = await pool.query(
+            `SELECT id, sender_id, content FROM messages WHERE id = $1 AND community_id IS NULL`,
+            [messageId]
+        );
+
+        if (messageCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        const message = messageCheck.rows[0];
+
+        // Only allow deleting own messages
+        if (message.sender_id !== userId) {
+            return res.status(403).json({ message: 'You can only delete your own messages' });
+        }
+
+        // Delete the message
+        await pool.query(
+            `DELETE FROM messages WHERE id = $1`,
+            [messageId]
+        );
+
+        res.json({ message: 'Message deleted successfully', deletedMessageId: parseInt(messageId) });
+    } catch (err) {
+        console.error('Delete message error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete multiple messages (for "delete for me" feature - marks as deleted)
+router.post('/message/delete-multiple', auth, async (req, res) => {
+    try {
+        const { messageIds } = req.body;
+        const userId = req.user.userId;
+
+        console.log('[Delete Multiple] userId from token:', userId, typeof userId);
+        console.log('[Delete Multiple] messageIds:', messageIds);
+
+        if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+            return res.status(400).json({ message: 'Message IDs required' });
+        }
+
+        // First, let's check what messages exist with these IDs
+        const checkResult = await pool.query(
+            `SELECT id, sender_id FROM messages WHERE id = ANY($1) AND community_id IS NULL`,
+            [messageIds]
+        );
+        console.log('[Delete Multiple] Messages found:', checkResult.rows);
+
+        // Only delete messages sent by the user
+        const result = await pool.query(
+            `DELETE FROM messages 
+             WHERE id = ANY($1) 
+               AND sender_id = $2
+               AND community_id IS NULL
+             RETURNING id`,
+            [messageIds, userId]
+        );
+
+        console.log('[Delete Multiple] Deleted count:', result.rowCount);
+
+        res.json({ 
+            message: 'Messages deleted successfully', 
+            deletedCount: result.rowCount,
+            deletedIds: result.rows.map(r => r.id)
+        });
+    } catch (err) {
+        console.error('Delete multiple messages error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });

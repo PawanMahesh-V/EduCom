@@ -19,7 +19,7 @@ import socketService from '../services/socket';
 import { showAlert } from '../utils/alert';
 const StudentDashboard = () => {
   const navigate = useNavigate();
-  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
+  const raw = sessionStorage.getItem('user');
   const user = raw ? JSON.parse(raw) : null;
   // Try different possible ID field names
   const userId = user?.id || user?.userId;
@@ -115,7 +115,26 @@ const StudentDashboard = () => {
     if (selectedConversation && 
         (newMessage.sender_id === selectedConversation.user_id || 
          newMessage.receiver_id === selectedConversation.user_id)) {
-      setDmMessages(prev => [...prev, newMessage]);
+      setDmMessages(prev => {
+        // Check if message already exists (avoid duplicates from optimistic updates)
+        const exists = prev.some(msg => 
+          msg.id === newMessage.id || 
+          (String(msg.id).startsWith('temp-') && 
+           msg.content === newMessage.content && 
+           msg.sender_id === newMessage.sender_id)
+        );
+        if (exists) {
+          // Replace temp message with real one
+          return prev.map(msg => 
+            String(msg.id).startsWith('temp-') && 
+            msg.content === newMessage.content && 
+            msg.sender_id === newMessage.sender_id
+              ? newMessage
+              : msg
+          );
+        }
+        return [...prev, newMessage];
+      });
       scrollToBottom();
     }
   });
@@ -337,6 +356,17 @@ const StudentDashboard = () => {
   };
   const handleSendMessage = () => {
     if (message.trim() && selectedChat) {
+      // Optimistic update - add message to UI immediately
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        text: message,
+        sender: user?.name || 'Student',
+        senderId: userId,
+        time: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+      };
+      setMessages(prev => [...prev, optimisticMessage]);
+      scrollToBottom();
+      
       sendSocketMessage(
         message,
         userId,
@@ -351,6 +381,42 @@ const StudentDashboard = () => {
     console.log('[StudentDashboard] handleSendDirectMessage called with isAnonymous:', isAnonymous);
     if (message.trim() && selectedConversation) {
       console.log('[StudentDashboard] Calling sendDirectMessage with isAnonymous:', isAnonymous);
+      
+      // Optimistic update - add message to UI immediately
+      const optimisticMessage = {
+        id: `temp-${Date.now()}`,
+        sender_id: userId,
+        receiver_id: selectedConversation.user_id,
+        content: message,
+        is_read: false,
+        is_anonymous: isAnonymous,
+        created_at: new Date().toISOString(),
+        sender_name: isAnonymous ? 'Anonymous Student' : (user?.name || 'Student')
+      };
+      setDmMessages(prev => [...prev, optimisticMessage]);
+      scrollToBottom();
+      
+      // Also update conversations list immediately
+      setConversations(prev => {
+        const existingIndex = prev.findIndex(c => c.user_id === selectedConversation.user_id);
+        const updatedConversation = {
+          ...selectedConversation,
+          last_message: message,
+          last_message_time: new Date().toISOString(),
+          unread_count: 0
+        };
+        
+        if (existingIndex >= 0) {
+          // Update existing conversation and move to top
+          const updated = [...prev];
+          updated.splice(existingIndex, 1);
+          return [updatedConversation, ...updated];
+        } else {
+          // Add new conversation at top
+          return [updatedConversation, ...prev];
+        }
+      });
+      
       sendDirectMessage(
         selectedConversation.user_id,
         message,
@@ -360,11 +426,6 @@ const StudentDashboard = () => {
       
       setMessage('');
       dmTypingIndicator.stopTyping();
-      
-      // Refresh conversations to show new message
-      setTimeout(() => {
-        fetchConversations();
-      }, 500);
     }
   };
   const handleSelectConversation = async (conversation) => {
@@ -401,6 +462,20 @@ const StudentDashboard = () => {
       dmTypingIndicator.startTyping();
     }
   };
+
+  // Handle message deletion - remove from local state and refresh conversations
+  const handleMessageDeleted = (messageId) => {
+    const idToRemove = Number(messageId);
+    console.log('[StudentDashboard] handleMessageDeleted called with:', messageId, 'as number:', idToRemove);
+    setDmMessages(prev => {
+      const newMessages = prev.filter(msg => Number(msg.id) !== idToRemove);
+      console.log('[StudentDashboard] Messages before:', prev.length, 'after:', newMessages.length);
+      return newMessages;
+    });
+    // Refresh conversations to update last message preview
+    fetchConversations();
+  };
+
   const handleChatSelect = async (chat) => {
     setSelectedChat(chat);
     setMessages([]);
@@ -563,6 +638,7 @@ const StudentDashboard = () => {
           onStartNewConversation={handleStartNewConversation}
           onSendDirectMessage={handleSendDirectMessage}
           onDMTyping={handleDMTyping}
+          onMessageDeleted={handleMessageDeleted}
           loading={loading}
         />
       )}
