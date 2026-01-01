@@ -747,9 +747,8 @@ const TeacherDashboard = () => {
                         value={user?.name || 'Current User'}
                         disabled
                         className="input-disabled"
-                        style={{ backgroundColor: '#f5f5f5', cursor: 'not-allowed' }}
                       />
-                      <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '0.25rem', display: 'block' }}>
+                      <small className="helper-text">
                         This course will be assigned to you
                       </small>
                     </div>

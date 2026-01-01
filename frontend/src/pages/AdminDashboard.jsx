@@ -853,28 +853,28 @@ const AdminDashboard = () => {
                     title: 'Total Users',
                     value: stats?.totalUsers || 0,
                     icon: faUsers,
-                    color: '#2563EB',
+                    colorClass: 'stat-icon-primary',
                     subtitle: `${stats?.usersByRole?.Student || 0} Students, ${stats?.usersByRole?.Teacher || 0} Teachers`
                   },
                   {
                     title: 'Total Courses',
                     value: stats?.totalCourses || 0,
                     icon: faBook,
-                    color: '#3B82F6',
+                    colorClass: 'stat-icon-accent',
                     subtitle: `${stats?.totalEnrollments || 0} Total Enrollments`
                   },
                   {
                     title: 'Communities',
                     value: stats?.totalCommunities || 0,
                     icon: faComments,
-                    color: '#2563EB',
+                    colorClass: 'stat-icon-secondary',
                     subtitle: `${stats?.totalMessages || 0} Messages`
                   },
                   {
                     title: 'Marketplace',
                     value: stats?.totalMarketplaceItems || 0,
                     icon: faStore,
-                    color: '#3B82F6',
+                    colorClass: 'stat-icon-info',
                     subtitle: `${stats?.pendingMarketplaceItems || 0} Pending Approval`
                   }
                 ].map((card, index) => (
@@ -1364,22 +1364,6 @@ const AdminDashboard = () => {
                               <div className="user-card-label">Registration ID</div>
                               <div className="user-card-value large">{request.reg_id}</div>
                             </div>
-                            <div className="user-card-actions">
-                              <button
-                                className="btn-approve"
-                                onClick={() => handleApproveRequest(request.id)}
-                                title="Approve"
-                              >
-                                <FontAwesomeIcon icon={faUserCheck} />
-                              </button>
-                              <button
-                                className="btn-reject"
-                                onClick={() => handleRejectRequest(request.id)}
-                                title="Reject"
-                              >
-                                <FontAwesomeIcon icon={faUserMinus} />
-                              </button>
-                            </div>
                           </div>
                           <div className="user-card-body">
                             <div className="user-card-row">
@@ -1410,6 +1394,22 @@ const AdminDashboard = () => {
                               <div className="user-card-label">Request Date</div>
                               <div className="user-card-value">{new Date(request.created_at).toLocaleDateString()}</div>
                             </div>
+                          </div>
+                          <div className="user-card-actions">
+                            <button
+                              className="button approve"
+                              onClick={() => handleApproveRequest(request.id)}
+                            >
+                              <FontAwesomeIcon icon={faUserCheck} />
+                              Approve
+                            </button>
+                            <button
+                              className="button reject"
+                              onClick={() => handleRejectRequest(request.id)}
+                            >
+                              <FontAwesomeIcon icon={faUserMinus} />
+                              Reject
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -2090,18 +2090,18 @@ const AdminDashboard = () => {
                           </div>
                           <div className="user-card-actions">
                             <button 
-                              className="btn-approve"
+                              className="button approve"
                               onClick={() => handleApproveCourseRequest(request.id)}
-                              title="Approve"
                             >
                               <FontAwesomeIcon icon={faUserCheck} />
+                              Approve
                             </button>
                             <button 
-                              className="btn-reject"
+                              className="button reject"
                               onClick={() => handleRejectCourseRequest(request.id)}
-                              title="Reject"
                             >
                               <FontAwesomeIcon icon={faUserMinus} />
+                              Reject
                             </button>
                           </div>
                         </div>

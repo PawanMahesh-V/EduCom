@@ -314,17 +314,9 @@ const MessageLayout = ({
                   </div>
                   <div className="chat-info">
                     <div className="chat-info-header">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: 0 }}>
+                      <div className="chat-item-header-wrapper">
                         <h4 className="chat-name">{conv.user_name}</h4>
-                        <span style={{ 
-                          fontSize: '0.65rem', 
-                          padding: '0.15rem 0.4rem', 
-                          borderRadius: '10px', 
-                          backgroundColor: conv.user_role === 'Teacher' ? '#4CAF50' : conv.user_role === 'Admin' ? '#f44336' : '#2196F3',
-                          color: 'white',
-                          fontWeight: '500',
-                          flexShrink: 0
-                        }}>
+                        <span className={`role-badge role-badge-${conv.user_role.toLowerCase()}`}>
                           {conv.user_role}
                         </span>
                       </div>
@@ -465,7 +457,7 @@ const MessageLayout = ({
                       <div className="chat-message-sender">
                         {msg.is_anonymous ? (
                           <>
-                            <FontAwesomeIcon icon={faUserSecret} style={{ marginRight: '6px' }} />
+                            <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-left" />
                             Anonymous Student
                           </>
                         ) : (
@@ -478,7 +470,7 @@ const MessageLayout = ({
                       {new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })}
                       {msg.is_anonymous && msg.sender_id === userId && (
                         <span className="anonymous-indicator" title="Sent anonymously">
-                          <FontAwesomeIcon icon={faUserSecret} style={{ marginLeft: '6px', fontSize: '0.75rem' }} />
+                          <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-right" />
                         </span>
                       )}
                     </div>
@@ -527,8 +519,8 @@ const MessageLayout = ({
               {/* Disable input for teachers in anonymous conversation */}
               {selectedConversation.user_id === 'anonymous' ? (
                 <div className="anonymous-reply-disabled">
-                  <p style={{ textAlign: 'center', color: '#6c757d', padding: '20px', fontStyle: 'italic' }}>
-                    <FontAwesomeIcon icon={faUserSecret} style={{ marginRight: '8px' }} />
+                  <p className="anonymous-reply-disabled-text">
+                    <FontAwesomeIcon icon={faUserSecret} />
                     You cannot reply to anonymous messages. Students will remain anonymous.
                   </p>
                 </div>
