@@ -125,10 +125,14 @@ const AdminDashboard = () => {
     message: ''
   });
   
-
-  
-  // Real-time direct messages
+  // Connect to socket FIRST - before any hooks that use it
   const userId = currentUser?.id || currentUser?.userId;
+  useEffect(() => {
+    if (!userId) return;
+    socketService.connect(userId);
+  }, [userId]);
+
+  // Real-time direct messages
   const { sendDirectMessage } = useDirectMessages(userId, (newMessage) => {
     fetchConversations();
     
@@ -157,6 +161,16 @@ const AdminDashboard = () => {
       });
       scrollToBottom();
     }
+  }, (sentMessage) => {
+    // Handle message sent confirmation - replace temp ID with real ID
+    console.log('[AdminDashboard] Message sent confirmed:', sentMessage);
+    setDmMessages(prev => prev.map(msg => 
+      String(msg.id).startsWith('temp-') && 
+      msg.content === sentMessage.content && 
+      msg.sender_id === sentMessage.sender_id
+        ? { ...msg, id: sentMessage.id }
+        : msg
+    ));
   });
   const dmTypingIndicator = useDMTypingIndicator(
     selectedConversation?.user_id,
@@ -177,7 +191,7 @@ const AdminDashboard = () => {
     }
   }, [selectedConversation]);
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
   useEffect(() => {
     scrollToBottom();
@@ -188,8 +202,6 @@ const AdminDashboard = () => {
       fetchAvailableUsers();
     }
   }, [activeSection, userId]);
-  
-
   
   const [error, setError] = useState(null);
   useEffect(() => {

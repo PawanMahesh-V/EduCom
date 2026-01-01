@@ -30,6 +30,14 @@ const communityApi = {
     return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.MESSAGES(id, userId));
   },
 
+  deleteMessage: async (communityId, messageId) => {
+    return await ApiClient.delete(API_ENDPOINTS.COMMUNITIES.DELETE_MESSAGE(communityId, messageId));
+  },
+
+  deleteMultipleMessages: async (communityId, messageIds) => {
+    return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.DELETE_MULTIPLE_MESSAGES(communityId), { messageIds });
+  },
+
   getStudentCommunities: async (studentId) => {
     return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.STUDENT(studentId));
   },

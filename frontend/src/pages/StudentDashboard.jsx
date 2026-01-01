@@ -50,6 +50,13 @@ const StudentDashboard = () => {
   const [joinCode, setJoinCode] = useState('');
   const [joiningCommunity, setJoiningCommunity] = useState(false);
 
+  // Connect to socket FIRST - before any hooks that use it
+  useEffect(() => {
+    if (!userId) return;
+    console.log('[StudentDashboard] Connecting socket for user:', userId);
+    socketService.connect(userId);
+  }, [userId]);
+
   // Real-time notifications
   useNotifications((notification) => {
     showAlert(notification.title, notification.message, notification.type || 'info');
@@ -136,6 +143,16 @@ const StudentDashboard = () => {
       });
       scrollToBottom();
     }
+  }, (sentMessage) => {
+    // Handle message sent confirmation - replace temp ID with real ID
+    console.log('[StudentDashboard] Message sent confirmed:', sentMessage);
+    setDmMessages(prev => prev.map(msg => 
+      String(msg.id).startsWith('temp-') && 
+      msg.content === sentMessage.content && 
+      msg.sender_id === sentMessage.sender_id
+        ? { ...msg, id: sentMessage.id }
+        : msg
+    ));
   });
   // DM typing indicator
   const dmTypingIndicator = useDMTypingIndicator(
@@ -170,7 +187,31 @@ const StudentDashboard = () => {
         addedMessageIds.current.add(newMessage.id);
         
         setMessages(prev => {
-          // Double-check it's not already in state
+          // Check if this is a confirmation of our optimistic message
+          const tempExists = prev.some(msg => 
+            String(msg.id).startsWith('temp-') && 
+            msg.text === newMessage.content && 
+            msg.senderId === newMessage.sender_id
+          );
+          
+          if (tempExists) {
+            // Replace temp message with real one
+            return prev.map(msg => 
+              String(msg.id).startsWith('temp-') && 
+              msg.text === newMessage.content && 
+              msg.senderId === newMessage.sender_id
+                ? {
+                    id: newMessage.id,
+                    text: newMessage.content,
+                    sender: newMessage.sender_name,
+                    senderId: newMessage.sender_id,
+                    time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
+                  }
+                : msg
+            );
+          }
+          
+          // Check if message already exists with real ID
           const exists = prev.some(msg => msg.id === newMessage.id);
           if (exists) return prev;
           
@@ -179,7 +220,7 @@ const StudentDashboard = () => {
             text: newMessage.content,
             sender: newMessage.sender_name,
             senderId: newMessage.sender_id,
-            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
           }];
         });
         scrollToBottom();
@@ -207,11 +248,14 @@ const StudentDashboard = () => {
     }
   }, [selectedChat?.id]);
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [dmMessages]);
   useEffect(() => {
     if (activeSection === 'courses' && userId) {
       fetchMyCourses();
@@ -361,7 +405,7 @@ const StudentDashboard = () => {
         text: message,
         sender: user?.name || 'Student',
         senderId: userId,
-        time: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
       };
       setMessages(prev => [...prev, optimisticMessage]);
       scrollToBottom();
@@ -475,8 +519,29 @@ const StudentDashboard = () => {
     fetchConversations();
   };
 
+  // Handle community message deletion
+  const handleCommunityMessageDeleted = async (messageId) => {
+    if (!selectedChat) return;
+    
+    try {
+      await communityApi.deleteMessage(selectedChat.id, messageId);
+      // Remove from local state
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (err) {
+      console.error('[StudentDashboard] Community message delete error:', err);
+      showAlert('Failed to delete message', 'error');
+    }
+  };
+
   const handleChatSelect = async (chat) => {
     setSelectedChat(chat);
+    
+    // If chat is null (back button clicked), just clear messages and return
+    if (!chat) {
+      setMessages([]);
+      return;
+    }
+    
     setMessages([]);
     addedMessageIds.current.clear();
     
@@ -493,7 +558,7 @@ const StudentDashboard = () => {
         text: msg.content,
         sender: msg.sender_name,
         senderId: msg.sender_id,
-        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
       }));
       setMessages(formattedMessages);
     } catch (err) {
@@ -655,6 +720,7 @@ const StudentDashboard = () => {
           onSelectChat={handleChatSelect}
           onSendCommunityMessage={handleSendMessage}
           onCommunityTyping={startTyping}
+          onCommunityMessageDeleted={handleCommunityMessageDeleted}
           loading={loading}
         />
       )}

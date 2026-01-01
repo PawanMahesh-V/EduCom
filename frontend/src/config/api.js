@@ -33,6 +33,8 @@ export const API_ENDPOINTS = {
     BY_ID: (id) => `${API_BASE_URL}/communities/${id}`,
     MEMBERS: (id) => `${API_BASE_URL}/communities/${id}/members`,
     MESSAGES: (id, userId) => `${API_BASE_URL}/communities/${id}/messages${userId ? `?userId=${userId}` : ''}`,
+    DELETE_MESSAGE: (communityId, messageId) => `${API_BASE_URL}/communities/${communityId}/messages/${messageId}`,
+    DELETE_MULTIPLE_MESSAGES: (communityId) => `${API_BASE_URL}/communities/${communityId}/messages/delete-multiple`,
     STUDENT: (studentId) => `${API_BASE_URL}/communities/student/${studentId}`,
     TEACHER: (teacherId) => `${API_BASE_URL}/communities/teacher/${teacherId}`,
     JOIN: `${API_BASE_URL}/communities/join`,

@@ -124,28 +124,60 @@ export const useUserStatus = (onUserStatus) => {
     };
   }, [onUserStatus]);
 };
-export const useDirectMessages = (userId, onNewMessage) => {
+export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
   // Use ref to avoid stale closures
   const onNewMessageRef = useRef(onNewMessage);
+  const onMessageSentRef = useRef(onMessageSent);
   
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
   }, [onNewMessage]);
+
+  useEffect(() => {
+    onMessageSentRef.current = onMessageSent;
+  }, [onMessageSent]);
   
   useEffect(() => {
     if (!userId) return;
     
+    // Ensure socket is connected before setting up listeners
+    const socket = socketService.connect(userId);
+    
     const handleNewMessage = (message) => {
+      console.log('[useDirectMessages] Received new-direct-message:', message);
       if (onNewMessageRef.current) {
         onNewMessageRef.current(message);
       }
     };
+
+    const handleMessageSent = (message) => {
+      console.log('[useDirectMessages] Received direct-message-sent:', message);
+      if (onMessageSentRef.current) {
+        onMessageSentRef.current(message);
+      }
+    };
     
-    // Only listen for incoming messages, not sent ones (to avoid duplicates)
-    socketService.onNewDirectMessage(handleNewMessage);
+    // Set up listener - may need to wait for connection
+    const setupListener = () => {
+      console.log('[useDirectMessages] Setting up new-direct-message listener');
+      socket.off('new-direct-message', handleNewMessage); // Remove any existing
+      socket.on('new-direct-message', handleNewMessage);
+      socket.off('direct-message-sent', handleMessageSent);
+      socket.on('direct-message-sent', handleMessageSent);
+    };
+    
+    // If already connected, set up immediately
+    if (socket.connected) {
+      setupListener();
+    } else {
+      // Wait for connection
+      socket.once('connect', setupListener);
+    }
     
     return () => {
-      socketService.offNewDirectMessage();
+      console.log('[useDirectMessages] Cleaning up listener');
+      socket.off('new-direct-message', handleNewMessage);
+      socket.off('direct-message-sent', handleMessageSent);
     };
   }, [userId]); // Only depend on userId
   

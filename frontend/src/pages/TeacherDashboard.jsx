@@ -66,6 +66,60 @@ const TeacherDashboard = () => {
     department: 'CS',
     semester: ''
   });
+
+  // Connect to socket FIRST - before any hooks that use it
+  useEffect(() => {
+    if (!userId) return;
+    console.log('[TeacherDashboard] Connecting socket for user:', userId);
+    socketService.connect(userId);
+  }, [userId]);
+
+  // Listen for course approval events
+  useEffect(() => {
+    if (!userId) return;
+    
+    const socket = socketService.connect(userId);
+    
+    const handleCourseApproved = (data) => {
+      console.log('[TeacherDashboard] Course approved event received:', data);
+      // Only update if this course belongs to the current teacher
+      if (data.teacherId === userId) {
+        // Add the new course to the list
+        setCourses(prev => {
+          // Check if course already exists
+          if (prev.some(c => c.id === data.course.id)) return prev;
+          return [...prev, data.course];
+        });
+        // Also refresh communities since a new community was created
+        communityApi.getTeacherCommunities(userId).then(communities => {
+          const formattedChats = communities.map(community => ({
+            id: community.id,
+            name: community.course_name || community.name,
+            courseId: community.course_id,
+            courseName: community.course_name,
+            courseCode: community.course_code,
+            lastMessage: 'Start chatting...',
+            time: new Date(community.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
+            unread: community.unread_count || 0
+          }));
+          setChats(formattedChats);
+          // Join the new community
+          if (communities.length > 0) {
+            const newCommunity = communities.find(c => c.course_id === data.course.id);
+            if (newCommunity) {
+              socket.emit('join-community', newCommunity.id);
+            }
+          }
+        }).catch(() => {});
+      }
+    };
+    
+    socket.on('course-approved', handleCourseApproved);
+    
+    return () => {
+      socket.off('course-approved', handleCourseApproved);
+    };
+  }, [userId]);
   
   // Real-time notifications
   useNotifications((notification) => {
@@ -154,6 +208,16 @@ const TeacherDashboard = () => {
       });
       scrollToBottom();
     }
+  }, (sentMessage) => {
+    // Handle message sent confirmation - replace temp ID with real ID
+    console.log('[TeacherDashboard] Message sent confirmed:', sentMessage);
+    setDmMessages(prev => prev.map(msg => 
+      String(msg.id).startsWith('temp-') && 
+      msg.content === sentMessage.content && 
+      msg.sender_id === sentMessage.sender_id
+        ? { ...msg, id: sentMessage.id }
+        : msg
+    ));
   });
   const dmTypingIndicator = useDMTypingIndicator(
     selectedConversation?.user_id,
@@ -187,7 +251,31 @@ const TeacherDashboard = () => {
         addedMessageIds.current.add(newMessage.id);
         
         setMessages(prev => {
-          // Double-check it's not already in state
+          // Check if this is a confirmation of our optimistic message
+          const tempExists = prev.some(msg => 
+            String(msg.id).startsWith('temp-') && 
+            msg.text === newMessage.content && 
+            msg.senderId === newMessage.sender_id
+          );
+          
+          if (tempExists) {
+            // Replace temp message with real one
+            return prev.map(msg => 
+              String(msg.id).startsWith('temp-') && 
+              msg.text === newMessage.content && 
+              msg.senderId === newMessage.sender_id
+                ? {
+                    id: newMessage.id,
+                    text: newMessage.content,
+                    sender: newMessage.sender_name,
+                    senderId: newMessage.sender_id,
+                    time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
+                  }
+                : msg
+            );
+          }
+          
+          // Check if message already exists with real ID
           const exists = prev.some(msg => msg.id === newMessage.id);
           if (exists) return prev;
           
@@ -196,7 +284,7 @@ const TeacherDashboard = () => {
             text: newMessage.content,
             sender: newMessage.sender_name,
             senderId: newMessage.sender_id,
-            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+            time: new Date(newMessage.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
           }];
         });
         scrollToBottom();
@@ -224,11 +312,14 @@ const TeacherDashboard = () => {
     }
   }, [selectedChat?.id]);
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   };
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [dmMessages]);
   useEffect(() => {
     if (userId) {
       fetchTeacherStats();
@@ -427,7 +518,7 @@ const TeacherDashboard = () => {
         text: message,
         sender: user?.name || 'Teacher',
         senderId: userId,
-        time: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date().toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
       };
       setMessages(prev => [...prev, optimisticMessage]);
       scrollToBottom();
@@ -444,11 +535,18 @@ const TeacherDashboard = () => {
   };
   const handleChatSelect = async (chat) => {
     setSelectedChat(chat);
+    
+    // If chat is null (back button clicked), just clear messages and return
+    if (!chat) {
+      setMessages([]);
+      return;
+    }
+    
     setMessages([]);
     addedMessageIds.current.clear();
     
     // Reset unread count for this chat in the UI
-    setChats(prev => prev.map(c => 
+    setChats(prev => prev.filter(c => c !== null).map(c => 
       c.id === chat.id ? { ...c, unread_count: 0 } : c
     ));
     
@@ -459,7 +557,7 @@ const TeacherDashboard = () => {
         text: msg.content,
         sender: msg.sender_name,
         senderId: msg.sender_id,
-        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })
+        time: new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })
       }));
       setMessages(formattedMessages);
     } catch (err) {
@@ -567,6 +665,20 @@ const TeacherDashboard = () => {
     });
     // Refresh conversations to update last message preview
     fetchConversations();
+  };
+
+  // Handle community message deletion
+  const handleCommunityMessageDeleted = async (messageId) => {
+    if (!selectedChat) return;
+    
+    try {
+      await communityApi.deleteMessage(selectedChat.id, messageId);
+      // Remove from local state
+      setMessages(prev => prev.filter(msg => msg.id !== messageId));
+    } catch (err) {
+      console.error('[TeacherDashboard] Community message delete error:', err);
+      showAlert('Failed to delete message', 'error');
+    }
   };
 
   const handleCopyJoinCode = async (joinCode, courseName, e) => {
@@ -788,6 +900,7 @@ const TeacherDashboard = () => {
           onSelectChat={handleChatSelect}
           onSendCommunityMessage={handleSendMessage}
           onCommunityTyping={startTyping}
+          onCommunityMessageDeleted={handleCommunityMessageDeleted}
           loading={loading}
         />
       )}

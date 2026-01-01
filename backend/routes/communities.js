@@ -354,4 +354,72 @@ router.post('/join', auth, async (req, res) => {
     }
 });
 
+// Delete a community message (only own messages)
+router.delete('/:communityId/messages/:messageId', auth, async (req, res) => {
+    try {
+        const { communityId, messageId } = req.params;
+        const userId = req.user.userId;
+
+        // Check if message exists, belongs to this community and was sent by the user
+        const messageCheck = await pool.query(
+            `SELECT id, sender_id, community_id FROM messages WHERE id = $1 AND community_id = $2`,
+            [messageId, communityId]
+        );
+
+        if (messageCheck.rows.length === 0) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        const message = messageCheck.rows[0];
+
+        // Only allow deleting own messages
+        if (message.sender_id !== userId) {
+            return res.status(403).json({ message: 'You can only delete your own messages' });
+        }
+
+        // Delete the message
+        await pool.query(
+            `DELETE FROM messages WHERE id = $1`,
+            [messageId]
+        );
+
+        res.json({ message: 'Message deleted successfully', deletedMessageId: parseInt(messageId) });
+    } catch (err) {
+        console.error('Delete community message error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Delete multiple community messages
+router.post('/:communityId/messages/delete-multiple', auth, async (req, res) => {
+    try {
+        const { communityId } = req.params;
+        const { messageIds } = req.body;
+        const userId = req.user.userId;
+
+        if (!messageIds || !Array.isArray(messageIds) || messageIds.length === 0) {
+            return res.status(400).json({ message: 'Message IDs required' });
+        }
+
+        // Only delete messages sent by the user in this community
+        const result = await pool.query(
+            `DELETE FROM messages 
+             WHERE id = ANY($1) 
+               AND sender_id = $2
+               AND community_id = $3
+             RETURNING id`,
+            [messageIds, userId, communityId]
+        );
+
+        res.json({ 
+            message: 'Messages deleted successfully', 
+            deletedCount: result.rowCount,
+            deletedIds: result.rows.map(r => r.id)
+        });
+    } catch (err) {
+        console.error('Delete multiple community messages error:', err);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 module.exports = router;

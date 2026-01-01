@@ -25,10 +25,8 @@ function App() {
         socketService.connect(userId);
       }
     }
-
-    return () => {
-      socketService.disconnect();
-    };
+    // Don't disconnect on cleanup - React Strict Mode double-invokes effects
+    // Socket will be disconnected when user logs out
   }, []);
   return (
     <Router>

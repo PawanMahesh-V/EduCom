@@ -262,21 +262,57 @@ router.put('/:id', auth, async (req, res) => {
 });
 
 router.delete('/:id', auth, async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
 
-        const result = await pool.query(
+        await client.query('BEGIN');
+
+        // First, delete messages in communities related to this course
+        await client.query(
+            `DELETE FROM messages 
+             WHERE community_id IN (SELECT id FROM communities WHERE course_id = $1)`,
+            [id]
+        );
+
+        // Delete communities related to this course
+        await client.query(
+            'DELETE FROM communities WHERE course_id = $1',
+            [id]
+        );
+
+        // Delete enrollments for this course
+        await client.query(
+            'DELETE FROM enrollments WHERE course_id = $1',
+            [id]
+        );
+
+        // Delete notifications related to this course
+        await client.query(
+            'DELETE FROM notifications WHERE course_id = $1',
+            [id]
+        );
+
+        // Now delete the course
+        const result = await client.query(
             'DELETE FROM courses WHERE id = $1 RETURNING id',
             [id]
         );
 
         if (result.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Course not found' });
         }
 
+        await client.query('COMMIT');
+
         res.json({ message: 'Course deleted successfully' });
     } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error deleting course:', err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 });
 
@@ -560,6 +596,16 @@ router.post('/requests/:id/approve', auth, async (req, res) => {
         );
 
         await client.query('COMMIT');
+
+        // Emit socket event to notify the teacher that their course was approved
+        const io = req.app.get('io');
+        if (io) {
+            // Emit to all connected clients - the frontend will filter by teacher_id
+            io.emit('course-approved', {
+                course: newCourse,
+                teacherId: request.teacher_id
+            });
+        }
 
         res.json({ 
             message: 'Course request approved and course created',

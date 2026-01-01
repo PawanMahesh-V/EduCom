@@ -38,6 +38,7 @@ const MessageLayout = ({
   onSelectChat,
   onSendCommunityMessage,
   onCommunityTyping,
+  onCommunityMessageDeleted,
   
   // Loading state
   loading,
@@ -122,6 +123,74 @@ const MessageLayout = ({
     setMessageSearchQuery('');
     setSearchResults([]);
     setCurrentSearchIndex(0);
+  };
+
+  // Search messages in community (local search in already loaded messages)
+  const handleCommunitySearch = useCallback(() => {
+    if (!messageSearchQuery.trim() || !selectedChat) return;
+    
+    const query = messageSearchQuery.toLowerCase();
+    const results = communityMessages.filter(msg => 
+      msg.text?.toLowerCase().includes(query) || 
+      msg.sender?.toLowerCase().includes(query)
+    );
+    
+    setSearchResults(results);
+    setCurrentSearchIndex(0);
+    
+    // Scroll to first result
+    if (results.length > 0) {
+      const element = document.getElementById(`community-message-${results[0].id}`);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        element.classList.add('search-highlight');
+        setTimeout(() => element.classList.remove('search-highlight'), 2000);
+      }
+    }
+  }, [messageSearchQuery, selectedChat, communityMessages]);
+
+  // Navigate community search results
+  const navigateCommunitySearchResult = (direction) => {
+    if (searchResults.length === 0) return;
+    
+    let newIndex = currentSearchIndex + direction;
+    if (newIndex < 0) newIndex = searchResults.length - 1;
+    if (newIndex >= searchResults.length) newIndex = 0;
+    
+    setCurrentSearchIndex(newIndex);
+    
+    const element = document.getElementById(`community-message-${searchResults[newIndex].id}`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.classList.add('search-highlight');
+      setTimeout(() => element.classList.remove('search-highlight'), 2000);
+    }
+  };
+
+  // Delete selected community messages
+  const handleDeleteSelectedCommunity = async () => {
+    if (selectedMessages.length === 0) return;
+    
+    // Filter out temporary message IDs
+    const realMessageIds = selectedMessages.filter(id => !String(id).startsWith('temp-'));
+    
+    if (realMessageIds.length === 0) {
+      alert('Please wait for messages to be sent before deleting');
+      setSelectedMessages([]);
+      setIsSelectMode(false);
+      return;
+    }
+    
+    console.log('[MessageLayout] Deleting community messages:', realMessageIds);
+    
+    if (onCommunityMessageDeleted) {
+      for (const id of realMessageIds) {
+        await onCommunityMessageDeleted(id);
+      }
+    }
+    
+    setSelectedMessages([]);
+    setIsSelectMode(false);
   };
 
   // Delete single message
@@ -217,6 +286,14 @@ const MessageLayout = ({
     setIsSelectMode(false);
     setContextMenuMessage(null);
   }, [selectedConversation?.user_id]);
+
+  // Reset states when community chat changes
+  useEffect(() => {
+    closeSearch();
+    setSelectedMessages([]);
+    setIsSelectMode(false);
+    setShowCommunityOptions(false);
+  }, [selectedChat?.id]);
 
   const handleOptionClick = (action, mode) => {
     if (mode === 'dm') {
@@ -316,9 +393,11 @@ const MessageLayout = ({
                     <div className="chat-info-header">
                       <div className="chat-item-header-wrapper">
                         <h4 className="chat-name">{conv.user_name}</h4>
-                        <span className={`role-badge role-badge-${conv.user_role.toLowerCase()}`}>
-                          {conv.user_role}
-                        </span>
+                        {conv.user_role && (
+                          <span className={`role-badge role-badge-${conv.user_role.toLowerCase()}`}>
+                            {conv.user_role}
+                          </span>
+                        )}
                       </div>
                       {conv.last_message_time && (
                         <span className="chat-time">
@@ -335,7 +414,7 @@ const MessageLayout = ({
                     </div>
                     <div className="chat-preview">
                       <p className="chat-message-preview">
-                        {conv.last_message || 'No messages yet'}
+                        Start chatting...
                       </p>
                       {conv.unread_count > 0 && (
                         <span className="chat-unread-badge">{conv.unread_count}</span>
@@ -467,7 +546,7 @@ const MessageLayout = ({
                     )}
                     <div className="chat-message-text">{msg.content}</div>
                     <div className="chat-message-time">
-                      {new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                      {new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' })}
                       {msg.is_anonymous && msg.sender_id === userId && (
                         <span className="anonymous-indicator" title="Sent anonymously">
                           <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-right" />
@@ -642,45 +721,112 @@ const MessageLayout = ({
         {selectedChat ? (
           <>
             <div className="chat-main-header">
-              <button className="chat-back-btn" onClick={() => onSelectChat(null)}>
-                <FontAwesomeIcon icon={faArrowLeft} />
-              </button>
-              <div className="chat-user-info">
-                <div className="chat-avatar">{selectedChat.name.charAt(0)}</div>
-                <div>
-                  <h3 className="m-0 font-semibold">{selectedChat.name}</h3>
-                  <p className="m-0 text-sm text-secondary">Course Community</p>
-                </div>
-              </div>
-              <div className="chat-options-wrapper">
-                <button className="chat-options-btn" onClick={() => setShowCommunityOptions(!showCommunityOptions)}>
-                  <FontAwesomeIcon icon={faEllipsisVertical} />
-                </button>
-                {showCommunityOptions && (
-                  <div className="chat-options-dropdown">
-                    <button className="chat-option-item" onClick={() => handleOptionClick('delete', 'community')}>
-                      <FontAwesomeIcon icon={faTrash} />
-                      <span>Delete</span>
+              {isSearchMode ? (
+                // Search Mode Header
+                <div className="search-header">
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search messages..."
+                    value={messageSearchQuery}
+                    onChange={(e) => setMessageSearchQuery(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && handleCommunitySearch()}
+                    autoFocus
+                  />
+                  <div className="search-controls">
+                    <span className="search-count">
+                      {searchResults.length > 0 
+                        ? `${currentSearchIndex + 1}/${searchResults.length}` 
+                        : '0/0'}
+                    </span>
+                    <button 
+                      className="search-nav-btn" 
+                      onClick={() => navigateCommunitySearchResult(-1)}
+                      disabled={searchResults.length === 0}
+                    >
+                      <FontAwesomeIcon icon={faChevronUp} />
                     </button>
-                    <button className="chat-option-item" onClick={() => handleOptionClick('search', 'community')}>
-                      <FontAwesomeIcon icon={faSearch} />
-                      <span>Search</span>
+                    <button 
+                      className="search-nav-btn" 
+                      onClick={() => navigateCommunitySearchResult(1)}
+                      disabled={searchResults.length === 0}
+                    >
+                      <FontAwesomeIcon icon={faChevronDown} />
                     </button>
-                    <button className="chat-option-item" onClick={() => handleOptionClick('select', 'community')}>
-                      <FontAwesomeIcon icon={faCheckSquare} />
-                      <span>Select</span>
+                    <button className="search-close-btn" onClick={closeSearch}>
+                      <FontAwesomeIcon icon={faTimes} />
                     </button>
                   </div>
-                )}
-              </div>
+                </div>
+              ) : isSelectMode ? (
+                // Select Mode Header
+                <div className="select-mode-header">
+                  <span className="selected-count">{selectedMessages.length} selected</span>
+                  <button 
+                    className="select-delete-btn" 
+                    onClick={handleDeleteSelectedCommunity}
+                    disabled={selectedMessages.length === 0}
+                  >
+                    <FontAwesomeIcon icon={faTrash} />
+                    Delete
+                  </button>
+                  <button className="select-cancel-btn" onClick={() => { setIsSelectMode(false); setSelectedMessages([]); }}>
+                    <FontAwesomeIcon icon={faTimes} />
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                // Normal Header
+                <>
+                  <button className="chat-back-btn" onClick={() => onSelectChat(null)}>
+                    <FontAwesomeIcon icon={faArrowLeft} />
+                  </button>
+                  <div className="chat-user-info">
+                    <div className="chat-avatar">{selectedChat.name.charAt(0)}</div>
+                    <div>
+                      <h3 className="m-0 font-semibold">{selectedChat.name}</h3>
+                      <p className="m-0 text-sm text-secondary">Course Community</p>
+                    </div>
+                  </div>
+                  <div className="chat-options-wrapper">
+                    <button className="chat-options-btn" onClick={() => setShowCommunityOptions(!showCommunityOptions)}>
+                      <FontAwesomeIcon icon={faEllipsisVertical} />
+                    </button>
+                    {showCommunityOptions && (
+                      <div className="chat-options-dropdown">
+                        <button className="chat-option-item" onClick={() => handleOptionClick('search', 'community')}>
+                          <FontAwesomeIcon icon={faSearch} />
+                          <span>Search</span>
+                        </button>
+                        <button className="chat-option-item" onClick={() => handleOptionClick('select', 'community')}>
+                          <FontAwesomeIcon icon={faCheckSquare} />
+                          <span>Select Messages</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
             
             <div className="chat-messages">
               {communityMessages.map((msg, index) => (
                 <div 
                   key={`${msg.id}-${index}`}
-                  className={`chat-message ${msg.senderId === userId ? 'sent' : 'received'}`}
+                  id={`community-message-${msg.id}`}
+                  className={`chat-message ${msg.senderId === userId ? 'sent' : 'received'} ${selectedMessages.includes(msg.id) ? 'selected' : ''} ${isSelectMode && msg.senderId === userId ? 'selectable' : ''}`}
+                  onClick={isSelectMode && msg.senderId === userId ? (e) => { e.stopPropagation(); toggleMessageSelection(msg.id); } : undefined}
+                  style={isSelectMode && msg.senderId === userId ? { cursor: 'pointer' } : {}}
                 >
+                  {isSelectMode && msg.senderId === userId && (
+                    <div className="message-checkbox" onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        checked={selectedMessages.includes(msg.id)}
+                        onChange={(e) => { e.stopPropagation(); toggleMessageSelection(msg.id); }}
+                      />
+                    </div>
+                  )}
                   <div className={`chat-message-bubble ${msg.senderId === userId ? 'sent' : 'received'}`}>
                     {msg.senderId !== userId && (
                       <div className="chat-message-sender">{msg.sender}</div>

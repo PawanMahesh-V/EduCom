@@ -54,11 +54,13 @@ const connectedUsers = new Map(); // userId -> socketId
 io.on('connection', (socket) => {
     // User authentication and registration
     socket.on('register', (userId) => {
-        connectedUsers.set(userId, socket.id);
-        socket.userId = userId;
+        // Always store userId as integer for consistent lookup
+        const numericUserId = parseInt(userId);
+        connectedUsers.set(numericUserId, socket.id);
+        socket.userId = numericUserId;
         
         // Notify user is online
-        io.emit('user-status', { userId, status: 'online' });
+        io.emit('user-status', { userId: numericUserId, status: 'online' });
     });
 
     // Join a community/course room
@@ -92,8 +94,7 @@ io.on('connection', (socket) => {
                 const result = await pool.query(
                     `INSERT INTO messages (community_id, sender_id, content, status)
                      VALUES ($1, $2, $3, 'approved')
-                     RETURNING id, community_id, sender_id, content, status, 
-                               (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at`,
+                     RETURNING id, community_id, sender_id, content, status, created_at`,
                     [communityId, senderId, message]
                 );
 
@@ -295,8 +296,7 @@ io.on('connection', (socket) => {
             const result = await pool.query(
                 `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
                  VALUES ($1, $2, $3, false, $4, NULL, 'approved')
-                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous,
-                           (created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at`,
+                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at`,
                 [senderId, receiverId, message, isAnonymous]
             );
 
@@ -304,11 +304,16 @@ io.on('connection', (socket) => {
             
             // Send to receiver if online (hide sender name if anonymous)
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
+            console.log('[Backend] Looking for receiver:', parseInt(receiverId), 'Found socket:', receiverSocketId);
+            console.log('[Backend] Connected users:', Array.from(connectedUsers.entries()));
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
                     sender_name: isAnonymous ? 'Anonymous Student' : senderName
                 });
+                console.log('[Backend] Message emitted to receiver');
+            } else {
+                console.log('[Backend] Receiver not online');
             }
 
             // Send confirmation to sender (always show real name to sender)
