@@ -6,11 +6,9 @@ import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import VerifyCodePage from './pages/VerifyCodePage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
-import AdminDashboard from './pages/AdminDashboard';
-import TeacherDashboard from './pages/TeacherDashboard';
+import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { TEACHING_ROLES } from './constants';
-import StudentDashboard from './pages/StudentDashboard';
 import socketService from './services/socket';
 import './styles/global.css';
 function App() {
@@ -41,7 +39,7 @@ function App() {
             path="/admin" 
             element={
               <ProtectedRoute allowedRoles={['Admin']}>
-                <AdminDashboard />
+                <Dashboard />
               </ProtectedRoute>
             }
           />
@@ -49,7 +47,7 @@ function App() {
             path="/student"
             element={
               <ProtectedRoute allowedRoles={['Student']}>
-                <StudentDashboard />
+                <Dashboard />
               </ProtectedRoute>
             }
           />
@@ -57,7 +55,7 @@ function App() {
             path="/teacher"
             element={
               <ProtectedRoute allowedRoles={TEACHING_ROLES}>
-                <TeacherDashboard />
+                <Dashboard />
               </ProtectedRoute>
             }
           />
