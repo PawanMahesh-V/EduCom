@@ -48,8 +48,9 @@ const ForgotPasswordPage = () => {
       const data = await authApi.forgotPassword(email);
       if (data) {
         setMessage('Verification code sent! Check your email.');
-        // Store email and navigate to verify page
-        sessionStorage.setItem('resetEmail', email);
+        // Store email and flow type, navigate to verify page
+        sessionStorage.setItem('verifyEmail', email);
+        sessionStorage.setItem('verifyFlow', 'passwordReset');
         setTimeout(() => {
           navigate('/verify-code');
         }, 2000);
@@ -57,7 +58,7 @@ const ForgotPasswordPage = () => {
         setError('Failed to process request');
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError(err.message || 'Account does not exist!.');
     } finally {
       setLoading(false);
     }

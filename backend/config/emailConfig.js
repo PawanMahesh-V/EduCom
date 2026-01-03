@@ -15,16 +15,23 @@ const sendVerificationCode = async (email, code, type = 'login') => {
   const transporter = createTransporter();
   
   const isPasswordReset = type === 'password-reset';
-  const subject = isPasswordReset ? 'Password Reset - EduCom' : 'Login Verification Code - EduCom';
+  const isRegistration = type === 'registration';
+  
+  let subject, messageText;
+  if (isPasswordReset) {
+    subject = 'Password Reset - EduCom';
+    messageText = 'We received a request to reset the password for your EduCom account.';
+  } else if (isRegistration) {
+    subject = 'Email Verification - EduCom';
+    messageText = 'Thank you for registering with EduCom. Please verify your email address.';
+  } else {
+    subject = 'Login Verification Code - EduCom';
+    messageText = 'You are attempting to log in to your EduCom account.';
+  }
   
   const html = `
     <p>Hello,</p>
-    <p>
-      ${isPasswordReset 
-        ? 'We received a request to reset the password for your EduCom account.'
-        : 'You are attempting to log in to your EduCom account.'
-      }
-    </p>
+    <p>${messageText}</p>
     <p>Your verification code is:</p>
     <p><b>${code}</b></p>
     <p>This code will expire in 10 minutes.</p>
@@ -86,37 +93,6 @@ const sendWelcomeEmail = async (email, name, role) => {
   }
 };
 
-// Send notification email
-const sendNotificationEmail = async (email, title, message) => {
-  const transporter = createTransporter();
-  
-  const html = `
-    <p>Hello,</p>
-    <p>You have a new notification from EduCom:</p>
-    <p><b>${title}</b></p>
-    <p>${message}</p>
-    <p>Log in to your EduCom account to view more details.</p>
-    <br>
-    <p>Best regards,</p>
-    <p>The EduCom Team</p>
-  `;
-  
-  const mailOptions = {
-    from: `"EduCom" <${process.env.EMAIL_USER}>`,
-    to: email,
-    subject: `${title} - EduCom`,
-    html: html
-  };
-
-  try {
-    await transporter.sendMail(mailOptions);
-    return { success: true };
-  } catch (error) {
-    console.error('Failed to send notification email:', error);
-    return { success: false };
-  }
-};
-
 // Send registration approval email
 const sendRegistrationApprovalEmail = async (userEmail, userName) => {
   const transporter = createTransporter();
@@ -153,6 +129,5 @@ const sendRegistrationApprovalEmail = async (userEmail, userName) => {
 module.exports = {
   sendVerificationCode,
   sendWelcomeEmail,
-  sendNotificationEmail,
   sendRegistrationApprovalEmail
 };

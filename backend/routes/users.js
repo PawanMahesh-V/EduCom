@@ -269,12 +269,49 @@ router.delete('/:id', auth, async (req, res) => {
             }
         }
 
+        // Delete from all tables with foreign key references to users
+        // Order matters due to dependencies
+
+        // Get assignments created by user to delete submissions first
+        const userAssignments = await client.query(
+            'SELECT id FROM assignments WHERE created_by = $1',
+            [id]
+        );
+        if (userAssignments.rows.length > 0) {
+            const assignmentIds = userAssignments.rows.map(a => a.id);
+            await client.query('DELETE FROM submissions WHERE assignment_id = ANY($1::int[])', [assignmentIds]);
+        }
+
+        // Delete assignments created by user
+        await client.query('DELETE FROM assignments WHERE created_by = $1', [id]);
+
+        // Delete user's submissions as student
         await client.query('DELETE FROM submissions WHERE student_id = $1', [id]);
+
+        // Delete enrollments
         await client.query('DELETE FROM enrollments WHERE student_id = $1', [id]);
+        await client.query('UPDATE enrollments SET enrolled_by = NULL WHERE enrolled_by = $1', [id]);
+
+        // Delete anonymous feedback
         await client.query('DELETE FROM anonymous_feedback WHERE sender_id = $1 OR receiver_id = $1', [id]);
-        await client.query('DELETE FROM notifications WHERE sender_id = $1', [id]);
+
+        // Delete notifications
+        await client.query('DELETE FROM notifications WHERE user_id = $1 OR sender_id = $1', [id]);
+
+        // Update courses (set teacher to null)
         await client.query('UPDATE courses SET teacher_id = NULL WHERE teacher_id = $1', [id]);
+
+        // Handle course requests
+        await client.query('UPDATE course_requests SET teacher_id = NULL WHERE teacher_id = $1', [id]);
+        await client.query('UPDATE course_requests SET requested_by = NULL WHERE requested_by = $1', [id]);
+
+        // Delete reports (need to handle messages first if they reference user)
         await client.query('DELETE FROM reports WHERE reporter_id = $1', [id]);
+
+        // Delete messages
+        await client.query('DELETE FROM messages WHERE sender_id = $1 OR receiver_id = $1', [id]);
+
+        // Handle marketplace
         const marketplaceItems = await client.query(
             'SELECT id FROM marketplace_items WHERE seller_id = $1',
             [id]
@@ -282,12 +319,13 @@ router.delete('/:id', auth, async (req, res) => {
         
         if (marketplaceItems.rows.length > 0) {
             const itemIds = marketplaceItems.rows.map(item => item.id);
-            await client.query('DELETE FROM transactions WHERE id = ANY($1::int[])', [itemIds]);
+            await client.query('DELETE FROM transactions WHERE item_id = ANY($1::int[])', [itemIds]);
         }
         
         await client.query('DELETE FROM transactions WHERE buyer_id = $1', [id]);
-        
         await client.query('DELETE FROM marketplace_items WHERE seller_id = $1', [id]);
+
+        // Finally delete the user
         const result = await client.query(
             'DELETE FROM users WHERE id = $1 RETURNING id',
             [id]
@@ -296,7 +334,7 @@ router.delete('/:id', auth, async (req, res) => {
         res.json({ message: 'User deleted successfully' });
     } catch (err) {
         await client.query('ROLLBACK');
-        
+        console.error('Delete user error:', err);
         res.status(500).json({ 
             message: 'Server error while deleting user',
             detail: process.env.NODE_ENV === 'development' ? err.message : undefined

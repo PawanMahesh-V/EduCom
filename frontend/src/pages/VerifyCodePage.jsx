@@ -14,6 +14,7 @@ const VerifyCodePage = () => {
   const navigate = useNavigate();
   const [code, setCode] = useState(['', '', '', '', '', '']);
   const [email, setEmail] = useState('');
+  const [flowType, setFlowType] = useState(''); // 'registration' or 'passwordReset'
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(600); // 10 minutes in seconds
@@ -44,12 +45,16 @@ const VerifyCodePage = () => {
   };
 
   useEffect(() => {
-    const storedEmail = sessionStorage.getItem('resetEmail');
-    if (!storedEmail) {
-      navigate('/forgot-password');
+    const storedEmail = sessionStorage.getItem('verifyEmail');
+    const storedFlow = sessionStorage.getItem('verifyFlow');
+    
+    if (!storedEmail || !storedFlow) {
+      // No valid session, redirect to home
+      navigate('/');
     } else {
       setEmail(storedEmail);
-      startTimer(); // Start timer when page loads
+      setFlowType(storedFlow);
+      startTimer();
     }
 
     // Cleanup timer on unmount
@@ -104,17 +109,58 @@ const VerifyCodePage = () => {
     setLoading(true);
 
     try {
-      const data = await authApi.verifyResetCode(email, verificationCode);
-      if (data && data.resetToken) {
-        sessionStorage.setItem('resetToken', data.resetToken);
-        navigate('/reset-password');
+      if (flowType === 'registration') {
+        // Registration flow
+        await authApi.verifyRegistrationCode(email, verificationCode);
+        // Mark email as verified and navigate to registration details
+        sessionStorage.setItem('registrationVerified', 'true');
+        navigate('/register?step=details');
+      } else if (flowType === 'login') {
+        // Login flow
+        const data = await authApi.verifyLogin(email, verificationCode);
+        
+        // Store user session
+        sessionStorage.setItem('user', JSON.stringify(data.user));
+        if (data.token) {
+          sessionStorage.setItem('userToken', data.token);
+        }
+        
+        // Clear verify session
+        sessionStorage.removeItem('verifyEmail');
+        sessionStorage.removeItem('verifyFlow');
+        
+        // Navigate based on role
+        switch (data.user.role) {
+          case 'Admin':
+            navigate('/admin');
+            break;
+          case 'Teacher':
+          case 'HOD':
+          case 'PM':
+            navigate('/teacher');
+            break;
+          case 'Student':
+            navigate('/student');
+            break;
+          default:
+            navigate('/');
+        }
       } else {
-        setError('Invalid verification code');
-        setCode(['', '', '', '', '', '']);
-        document.getElementById('code-0')?.focus();
+        // Password reset flow
+        const data = await authApi.verifyResetCode(email, verificationCode);
+        if (data && data.resetToken) {
+          sessionStorage.setItem('resetToken', data.resetToken);
+          navigate('/reset-password');
+        } else {
+          setError('Invalid verification code');
+          setCode(['', '', '', '', '', '']);
+          document.getElementById('code-0')?.focus();
+        }
       }
     } catch (err) {
-      setError('Network error. Please try again.');
+      setError(err.message || 'Invalid or expired verification code');
+      setCode(['', '', '', '', '', '']);
+      document.getElementById('code-0')?.focus();
     } finally {
       setLoading(false);
     }
@@ -125,17 +171,43 @@ const VerifyCodePage = () => {
     setError('');
 
     try {
-      const data = await authApi.forgotPassword(email);
-      if (data) {
-        startTimer(); // Reset timer to 10:00
-        setCode(['', '', '', '', '', '']);
-        document.getElementById('code-0')?.focus();
+      if (flowType === 'registration') {
+        await authApi.sendRegistrationCode(email);
+      } else if (flowType === 'login') {
+        // For login, we need to re-authenticate with stored password
+        const password = sessionStorage.getItem('loginPassword');
+        if (password) {
+          await authApi.login(email, password);
+        } else {
+          setError('Session expired. Please login again.');
+          navigate('/login');
+          return;
+        }
+      } else {
+        await authApi.forgotPassword(email);
       }
+      startTimer(); // Reset timer to 10:00
+      setCode(['', '', '', '', '', '']);
+      document.getElementById('code-0')?.focus();
     } catch (err) {
       setError('Failed to resend code');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Get title and subtitle based on flow
+  const getTitle = () => {
+    if (flowType === 'registration') return 'Verify Your Email';
+    if (flowType === 'login') return 'Verify Your Login';
+    return 'Enter Verification Code';
+  };
+
+  const getSubtitle = () => {
+    if (flowType === 'registration') {
+      return <>We sent a 6-digit code to<br /><strong className="color-primary">{email}</strong></>;
+    }
+    return <>We sent a 6-digit code to <strong className="color-primary">{email}</strong></>;
   };
 
   return (
@@ -165,8 +237,8 @@ const VerifyCodePage = () => {
         <div className="verify-container">
           {/* Welcome Section */}
           <div className="verify-welcome">
-            <h1 className="verify-title">Enter Verification Code</h1>
-            <p className="verify-subtitle">We sent a 6-digit code to <strong className="color-primary">{email}</strong></p>
+            <h1 className="verify-title">{getTitle()}</h1>
+            <p className="verify-subtitle">{getSubtitle()}</p>
           </div>
 
           {/* Timer Display */}
@@ -234,9 +306,13 @@ const VerifyCodePage = () => {
             <div className="verify-divider">
               <span>or</span>
             </div>
-            <button className="verify-back-link" onClick={() => navigate('/login')}>
+            <button className="verify-back-link" onClick={() => {
+              // Clean up login password if stored
+              sessionStorage.removeItem('loginPassword');
+              navigate(flowType === 'registration' ? '/register' : '/login');
+            }}>
               <FontAwesomeIcon icon={faArrowLeft} />
-              <span>Back to Login</span>
+              <span>{flowType === 'registration' ? 'Use a different email' : 'Back to Login'}</span>
             </button>
           </div>
         </div>

@@ -61,6 +61,24 @@ const authApi = {
     }
   },
 
+  sendRegistrationCode: async (email) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.SEND_REGISTRATION_CODE, { email });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to send verification code');
+    }
+  },
+
+  verifyRegistrationCode: async (email, code) => {
+    try {
+      const data = await ApiClient.post(API_ENDPOINTS.AUTH.VERIFY_REGISTRATION_CODE, { email, code });
+      return data;
+    } catch (error) {
+      throw new Error(error || 'Failed to verify code');
+    }
+  },
+
   register: async (payload) => {
     try {
       const data = await ApiClient.post(API_ENDPOINTS.AUTH.REGISTER, payload);

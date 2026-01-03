@@ -17,9 +17,6 @@ const LoginPage = () => {
     identifier: '',
     password: ''
   });
-  const [verificationCode, setVerificationCode] = useState('');
-  const [showVerification, setShowVerification] = useState(false);
-  const [userEmail, setUserEmail] = useState('');
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({
     identifier: '',
@@ -41,7 +38,7 @@ const LoginPage = () => {
         [name]: ''
       }));
     }
-  if (error) setError('');
+    if (error) setError('');
   };
 
   const handleSubmit = async (e) => {
@@ -87,57 +84,16 @@ const LoginPage = () => {
     try {
       const response = await authApi.login(formData.identifier, formData.password);
       
-      // Login now returns verification code info
-      setUserEmail(response.email);
-      setShowVerification(true);
-      setError('');
+      // Store email, password (for resend), and flow type for VerifyCodePage
+      sessionStorage.setItem('verifyEmail', response.email);
+      sessionStorage.setItem('verifyFlow', 'login');
+      sessionStorage.setItem('loginPassword', formData.password);
+      
+      // Navigate to verify page
+      navigate('/verify-code');
 
     } catch (err) {
       setError(err.message || 'Failed to login. Please check your credentials.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerificationSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-    
-    if (!verificationCode.trim() || verificationCode.length !== 6) {
-      setError('Please enter a valid 6-digit verification code');
-      return;
-    }
-    
-    setLoading(true);
-    
-    try {
-      const data = await authApi.verifyLogin(userEmail, verificationCode);
-
-      sessionStorage.setItem('user', JSON.stringify(data.user));
-      
-      if (data.token) {
-        sessionStorage.setItem('userToken', data.token);
-      } else {
-        throw new Error('No token received from server');
-      }
-
-      switch (data.user.role) {
-        case 'Admin':
-          navigate('/admin');
-          break;
-        case 'Teacher':
-        case 'HOD':
-        case 'PM':
-          navigate('/teacher');
-          break;
-        case 'Student':
-          navigate('/student');
-          break;
-        default:
-          navigate('/');
-      }
-    } catch (err) {
-      setError(err.message || 'Failed to verify code');
     } finally {
       setLoading(false);
     }
@@ -167,12 +123,11 @@ const LoginPage = () => {
       <div className="login-content">
         <div className="login-container">
           <div className="login-welcome">
-            <h1 className="login-title">{showVerification ? 'Verify Your Login' : 'Welcome Back!'}</h1>
-            <p className="login-subtitle">{showVerification ? 'Enter the 6-digit code sent to your email' : 'Sign in to your account to continue your learning journey'}</p>
+            <h1 className="login-title">Welcome Back!</h1>
+            <p className="login-subtitle">Sign in to your account to continue your learning journey</p>
           </div>
 
-          {!showVerification ? (
-            <form className="login-form" onSubmit={handleSubmit}>
+          <form className="login-form" onSubmit={handleSubmit}>
             <div className="login-form-group">
               <label className="login-label" htmlFor="identifier">
                 Email or Registration ID
@@ -257,7 +212,7 @@ const LoginPage = () => {
               {loading ? (
                 <>
                   <div className="spinner-small"></div>
-                  Sending Code...
+                  Signing In...
                 </>
               ) : (
                 'Continue'
@@ -273,73 +228,6 @@ const LoginPage = () => {
               </Link>
             </div>
           </form>
-          ) : (
-            <form className="login-form" onSubmit={handleVerificationSubmit}>
-            <div className="login-form-group">
-              <label className="login-label" htmlFor="code">
-                Verification Code
-              </label>
-              <div className="login-input-wrapper">
-                <div className="login-input-icon">
-                  <FontAwesomeIcon icon={faLock} />
-                </div>
-                <input
-                  className="login-input"
-                  type="text"
-                  id="code"
-                  name="code"
-                  value={verificationCode}
-                  onChange={(e) => {
-                    setVerificationCode(e.target.value);
-                    if (error) setError('');
-                  }}
-                  placeholder="Enter 6-digit code"
-                  maxLength="6"
-                  disabled={loading}
-                  autoFocus
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="login-error-message fade-in">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                {error}
-              </div>
-            )}
-            
-            <button 
-              className="login-submit-button" 
-              type="submit"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <div className="spinner-small"></div>
-                  Verifying...
-                </>
-              ) : (
-                'Verify & Sign In'
-              )}
-            </button>
-
-            <div className="login-footer">
-              <button 
-                type="button"
-                className="login-back-link"
-                onClick={() => {
-                  setShowVerification(false);
-                  setVerificationCode('');
-                  setError('');
-                }}
-              >
-                ← Back to login
-              </button>
-            </div>
-          </form>
-          )}
         </div>
       </div>
     </div>

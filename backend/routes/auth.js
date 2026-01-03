@@ -29,6 +29,8 @@ const resetLimiter = rateLimit({
 router.post('/login', loginLimiter, AuthController.login);
 router.post('/verify-login', verifyLimiter, AuthController.verifyLogin);
 router.post('/check-email', AuthController.checkEmail);
+router.post('/send-registration-code', verifyLimiter, AuthController.sendRegistrationCode);
+router.post('/verify-registration-code', verifyLimiter, AuthController.verifyRegistrationCode);
 router.post('/register', AuthController.register);
 router.get('/registration-requests', auth, AuthController.getRegistrationRequests);
 router.post('/registration-requests/:requestId/approve', auth, AuthController.approveRegistration);
