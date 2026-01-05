@@ -46,6 +46,10 @@ const communityApi = {
     return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.TEACHER(teacherId));
   },
 
+  getHodCommunities: async (hodId) => {
+    return await ApiClient.get(API_ENDPOINTS.COMMUNITIES.HOD(hodId));
+  },
+
   joinCommunity: async (joinCode, studentId) => {
     return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.JOIN, { joinCode, studentId });
   },

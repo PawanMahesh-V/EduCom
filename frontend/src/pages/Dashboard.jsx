@@ -92,6 +92,7 @@ const Dashboard = () => {
           { id: 'notifications', name: 'Notifications', icon: faBell },
         ];
       case 'teacher':
+      case 'hod':
         return [
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
@@ -111,6 +112,7 @@ const Dashboard = () => {
       case 'student':
         return renderStudentContent();
       case 'teacher':
+      case 'hod':
         return renderTeacherContent();
       default:
         return <div>Unknown role</div>;

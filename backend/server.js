@@ -287,7 +287,7 @@ io.on('connection', (socket) => {
                 // Only allow students to send anonymous messages to teachers/HODs/PMs
                 const { TEACHING_ROLES } = require('./config/constants');
                 if (senderRole !== 'Student' || !TEACHING_ROLES.includes(receiverRole)) {
-                    socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers or HODs' });
+                    socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers, HODs, or PMs' });
                     return;
                 }
             }

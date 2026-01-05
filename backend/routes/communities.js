@@ -113,6 +113,47 @@ router.get('/teacher/:teacherId', auth, async (req, res) => {
     }
 });
 
+// Get communities for a HOD (all communities in their department)
+router.get('/hod/:hodId', auth, async (req, res) => {
+    try {
+        const { hodId } = req.params;
+
+        // Find HOD's department
+        const userResult = await pool.query(
+            'SELECT department FROM users WHERE id = $1',
+            [hodId]
+        );
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        const department = userResult.rows[0].department;
+
+        const result = await pool.query(
+            `SELECT DISTINCT c.id, c.course_id, c.name, c.join_code, c.status, c.created_at, 
+                    co.name as course_name, co.code as course_code,
+                    COALESCE(
+                        (SELECT COUNT(*)::integer 
+                         FROM messages 
+                         WHERE community_id = c.id 
+                           AND sender_id != $1 
+                           AND is_read = FALSE),
+                        0
+                    ) as unread_count
+             FROM communities c
+             JOIN courses co ON c.course_id = co.id
+             WHERE co.department = $2 AND c.status = 'active'
+             ORDER BY c.created_at DESC`,
+            [hodId, department]
+        );
+
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 router.get('/:id', auth, async (req, res) => {
     try {
         const { id } = req.params;

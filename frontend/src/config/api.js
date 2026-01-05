@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
     DELETE_MULTIPLE_MESSAGES: (communityId) => `${API_BASE_URL}/communities/${communityId}/messages/delete-multiple`,
     STUDENT: (studentId) => `${API_BASE_URL}/communities/student/${studentId}`,
     TEACHER: (teacherId) => `${API_BASE_URL}/communities/teacher/${teacherId}`,
+    HOD: (hodId) => `${API_BASE_URL}/communities/hod/${hodId}`,
     JOIN: `${API_BASE_URL}/communities/join`,
   },
   NOTIFICATIONS: {

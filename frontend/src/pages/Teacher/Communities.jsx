@@ -20,6 +20,8 @@ const Communities = ({ initialChat }) => {
   const [loading, setLoading] = useState(true);
   const addedMessageIds = useRef(new Set());
 
+  const isHod = (user?.role === 'HOD');
+
   // Connect to socket
   useEffect(() => {
     if (!userId) return;
@@ -34,7 +36,9 @@ const Communities = ({ initialChat }) => {
     
     const joinAllCommunities = async () => {
       try {
-        const communities = await communityApi.getTeacherCommunities(userId);
+        const communities = isHod 
+          ? await communityApi.getHodCommunities(userId)
+          : await communityApi.getTeacherCommunities(userId);
         communities.forEach(community => {
           socket.emit('join-community', community.id);
         });
@@ -47,7 +51,8 @@ const Communities = ({ initialChat }) => {
     
     const handleGlobalCommunityMessage = (newMessage) => {
       if (newMessage.community_id) {
-        communityApi.getTeacherCommunities(userId).then(communities => {
+        const fetcher = isHod ? communityApi.getHodCommunities : communityApi.getTeacherCommunities;
+        fetcher(userId).then(communities => {
           const formattedChats = communities.map(community => ({
             id: community.id,
             name: community.course_name || community.name,
@@ -163,7 +168,9 @@ const Communities = ({ initialChat }) => {
   const fetchCommunities = async () => {
     try {
       setLoading(true);
-      const teacherCommunities = await communityApi.getTeacherCommunities(userId);
+      const teacherCommunities = isHod 
+        ? await communityApi.getHodCommunities(userId)
+        : await communityApi.getTeacherCommunities(userId);
       
       const formattedChats = teacherCommunities.map(community => ({
         id: community.id,
