@@ -150,9 +150,10 @@ const UserManagement = () => {
   const handleUserSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate email domain
-    if (!userFormData.email.toLowerCase().endsWith('@szabist.pk')) {
-      showError('Email must end with @szabist.pk');
+    // Validate email domain (@szabist.pk or @szabist.edu.pk)
+    const lower = userFormData.email.toLowerCase();
+    if (!(lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk'))) {
+      showError('Email must end with @szabist.pk or @szabist.edu.pk');
       return;
     }
 
@@ -457,9 +458,9 @@ const UserManagement = () => {
                           name="email"
                           value={userFormData.email}
                           onChange={handleUserInputChange}
-                          pattern=".*@szabist\.pk$"
-                          title="Email must end with @szabist.pk"
-                          placeholder="example@szabist.pk"
+                          pattern={".*@(szabist\\.pk|szabist\\.edu\\.pk)$"}
+                          title="Email must end with @szabist.pk or @szabist.edu.pk"
+                          placeholder="example@szabist.pk or example@szabist.edu.pk"
                           required
                         />
                       </div>

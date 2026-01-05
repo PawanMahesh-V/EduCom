@@ -3959,6 +3959,7 @@ button {
   overflow-x: hidden;
   padding: var(--space-2);
   min-height: 0;
+  background-color: var(--bg-secondary);
 }
 
 /* Custom Scrollbar for Chat List */
@@ -5881,7 +5882,7 @@ window.alert {
     background: #1F2937;
     padding: 1rem;
     gap: 0.5rem;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+    /* box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2); */
     transform: translateX(-100%);
     transition: transform var(--transition-base);
     max-height: calc(100vh - 60px);

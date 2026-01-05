@@ -70,8 +70,10 @@ const LoginPage = () => {
     const identifier = formData.identifier.trim();
     
     if (identifier.includes('@')) {
-      if (!identifier.toLowerCase().endsWith('@szabist.pk')) {
-        setError('Only @szabist.pk email addresses are allowed');
+      const lower = identifier.toLowerCase();
+      const allowedDomain = lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk');
+      if (!allowedDomain) {
+        setError('Only @szabist.pk or @szabist.edu.pk email addresses are allowed');
         setLoading(false);
         return;
       }
@@ -143,7 +145,7 @@ const LoginPage = () => {
                   name="identifier"
                   value={formData.identifier}
                   onChange={handleInputChange}
-                  placeholder="your.email@szabist.pk"
+                  placeholder="your.email@szabist.pk or @szabist.edu.pk"
                   disabled={loading}
                 />
               </div>

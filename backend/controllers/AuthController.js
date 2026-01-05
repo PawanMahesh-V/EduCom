@@ -12,10 +12,10 @@ class AuthController {
             const user = await User.findByIdentifier(identifier);
 
             if (!user) {
-                return res.status(401).json({ message: 'Invalid credentials' });
+                return res.status(401).json({ message: 'Invalid credentials or User not found' });
             }
             if (!user.password) {
-                return res.status(401).json({ message: 'Invalid credentials' });
+                return res.status(401).json({ message: 'Invalid credentials or User not found' });
             }
 
             try {
@@ -25,10 +25,10 @@ class AuthController {
                 const isValidPassword = await bcrypt.compare(password, storedHash);
 
                 if (!isValidPassword) {
-                    return res.status(401).json({ message: 'Invalid credentials' });
+                    return res.status(401).json({ message: 'Invalid credentials or User not found' });
                 }
             } catch (hashError) {
-                return res.status(401).json({ message: 'Invalid credentials' });
+                return res.status(401).json({ message: 'Invalid credentials or User not found' });
             }
 
             // Generate verification code
@@ -315,9 +315,11 @@ class AuthController {
                 return res.status(400).json({ message: 'Email is required' });
             }
 
-            // Validate email domain
-            if (!email.toLowerCase().endsWith('@szabist.pk')) {
-                return res.status(400).json({ message: 'Only @szabist.pk email addresses are allowed' });
+            // Validate email domain (@szabist.pk or @szabist.edu.pk)
+            const lowerEmail = email.toLowerCase();
+            const allowedDomain = lowerEmail.endsWith('@szabist.pk') || lowerEmail.endsWith('@szabist.edu.pk');
+            if (!allowedDomain) {
+                return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
             // Check if email exists in users table
@@ -419,9 +421,11 @@ class AuthController {
                 return res.status(400).json({ message: 'All required fields must be provided' });
             }
 
-            // Validate email domain
-            if (!email.toLowerCase().endsWith('@szabist.pk')) {
-                return res.status(400).json({ message: 'Only @szabist.pk email addresses are allowed' });
+            // Validate email domain (@szabist.pk or @szabist.edu.pk)
+            const lowerEmail = email.toLowerCase();
+            const allowedDomain = lowerEmail.endsWith('@szabist.pk') || lowerEmail.endsWith('@szabist.edu.pk');
+            if (!allowedDomain) {
+                return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
             // Check if user already exists

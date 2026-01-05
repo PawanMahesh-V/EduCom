@@ -67,8 +67,9 @@ const RegisterPage = () => {
       return;
     }
 
-    if (!trimmedEmail.endsWith('@szabist.pk')) {
-      setFieldErrors({ email: 'Only @szabist.pk email addresses are allowed' });
+    const allowedDomain = trimmedEmail.endsWith('@szabist.pk') || trimmedEmail.endsWith('@szabist.edu.pk');
+    if (!allowedDomain) {
+      setFieldErrors({ email: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
       return;
     }
 
@@ -222,7 +223,7 @@ const RegisterPage = () => {
                 if (fieldErrors.email) setFieldErrors({});
                 if (error) setError('');
               }}
-              placeholder="your.email@szabist.pk"
+              placeholder="your.email@szabist.pk or @szabist.edu.pk"
               disabled={loading}
               autoFocus
             />

@@ -36,9 +36,10 @@ const ForgotPasswordPage = () => {
       return;
     }
     
-    // Validate @szabist.pk domain
-    if (!email.toLowerCase().endsWith('@szabist.pk')) {
-      setFieldError('Only @szabist.pk email addresses are allowed');
+    // Validate @szabist.pk or @szabist.edu.pk domain
+    const lower = email.toLowerCase();
+    if (!(lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk'))) {
+      setFieldError('Only @szabist.pk or @szabist.edu.pk email addresses are allowed');
       return;
     }
     
@@ -113,7 +114,7 @@ const ForgotPasswordPage = () => {
                     if (fieldError) setFieldError('');
                     if (error) setError('');
                   }}
-                  placeholder="your.email@szabist.pk"
+                  placeholder="your.email@szabist.pk or @szabist.edu.pk"
                   disabled={loading}
                 />
               </div>
