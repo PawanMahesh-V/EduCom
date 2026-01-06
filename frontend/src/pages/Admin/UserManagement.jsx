@@ -9,6 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { showSuccess, showError } from '../../utils/alert';
 import { authApi, userApi } from '../../api';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { useNotifications } from '../../hooks/useSocket';
 
 const UserManagement = () => {
@@ -28,6 +29,13 @@ const UserManagement = () => {
   const [usersLoading, setUsersLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmText: 'Delete',
+    onConfirm: null,
+  });
   const [userFormData, setUserFormData] = useState({
     reg_id: '',
     name: '',
@@ -183,21 +191,28 @@ const UserManagement = () => {
     }
   };
 
-  const handleUserDelete = async (userIdToDelete) => {
-    if (window.confirm('Are you sure you want to delete this user?')) {
-      // Optimistic update - remove from UI immediately
-      setUsers(prev => prev.filter(u => u.id !== userIdToDelete));
-      setFilteredUsers(prev => prev.filter(u => u.id !== userIdToDelete));
+  const handleUserDelete = (userIdToDelete) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete User',
+      message: 'Are you sure you want to delete this user?',
+      confirmText: 'Delete User',
+      onConfirm: async () => {
+        setConfirmState((s) => ({ ...s, open: false }));
+        // Optimistic update - remove from UI immediately
+        setUsers(prev => prev.filter(u => u.id !== userIdToDelete));
+        setFilteredUsers(prev => prev.filter(u => u.id !== userIdToDelete));
 
-      try {
-        await userApi.delete(userIdToDelete);
-        showSuccess('User deleted successfully');
-      } catch (err) {
-        // Revert on error
-        fetchUsers();
-        showError(err.message || 'Failed to delete user');
+        try {
+          await userApi.delete(userIdToDelete);
+          showSuccess('User deleted successfully');
+        } catch (err) {
+          // Revert on error
+          fetchUsers();
+          showError(err.message || 'Failed to delete user');
+        }
       }
-    }
+    });
   };
 
   const handleUserEdit = (user) => {
@@ -550,6 +565,15 @@ const UserManagement = () => {
                 </div>
               </div>
             )}
+            <ConfirmDialog
+              open={confirmState.open}
+              title={confirmState.title}
+              message={confirmState.message}
+              confirmText={confirmState.confirmText}
+              onCancel={() => setConfirmState((s) => ({ ...s, open: false }))}
+              onConfirm={confirmState.onConfirm}
+              variant="danger"
+            />
           </div>
         ) : (
           <div className="container">
@@ -692,3 +716,4 @@ const UserManagement = () => {
 };
 
 export default UserManagement;
+

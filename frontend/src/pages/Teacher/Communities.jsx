@@ -79,7 +79,10 @@ const Communities = ({ initialChat }) => {
   useEffect(() => {
     if (initialChat) {
       setChats([initialChat]);
+      setLoading(false);
       handleChatSelect(initialChat);
+      // Populate full list silently in background
+      fetchCommunities(true);
     } else {
       fetchCommunities();
     }
@@ -165,9 +168,9 @@ const Communities = ({ initialChat }) => {
     scrollToBottom();
   }, [messages]);
 
-  const fetchCommunities = async () => {
+  const fetchCommunities = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const teacherCommunities = isHod 
         ? await communityApi.getHodCommunities(userId)
         : await communityApi.getTeacherCommunities(userId);
@@ -187,7 +190,7 @@ const Communities = ({ initialChat }) => {
     } catch (err) {
       setChats([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 

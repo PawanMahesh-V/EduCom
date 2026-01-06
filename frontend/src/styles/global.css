@@ -3454,6 +3454,24 @@ button {
   animation: scale-in var(--transition-slow);
 }
 
+/* Confirm Dialog */
+.confirm-modal .confirm-modal-content {
+  max-width: 420px;
+  border-top: 6px solid var(--color-danger);
+}
+
+.confirm-title {
+  margin-bottom: var(--space-3);
+}
+
+.confirm-message {
+  color: var(--text-secondary);
+}
+
+.confirm-actions {
+  margin-top: var(--space-6);
+}
+
 .modal-content h2 {
   font-size: var(--font-2xl);
   color: var(--color-dark);

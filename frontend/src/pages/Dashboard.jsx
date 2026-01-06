@@ -93,6 +93,7 @@ const Dashboard = () => {
         ];
       case 'teacher':
       case 'hod':
+      case 'pm':
         return [
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
@@ -113,6 +114,7 @@ const Dashboard = () => {
         return renderStudentContent();
       case 'teacher':
       case 'hod':
+      case 'pm':
         return renderTeacherContent();
       default:
         return <div>Unknown role</div>;
@@ -165,7 +167,7 @@ const Dashboard = () => {
   };
 
   const displayUser = role === 'admin' ? (adminProfile || user) : user;
-  const displayRole = role === 'admin' ? 'Administrator' : (user?.role || role);
+  const displayRole = role === 'admin' ? 'Admin' : (user?.role || role);
 
   return (
     <DashboardLayout

@@ -9,7 +9,7 @@ This document consolidates the essential concepts and project specifics for the 
 ### Prerequisites
 - Node.js 18+ and npm
 - PostgreSQL 14+ reachable via credentials in `.env`
-
+6
 ### Environment variables
 Create `backend/.env`:
 

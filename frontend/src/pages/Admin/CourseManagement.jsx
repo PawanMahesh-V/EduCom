@@ -10,6 +10,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { showSuccess, showError, showWarning } from '../../utils/alert';
 import { courseApi, communityApi, userApi } from '../../api';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import socketService from '../../services/socket';
 
 const CourseManagement = () => {
@@ -28,6 +29,13 @@ const CourseManagement = () => {
   const [teachers, setTeachers] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    confirmText: 'Delete',
+    onConfirm: null,
+  });
   const [courseFormData, setCourseFormData] = useState({
     code: '',
     name: '',
@@ -212,21 +220,28 @@ const CourseManagement = () => {
     }
   };
 
-  const handleCourseDelete = async (courseId) => {
-    if (window.confirm('Are you sure you want to delete this course?')) {
-      // Optimistic update - remove from UI immediately
-      setCourses(prev => prev.filter(c => c.id !== courseId));
-      setFilteredCourses(prev => prev.filter(c => c.id !== courseId));
+  const handleCourseDelete = (courseId) => {
+    setConfirmState({
+      open: true,
+      title: 'Delete Course',
+      message: 'Are you sure you want to delete this course?',
+      confirmText: 'Delete Course',
+      onConfirm: async () => {
+        setConfirmState((s) => ({ ...s, open: false }));
+        // Optimistic update - remove from UI immediately
+        setCourses(prev => prev.filter(c => c.id !== courseId));
+        setFilteredCourses(prev => prev.filter(c => c.id !== courseId));
 
-      try {
-        await courseApi.delete(courseId);
-        showSuccess('Course deleted successfully');
-      } catch (err) {
-        // Revert on error
-        fetchCourses();
-        showError(err.message || 'Failed to delete course');
+        try {
+          await courseApi.delete(courseId);
+          showSuccess('Course deleted successfully');
+        } catch (err) {
+          // Revert on error
+          fetchCourses();
+          showError(err.message || 'Failed to delete course');
+        }
       }
-    }
+    });
   };
 
   const handleCourseEdit = (course) => {
@@ -628,6 +643,15 @@ const CourseManagement = () => {
                 </div>
               </div>
             )}
+            <ConfirmDialog
+              open={confirmState.open}
+              title={confirmState.title}
+              message={confirmState.message}
+              confirmText={confirmState.confirmText}
+              onCancel={() => setConfirmState((s) => ({ ...s, open: false }))}
+              onConfirm={confirmState.onConfirm}
+              variant="danger"
+            />
           </div>
         ) : courseTab === 'communities' ? (
           <div className="container">

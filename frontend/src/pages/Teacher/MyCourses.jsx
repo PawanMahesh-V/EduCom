@@ -164,7 +164,6 @@ const MyCourses = ({ onNavigateToCommunity }) => {
   return (
     <div className="container">
       <div className="header-actions mb-3">
-        <h2 className="section-title">My Courses</h2>
         <button 
           className="floating-join-btn"
           onClick={() => setIsCourseRequestModalOpen(true)}

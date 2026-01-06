@@ -76,8 +76,12 @@ const Communities = ({ initialChat, onChatSelected }) => {
   // Handle initial chat from MyCourses navigation
   useEffect(() => {
     if (initialChat) {
+      // Immediately show the selected chat and stop loading state
       setChats([initialChat]);
+      setLoading(false);
       handleChatSelect(initialChat);
+      // Load the full communities list in the background without toggling loader
+      fetchCommunities(true);
     } else {
       fetchCommunities();
     }
@@ -168,9 +172,9 @@ const Communities = ({ initialChat, onChatSelected }) => {
     scrollToBottom();
   }, [messages]);
 
-  const fetchCommunities = async () => {
+  const fetchCommunities = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const communities = await communityApi.getStudentCommunities(userId);
       
       const formattedChats = communities.map(community => ({
@@ -188,7 +192,7 @@ const Communities = ({ initialChat, onChatSelected }) => {
     } catch (err) {
       setChats([]);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
