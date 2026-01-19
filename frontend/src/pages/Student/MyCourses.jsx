@@ -8,6 +8,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { courseApi, communityApi } from '../../api';
 import { showAlert } from '../../utils/alert';
+import { useSocket } from '../../context/SocketContext';
 
 const MyCourses = ({ onNavigateToCommunity }) => {
   const raw = sessionStorage.getItem('user');
@@ -22,11 +23,24 @@ const MyCourses = ({ onNavigateToCommunity }) => {
   const [joinCode, setJoinCode] = useState('');
   const [joiningCommunity, setJoiningCommunity] = useState(false);
 
+  // Socket connection
+  const { socketService, isConnected } = useSocket();
+
   useEffect(() => {
     if (userId) {
       fetchMyCourses();
     }
   }, [userId]);
+
+  // Listen for real-time enrollment updates
+  useEffect(() => {
+    if (isConnected && socketService && socketService.socket) {
+        socketService.socket.on('user-enrolled', () => {
+             fetchMyCourses();
+        });
+        return () => socketService.socket.off('user-enrolled');
+    }
+  }, [isConnected, socketService]);
 
   const fetchMyCourses = async () => {
     try {

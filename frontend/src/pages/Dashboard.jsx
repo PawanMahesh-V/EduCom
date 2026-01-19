@@ -9,6 +9,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import DashboardLayout from '../components/DashboardLayout';
 import { authApi } from '../api';
+import { useSocket } from '../context/SocketContext';
+import { showAlert } from '../utils/alert';
 
 // Admin components
 import AdminOverview from './Admin/Overview';
@@ -37,6 +39,23 @@ const Dashboard = () => {
   const [activeSection, setActiveSection] = useState(role === 'admin' ? 'overview' : 'courses');
   const [initialChat, setInitialChat] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
+
+  const { socketService, isConnected } = useSocket();
+
+  // Global listeners
+  useEffect(() => {
+    if (isConnected && socketService) {
+      const handleEnrollment = (data) => {
+        showAlert(`You have been enrolled in ${data.courseName || 'a new course'}`, 'success');
+      };
+      
+      socketService.onUserEnrolled(handleEnrollment);
+      
+      return () => {
+        socketService.offUserEnrolled();
+      };
+    }
+  }, [isConnected, socketService]);
 
   // Fetch admin profile for admin users
   useEffect(() => {

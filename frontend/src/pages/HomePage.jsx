@@ -9,8 +9,6 @@ import {
   faChalkboardTeacher,
   faUserShield,
   faArrowRight,
-  faUserGraduate,
-  faClipboardList,
 } from "@fortawesome/free-solid-svg-icons";
 
 const HomePage = () => {

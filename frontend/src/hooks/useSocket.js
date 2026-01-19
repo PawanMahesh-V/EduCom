@@ -7,16 +7,16 @@ export const useCommunityMessages = (communityId, onNewMessage, onMessageDeleted
   // Use refs to avoid stale closures - callbacks always use latest version
   const onNewMessageRef = useRef(onNewMessage);
   const onMessageDeletedRef = useRef(onMessageDeleted);
-  
+
   // Update refs when callbacks change
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
   }, [onNewMessage]);
-  
+
   useEffect(() => {
     onMessageDeletedRef.current = onMessageDeleted;
   }, [onMessageDeleted]);
-  
+
   useEffect(() => {
     if (!communityId) {
       return;
@@ -34,10 +34,10 @@ export const useCommunityMessages = (communityId, onNewMessage, onMessageDeleted
         onMessageDeletedRef.current(data);
       }
     };
-    
+
     socketService.socket?.on('new-message', messageHandler);
     socketService.socket?.on('message-deleted', deleteHandler);
-    
+
     // Cleanup
     return () => {
       socketService.leaveCommunity(communityId);
@@ -65,7 +65,7 @@ export const useTypingIndicator = (communityId, userName) => {
     let typingTimeout;
     const handleTyping = (isTyping) => {
       socketService.sendTyping(communityId, userName, isTyping);
-      
+
       if (isTyping) {
         clearTimeout(typingTimeout);
         typingTimeout = setTimeout(() => {
@@ -84,36 +84,7 @@ export const useTypingIndicator = (communityId, userName) => {
     stopTyping: () => socketService.sendTyping(communityId, userName, false)
   };
 };
-export const useNotifications = (onNewNotification) => {
-  useEffect(() => {
-    if (onNewNotification) {
-      socketService.onNewNotification(onNewNotification);
-    }
-    return () => {
-      socketService.offNewNotification();
-    };
-  }, [onNewNotification]);
-  return {
-    sendNotification: (userId, title, message, type, senderId) => {
-      socketService.sendNotification({
-        userId,
-        title,
-        message,
-        type,
-        senderId
-      });
-    },
-    broadcastNotification: (role, title, message, type, senderId) => {
-      socketService.broadcastNotification({
-        role,
-        title,
-        message,
-        type,
-        senderId
-      });
-    }
-  };
-};
+
 export const useUserStatus = (onUserStatus) => {
   useEffect(() => {
     if (onUserStatus) {
@@ -128,7 +99,7 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
   // Use ref to avoid stale closures
   const onNewMessageRef = useRef(onNewMessage);
   const onMessageSentRef = useRef(onMessageSent);
-  
+
   useEffect(() => {
     onNewMessageRef.current = onNewMessage;
   }, [onNewMessage]);
@@ -136,13 +107,13 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
   useEffect(() => {
     onMessageSentRef.current = onMessageSent;
   }, [onMessageSent]);
-  
+
   useEffect(() => {
     if (!userId) return;
-    
+
     // Ensure socket is connected before setting up listeners
     const socket = socketService.connect(userId);
-    
+
     const handleNewMessage = (message) => {
       console.log('[useDirectMessages] Received new-direct-message:', message);
       if (onNewMessageRef.current) {
@@ -156,7 +127,7 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
         onMessageSentRef.current(message);
       }
     };
-    
+
     // Set up listener - may need to wait for connection
     const setupListener = () => {
       console.log('[useDirectMessages] Setting up new-direct-message listener');
@@ -165,7 +136,7 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
       socket.off('direct-message-sent', handleMessageSent);
       socket.on('direct-message-sent', handleMessageSent);
     };
-    
+
     // If already connected, set up immediately
     if (socket.connected) {
       setupListener();
@@ -173,14 +144,14 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
       // Wait for connection
       socket.once('connect', setupListener);
     }
-    
+
     return () => {
       console.log('[useDirectMessages] Cleaning up listener');
       socket.off('new-direct-message', handleNewMessage);
       socket.off('direct-message-sent', handleMessageSent);
     };
   }, [userId]); // Only depend on userId
-  
+
   return {
     sendDirectMessage: (receiverId, message, senderName, isAnonymous = false) => {
       console.log('[useSocket] sendDirectMessage called with isAnonymous:', isAnonymous);
@@ -201,20 +172,20 @@ export const useDMTypingIndicator = (receiverId, senderName) => {
   const receiverIdRef = useRef(receiverId);
   const senderNameRef = useRef(senderName);
   const typingCallbackRef = useRef(null);
-  
+
   useEffect(() => {
     receiverIdRef.current = receiverId;
     senderNameRef.current = senderName;
   }, [receiverId, senderName]);
-  
+
   useEffect(() => {
     if (!receiverId) return;
-    
+
     return () => {
       socketService.offDMUserTyping();
     };
   }, [receiverId]);
-  
+
   return {
     onTyping: (callback) => {
       // Store callback and register listener

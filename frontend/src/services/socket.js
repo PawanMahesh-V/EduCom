@@ -12,18 +12,18 @@ class SocketService {
     if (userId) {
       this.userId = userId;
     }
-    
+
     if (this.socket?.connected) {
       console.log('[SocketService] Already connected, socket id:', this.socket.id);
       return this.socket;
     }
-    
+
     // If socket exists but not connected, don't create new one - just return existing
     if (this.socket) {
       console.log('[SocketService] Socket exists, waiting for connection...');
       return this.socket;
     }
-    
+
     console.log('[SocketService] Creating new socket connection to:', SOCKET_URL);
     this.socket = io(SOCKET_URL, {
       transports: ['websocket', 'polling'],
@@ -34,7 +34,7 @@ class SocketService {
     this.socket.on('connect', () => {
       this.isConnected = true;
       console.log('[SocketService] Connected! Socket id:', this.socket.id);
-      
+
       // Register user
       if (this.userId) {
         console.log('[SocketService] Registering user:', this.userId);
@@ -48,12 +48,12 @@ class SocketService {
     this.socket.on('connect_error', (error) => {
       console.error('[SocketService] Connection error:', error);
     });
-    
+
     // Debug: log all incoming events
     this.socket.onAny((event, ...args) => {
       console.log('[SocketService] Received event:', event, args);
     });
-    
+
     return this.socket;
   }
   disconnect() {
@@ -154,16 +154,27 @@ class SocketService {
       this.socket.off('user-status');
     }
   }
+  // Enrollment events
+  onUserEnrolled(callback) {
+    if (this.socket) {
+      this.socket.on('user-enrolled', callback);
+    }
+  }
+  offUserEnrolled() {
+    if (this.socket) {
+      this.socket.off('user-enrolled');
+    }
+  }
   // Direct Message methods
   sendDirectMessage(data) {
     console.log('[SocketService] sendDirectMessage called with data:', data);
-    
+
     // If socket doesn't exist, try to connect first
     if (!this.socket && this.userId) {
       console.log('[SocketService] Socket not found, attempting to connect...');
       this.connect(this.userId);
     }
-    
+
     if (this.socket) {
       if (this.socket.connected) {
         console.log('[SocketService] Emitting send-direct-message event');

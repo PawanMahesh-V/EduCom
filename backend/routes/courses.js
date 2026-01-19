@@ -14,24 +14,24 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN users u ON c.teacher_id = u.id`;
         const queryParams = [];
         const conditions = [];
-        
+
         // Add department filter
         if (department && department !== 'All') {
             queryParams.push(department);
             conditions.push(`c.department = $${queryParams.length}`);
         }
-        
+
         // Add semester filter
         if (semester && semester !== 'All') {
             queryParams.push(semester);
             conditions.push(`c.semester = $${queryParams.length}`);
         }
-        
+
         // Append WHERE clause if filters exist
         if (conditions.length > 0) {
             query += ' WHERE ' + conditions.join(' AND ');
         }
-        
+
         // Add ordering and pagination
         queryParams.push(limit);
         queryParams.push(offset);
@@ -62,7 +62,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/student/:studentId', auth, async (req, res) => {
     try {
         const { studentId } = req.params;
-        
+
         const result = await pool.query(
             `SELECT c.*, 
                     u.name as teacher_name,
@@ -88,7 +88,7 @@ router.get('/student/:studentId', auth, async (req, res) => {
 router.get('/teacher/:teacherId', auth, async (req, res) => {
     try {
         const { teacherId } = req.params;
-        
+
         const result = await pool.query(
             `SELECT c.*, 
                     com.join_code,
@@ -116,13 +116,13 @@ router.get('/teacher/:teacherId', auth, async (req, res) => {
 router.get('/teacher/:teacherId/stats', auth, async (req, res) => {
     try {
         const { teacherId } = req.params;
-        
+
         // Get total courses
         const coursesResult = await pool.query(
             'SELECT COUNT(*) FROM courses WHERE teacher_id = $1',
             [teacherId]
         );
-        
+
         // Get total enrolled students across all courses
         const studentsResult = await pool.query(
             `SELECT COUNT(DISTINCT e.student_id) as total_students
@@ -131,7 +131,7 @@ router.get('/teacher/:teacherId/stats', auth, async (req, res) => {
              WHERE c.teacher_id = $1`,
             [teacherId]
         );
-        
+
         res.json({
             totalCourses: parseInt(coursesResult.rows[0].count),
             totalStudents: parseInt(studentsResult.rows[0].total_students || 0),
@@ -177,7 +177,7 @@ function generateJoinCode() {
 
 router.post('/', auth, async (req, res) => {
     const client = await pool.connect();
-    
+
     try {
         const { code, name, department, semester, teacher_id } = req.body;
         if (!code || !name || !department || !semester) {
@@ -199,7 +199,7 @@ router.post('/', auth, async (req, res) => {
         // Generate unique join code for the community
         const joinCode = generateJoinCode();
         const communityName = `${code} Community`;
-        
+
         const communityResult = await client.query(
             `INSERT INTO communities (course_id, name, join_code, status) 
              VALUES ($1, $2, $3, 'active')
@@ -211,6 +211,12 @@ router.post('/', auth, async (req, res) => {
         newCourse.join_code = communityResult.rows[0].join_code;
 
         await client.query('COMMIT');
+
+        // Emit update to admins
+        const io = req.app.get('io');
+        if (io) {
+            io.to('admin-room').emit('admin-course-update');
+        }
 
         res.status(201).json(newCourse);
     } catch (err) {
@@ -306,6 +312,12 @@ router.delete('/:id', auth, async (req, res) => {
 
         await client.query('COMMIT');
 
+        // Emit update to admins
+        const io = req.app.get('io');
+        if (io) {
+            io.to('admin-room').emit('admin-course-update');
+        }
+
         res.json({ message: 'Course deleted successfully' });
     } catch (err) {
         await client.query('ROLLBACK');
@@ -320,7 +332,7 @@ router.delete('/:id', auth, async (req, res) => {
 router.get('/:id/enrolled', auth, async (req, res) => {
     try {
         const { id } = req.params;
-        
+
         const result = await pool.query(
             `SELECT u.id, u.reg_id, u.name, u.email, u.department, u.semester, u.program_year, u.section, e.enrolled_on
              FROM enrollments e
@@ -339,7 +351,7 @@ router.get('/:id/enrolled', auth, async (req, res) => {
 // Remove students from course
 router.post('/:id/remove', auth, async (req, res) => {
     const client = await pool.connect();
-    
+
     try {
         const { id } = req.params;
         const { student_ids } = req.body;
@@ -372,7 +384,7 @@ router.post('/:id/remove', auth, async (req, res) => {
 
         await client.query('COMMIT');
 
-        res.json({ 
+        res.json({
             message: `Successfully removed ${removedCount} student(s) from course`,
             removedCount,
             totalAttempted: student_ids.length
@@ -389,7 +401,7 @@ router.post('/:id/remove', auth, async (req, res) => {
 // Assign course to students
 router.post('/:id/assign', auth, async (req, res) => {
     const client = await pool.connect();
-    
+
     try {
         const { id } = req.params;
         const { student_ids } = req.body;
@@ -400,7 +412,7 @@ router.post('/:id/assign', auth, async (req, res) => {
 
         // Verify course exists
         const courseCheck = await client.query(
-            'SELECT id, department FROM courses WHERE id = $1',
+            'SELECT id, department, name FROM courses WHERE id = $1',
             [id]
         );
 
@@ -429,8 +441,8 @@ router.post('/:id/assign', auth, async (req, res) => {
 
         if (mismatchedStudents.length > 0) {
             const names = mismatchedStudents.map(s => s.name).join(', ');
-            return res.status(400).json({ 
-                message: `Department mismatch: ${names} cannot be assigned to ${courseDepartment} course` 
+            return res.status(400).json({
+                message: `Department mismatch: ${names} cannot be assigned to ${courseDepartment} course`
             });
         }
 
@@ -452,7 +464,18 @@ router.post('/:id/assign', auth, async (req, res) => {
 
         await client.query('COMMIT');
 
-        res.json({ 
+        const io = req.app.get('io');
+        if (io && newEnrollments > 0) {
+            const courseName = courseCheck.rows[0].name;
+            student_ids.forEach(sid => {
+                io.to(`user-${sid}`).emit('user-enrolled', {
+                    courseId: id,
+                    courseName: courseName
+                });
+            });
+        }
+
+        res.json({
             message: `Successfully assigned course to ${newEnrollments} student(s)`,
             newEnrollments,
             totalAttempted: student_ids.length
@@ -499,7 +522,7 @@ router.post('/request', auth, async (req, res) => {
             [code, name, department, semester, teacher_id, requested_by]
         );
 
-        res.status(201).json({ 
+        res.status(201).json({
             message: 'Course request submitted successfully',
             request: result.rows[0]
         });
@@ -565,7 +588,7 @@ router.post('/requests/:id/approve', auth, async (req, res) => {
         // Generate unique join code for the community
         const joinCode = generateJoinCode();
         const communityName = `${request.code} Community`;
-        
+
         const communityResult = await client.query(
             `INSERT INTO communities (course_id, name, join_code, status) 
              VALUES ($1, $2, $3, 'active')
@@ -607,7 +630,7 @@ router.post('/requests/:id/approve', auth, async (req, res) => {
             });
         }
 
-        res.json({ 
+        res.json({
             message: 'Course request approved and course created',
             course: newCourse
         });
@@ -634,7 +657,7 @@ router.post('/requests/:id/reject', auth, async (req, res) => {
             return res.status(404).json({ message: 'Request not found or already processed' });
         }
 
-        res.json({ 
+        res.json({
             message: 'Course request rejected',
             request: result.rows[0]
         });

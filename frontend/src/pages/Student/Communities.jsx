@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import MessageLayout from '../../components/MessageLayout';
 import { useCommunityMessages, useTypingIndicator } from '../../hooks/useSocket';
-import socketService from '../../services/socket';
+import { useSocket } from '../../context/SocketContext';
 import { communityApi } from '../../api';
 import { showAlert } from '../../utils/alert';
 
@@ -20,24 +20,18 @@ const Communities = ({ initialChat, onChatSelected }) => {
   const [loading, setLoading] = useState(true);
   const addedMessageIds = useRef(new Set());
 
-  // Connect to socket FIRST - before any hooks that use it
-  useEffect(() => {
-    if (!userId) return;
-    socketService.connect(userId);
-  }, [userId]);
+  const { socketService, isConnected } = useSocket();
 
   // Join all communities on page load and listen for new messages
   useEffect(() => {
-    if (!userId) return;
-    
-    const socket = socketService.connect(userId);
+    if (!userId || !isConnected) return;
     
     // Fetch and join all communities immediately
     const joinAllCommunities = async () => {
       try {
         const communities = await communityApi.getStudentCommunities(userId);
         communities.forEach(community => {
-          socket.emit('join-community', community.id);
+          socketService.joinCommunity(community.id);
         });
       } catch (err) {
         console.error('Failed to join communities:', err);
@@ -50,28 +44,24 @@ const Communities = ({ initialChat, onChatSelected }) => {
     const handleGlobalCommunityMessage = (newMessage) => {
       if (newMessage.community_id) {
         // Refresh communities to update unread counts
-        communityApi.getStudentCommunities(userId).then(communities => {
-          const formattedChats = communities.map(community => ({
-            id: community.id,
-            name: community.course_name || community.name,
-            courseId: community.course_id,
-            courseName: community.course_name,
-            courseCode: community.course_code,
-            lastMessage: 'Start chatting...',
-            time: new Date(community.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
-            unread: community.unread_count || 0
-          }));
-          setChats(formattedChats);
-        }).catch(() => {});
+        fetchCommunities(true);
       }
     };
 
-    socket.on('new-message', handleGlobalCommunityMessage);
+    // Listen for new enrollments
+    const handleEnrollment = () => {
+      console.log('User enrolled in new course, refreshing communities...');
+      fetchCommunities(true);
+    };
+
+    socketService.onNewMessage(handleGlobalCommunityMessage);
+    socketService.onUserEnrolled(handleEnrollment);
 
     return () => {
-      socket.off('new-message', handleGlobalCommunityMessage);
+      socketService.offNewMessage();
+      socketService.offUserEnrolled();
     };
-  }, [userId]);
+  }, [userId, isConnected, socketService]);
 
   // Handle initial chat from MyCourses navigation
   useEffect(() => {

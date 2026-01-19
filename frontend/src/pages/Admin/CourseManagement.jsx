@@ -11,13 +11,28 @@ import {
 import { showSuccess, showError, showWarning } from '../../utils/alert';
 import { courseApi, communityApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import socketService from '../../services/socket';
+import { useSocket } from '../../context/SocketContext';
 
 const CourseManagement = () => {
   const raw = sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
 
+  // Socket connection
+  const { socketService, isConnected } = useSocket();
+
   const [courseTab, setCourseTab] = useState('courses'); // 'courses', 'communities', or 'requests'
+
+  // Listen for real-time course updates
+  useEffect(() => {
+    if (isConnected && socketService && socketService.socket) {
+        socketService.socket.on('admin-course-update', () => {
+             fetchCourses();
+             if (courseTab === 'communities') fetchCommunities();
+             if (courseTab === 'requests') fetchCourseRequests();
+        });
+        return () => socketService.socket.off('admin-course-update');
+    }
+  }, [isConnected, socketService, courseTab]);
 
   // Course Management states
   const [courses, setCourses] = useState([]);

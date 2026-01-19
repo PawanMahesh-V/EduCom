@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { TEACHING_ROLES } from '../constants';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faUsers, faEye, faEyeSlash, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft, faTimes, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faPaperPlane, faComments, faUsers, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft, faTimes, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import directMessageApi from '../api/directMessages';
 
 const MessageLayout = ({
@@ -56,7 +57,6 @@ const MessageLayout = ({
   const [messageSearchQuery, setMessageSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0);
-  const [isSearching, setIsSearching] = useState(false);
   
   // Delete feature state
   const [selectedMessages, setSelectedMessages] = useState([]);
@@ -73,7 +73,6 @@ const MessageLayout = ({
   const handleSearch = useCallback(async () => {
     if (!messageSearchQuery.trim() || !selectedConversation) return;
     
-    setIsSearching(true);
     try {
       const results = await directMessageApi.searchMessages(
         userId,
@@ -94,8 +93,6 @@ const MessageLayout = ({
       }
     } catch (err) {
       console.error('Search error:', err);
-    } finally {
-      setIsSearching(false);
     }
   }, [messageSearchQuery, selectedConversation, userId]);
 
@@ -433,7 +430,11 @@ const MessageLayout = ({
         {selectedConversation ? (
           <>
             <div className="chat-main-header">
-              <button className="chat-back-btn" onClick={() => onSelectConversation(null)}>
+              <button 
+                className="chat-back-btn" 
+                onClick={() => onSelectConversation(null)}
+                aria-label="Back to conversations list"
+              >
                 <FontAwesomeIcon icon={faArrowLeft} />
               </button>
               
@@ -492,7 +493,12 @@ const MessageLayout = ({
                     </div>
                   </div>
                   <div className="chat-options-wrapper">
-                    <button className="chat-options-btn" onClick={() => setShowDmOptions(!showDmOptions)}>
+                    <button 
+                      className="chat-options-btn" 
+                      onClick={() => setShowDmOptions(!showDmOptions)}
+                      aria-label="Conversation options"
+                      aria-haspopup="true"
+                    >
                       <FontAwesomeIcon icon={faEllipsisVertical} />
                     </button>
                     {showDmOptions && (

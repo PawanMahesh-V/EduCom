@@ -53,12 +53,26 @@ const connectedUsers = new Map(); // userId -> socketId
 
 io.on('connection', (socket) => {
     // User authentication and registration
-    socket.on('register', (userId) => {
+    // User authentication and registration
+    socket.on('register', async (userId) => {
         // Always store userId as integer for consistent lookup
         const numericUserId = parseInt(userId);
         connectedUsers.set(numericUserId, socket.id);
         socket.userId = numericUserId;
-        
+
+        // Join user-specific room
+        socket.join(`user-${numericUserId}`);
+
+        // Check if user is Admin and join admin room
+        try {
+            const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [numericUserId]);
+            if (userResult.rows.length > 0 && userResult.rows[0].role === 'Admin') {
+                socket.join('admin-room');
+            }
+        } catch (err) {
+            console.error('Error joining admin room:', err);
+        }
+
         // Notify user is online
         io.emit('user-status', { userId: numericUserId, status: 'online' });
     });
@@ -76,7 +90,7 @@ io.on('connection', (socket) => {
     // Send message to community
     socket.on('send-message', async (data) => {
         const { communityId, message, senderId, senderName, notificationOnly } = data;
-        
+
         try {
             // Check if sender is Admin
             const senderRole = await pool.query(
@@ -99,7 +113,7 @@ io.on('connection', (socket) => {
                 );
 
                 const newMessage = result.rows[0];
-                
+
                 // Broadcast to all users in the community
                 io.to(`community-${communityId}`).emit('new-message', {
                     ...newMessage,
@@ -120,7 +134,7 @@ io.on('connection', (socket) => {
 
                 if (communityDetails.rows.length > 0) {
                     const community = communityDetails.rows[0];
-                    
+
                     // Get all enrolled students in this community's course
                     const enrolledStudents = await pool.query(
                         `SELECT DISTINCT e.student_id as user_id
@@ -154,7 +168,7 @@ io.on('connection', (socket) => {
                     const notificationPromises = allRecipients.map(recipient => {
                         const notifTitle = `New message in ${community.course_code}`;
                         const notifMessage = `${senderName}: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`;
-                        
+
                         return pool.query(
                             `INSERT INTO notifications (user_id, sender_id, title, message, type, is_read, course_id)
                              VALUES ($1, $2, $3, $4, 'info', false, $5)
@@ -182,10 +196,10 @@ io.on('connection', (socket) => {
     // Delete message
     socket.on('delete-message', async (data) => {
         const { messageId, communityId } = data;
-        
+
         try {
             await pool.query('DELETE FROM messages WHERE id = $1', [messageId]);
-            
+
             // Notify all users in the community
             io.to(`community-${communityId}`).emit('message-deleted', { messageId });
         } catch (error) {
@@ -205,7 +219,7 @@ io.on('connection', (socket) => {
     // Send notification
     socket.on('send-notification', async (data) => {
         const { userId, title, message, type, senderId } = data;
-        
+
         try {
             // Save notification to database
             const result = await pool.query(
@@ -216,7 +230,7 @@ io.on('connection', (socket) => {
             );
 
             const notification = result.rows[0];
-            
+
             // Send to specific user if online
             const targetSocketId = connectedUsers.get(userId);
             if (targetSocketId) {
@@ -230,7 +244,7 @@ io.on('connection', (socket) => {
     // Broadcast notification to role
     socket.on('broadcast-notification', async (data) => {
         const { role, title, message, type, senderId } = data;
-        
+
         try {
             // Get all users with the specified role
             const users = await pool.query(
@@ -249,7 +263,7 @@ io.on('connection', (socket) => {
             );
 
             const results = await Promise.all(insertPromises);
-            
+
             // Broadcast to all connected users with that role
             results.forEach(result => {
                 const notification = result.rows[0];
@@ -268,22 +282,22 @@ io.on('connection', (socket) => {
         console.log('[Backend] Received send-direct-message event with data:', data);
         const { senderId, receiverId, message, senderName, isAnonymous = false } = data;
         console.log('[Backend] Extracted isAnonymous:', isAnonymous);
-        
+
         try {
             // Validate anonymous messages: only students can send anonymous to teachers/HODs/PMs
             if (isAnonymous) {
                 console.log('[Backend] Message is anonymous, validating roles...');
                 const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
                 const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
-                
+
                 if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {
                     socket.emit('message-error', { error: 'User not found' });
                     return;
                 }
-                
+
                 const senderRole = senderResult.rows[0].role;
                 const receiverRole = receiverResult.rows[0].role;
-                
+
                 // Only allow students to send anonymous messages to teachers/HODs/PMs
                 const { TEACHING_ROLES } = require('./config/constants');
                 if (senderRole !== 'Student' || !TEACHING_ROLES.includes(receiverRole)) {
@@ -291,7 +305,7 @@ io.on('connection', (socket) => {
                     return;
                 }
             }
-            
+
             // Save message to database (community_id is NULL for direct messages)
             const result = await pool.query(
                 `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
@@ -301,7 +315,7 @@ io.on('connection', (socket) => {
             );
 
             const newMessage = result.rows[0];
-            
+
             // Send to receiver if online (hide sender name if anonymous)
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
             console.log('[Backend] Looking for receiver:', parseInt(receiverId), 'Found socket:', receiverSocketId);

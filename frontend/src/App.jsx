@@ -9,61 +9,54 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import { TEACHING_ROLES } from './constants';
-import socketService from './services/socket';
+import { SocketProvider } from './context/SocketContext';
+import { NotificationProvider } from './context/NotificationContext';
 import './styles/global.css';
+
 function App() {
-  useEffect(() => {
-    const userStr = sessionStorage.getItem('user');
-    
-    if (userStr) {
-      const user = JSON.parse(userStr);
-      const userId = user.id || user.userId;
-      
-      if (userId) {
-        socketService.connect(userId);
-      }
-    }
-    // Don't disconnect on cleanup - React Strict Mode double-invokes effects
-    // Socket will be disconnected when user logs out
-  }, []);
+  // Socket connection is now handled by SocketProvider
   return (
     <Router>
-      <div className="app-container">
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="/verify-code" element={<VerifyCodePage />} />
-          <Route path="/reset-password" element={<ResetPasswordPage />} />
-          <Route 
-            path="/admin" 
-            element={
-              <ProtectedRoute allowedRoles={['Admin']}>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/student"
-            element={
-              <ProtectedRoute allowedRoles={['Student']}>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/teacher"
-            element={
-              <ProtectedRoute allowedRoles={TEACHING_ROLES}>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/" element={<HomePage />} />
-          <Route path="*" element={<Navigate to="/" />} />
-        </Routes>
-      </div>
+      <SocketProvider>
+        <NotificationProvider>
+          <div className="app-container">
+            <Routes>
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+              <Route path="/verify-code" element={<VerifyCodePage />} />
+              <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route 
+                path="/admin" 
+                element={
+                  <ProtectedRoute allowedRoles={['Admin']}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/student"
+                element={
+                  <ProtectedRoute allowedRoles={['Student']}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/teacher"
+                element={
+                  <ProtectedRoute allowedRoles={TEACHING_ROLES}>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route path="/" element={<HomePage />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </div>
+        </NotificationProvider>
+      </SocketProvider>
     </Router>
   )
 }
-export default App
+export default App;

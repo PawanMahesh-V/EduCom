@@ -83,7 +83,7 @@ router.get('/conversations/:userId', auth, async (req, res) => {
             );
 
             const anonymousData = anonymousMessages.rows[0];
-            
+
             // Check if there are any anonymous messages (sent or received)
             const hasAnonymous = await pool.query(
                 `SELECT EXISTS(
@@ -125,7 +125,7 @@ router.get('/messages/:userId/:otherUserId', auth, async (req, res) => {
         if (otherUserId === 'anonymous') {
             const result = await pool.query(
                 `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                        (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                        m.created_at,
                         'Anonymous Student' as sender_name
                  FROM messages m
                  WHERE m.community_id IS NULL
@@ -153,7 +153,7 @@ router.get('/messages/:userId/:otherUserId', auth, async (req, res) => {
         // Regular conversation - exclude anonymous messages only for teachers viewing them
         const result = await pool.query(
             `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                    m.created_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
@@ -226,7 +226,7 @@ router.get('/messages/:userId/:otherUserId/search', auth, async (req, res) => {
         if (otherUserId === 'anonymous') {
             const result = await pool.query(
                 `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                        (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                        m.created_at,
                         'Anonymous Student' as sender_name
                  FROM messages m
                  WHERE m.community_id IS NULL
@@ -243,7 +243,7 @@ router.get('/messages/:userId/:otherUserId/search', auth, async (req, res) => {
         // Regular conversation search
         const result = await pool.query(
             `SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    (m.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Asia/Karachi') as created_at,
+                    m.created_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
@@ -332,8 +332,8 @@ router.post('/message/delete-multiple', auth, async (req, res) => {
 
         console.log('[Delete Multiple] Deleted count:', result.rowCount);
 
-        res.json({ 
-            message: 'Messages deleted successfully', 
+        res.json({
+            message: 'Messages deleted successfully',
             deletedCount: result.rowCount,
             deletedIds: result.rows.map(r => r.id)
         });

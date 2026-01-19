@@ -10,14 +10,25 @@ import {
 import { showSuccess, showError } from '../../utils/alert';
 import { authApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import { useNotifications } from '../../hooks/useSocket';
+import { useSocket } from '../../context/SocketContext';
 
 const UserManagement = () => {
   const raw = sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
 
   // Real-time notifications
-  const { sendNotification } = useNotifications();
+  // Socket connection
+  const { socketService, isConnected } = useSocket();
+
+  // Listen for real-time user updates
+  useEffect(() => {
+    if (isConnected && socketService && socketService.socket) {
+        socketService.socket.on('admin-user-update', () => {
+             fetchUsers();
+        });
+        return () => socketService.socket.off('admin-user-update');
+    }
+  }, [isConnected, socketService]);
 
   // User Management states
   const [userTab, setUserTab] = useState('users'); // 'users' or 'requests'
@@ -174,14 +185,15 @@ const UserManagement = () => {
         showSuccess('User created successfully!');
 
         // Send welcome notification to new user
-        if (newUser.id) {
-          sendNotification(
-            newUser.id,
-            'Welcome to EduCom',
-            `Your account has been created. Your role is ${userFormData.role}.`,
-            'info',
-            currentUser?.id
-          );
+          // Send welcome notification to new user
+        if (newUser.id && socketService) {
+          socketService.sendNotification({
+            userId: newUser.id,
+            title: 'Welcome to EduCom',
+            message: `Your account has been created. Your role is ${userFormData.role}.`,
+            type: 'info',
+            senderId: currentUser?.id
+          });
         }
       }
       fetchUsers();
@@ -279,6 +291,7 @@ const UserManagement = () => {
                 className="button primary icon-button"
                 onClick={() => setIsUserModalOpen(true)}
                 data-tooltip="Add New User"
+                aria-label="Add New User"
               >
                 <FontAwesomeIcon icon={faUserPlus} />
               </button>
@@ -367,6 +380,7 @@ const UserManagement = () => {
                               className="button edit icon-button small"
                               onClick={() => handleUserEdit(user)}
                               data-tooltip="Edit User"
+                              aria-label={`Edit user ${user.name}`}
                             >
                               <FontAwesomeIcon icon={faPenToSquare} />
                             </button>
@@ -374,6 +388,7 @@ const UserManagement = () => {
                               className="button delete icon-button small"
                               onClick={() => handleUserDelete(user.id)}
                               data-tooltip="Delete User"
+                              aria-label={`Delete user ${user.name}`}
                             >
                               <FontAwesomeIcon icon={faTrash} />
                             </button>

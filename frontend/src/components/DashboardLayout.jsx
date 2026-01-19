@@ -35,8 +35,8 @@ const DashboardLayout = ({
       <nav className="topnav">
         <div className="topnav-container">
           {/* Logo */}
-          <div className="topnav-brand">
-            <FontAwesomeIcon icon={faGraduationCap} className="brand-icon" />
+          <div className="topnav-brand" role="banner">
+            <FontAwesomeIcon icon={faGraduationCap} className="brand-icon" aria-hidden="true" />
             <span className="brand-text">EduCom</span>
           </div>
 
@@ -60,6 +60,9 @@ const DashboardLayout = ({
             <div className="profile-dropdown">
               <button 
                 className="profile-trigger"
+                aria-label="User Profile Menu"
+                aria-haspopup="true"
+                aria-expanded="false"
               >
                 <div className="profile-avatar">
                   {getInitials(user?.full_name || user?.name)}
@@ -72,15 +75,20 @@ const DashboardLayout = ({
               </button>
               
               <div className="profile-dropdown-menu">
-                <button className="dropdown-item logout-item" onClick={onLogout}>
-                  <FontAwesomeIcon icon={faSignOutAlt} />
+                <button className="dropdown-item logout-item" onClick={onLogout} aria-label="Sign Out">
+                  <FontAwesomeIcon icon={faSignOutAlt} aria-hidden="true" />
                   <span>Logout</span>
                 </button>
               </div>
             </div>
 
             {/* Mobile Menu Toggle */}
-            <button className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+            <button 
+              className="mobile-menu-toggle" 
+              onClick={toggleMobileMenu}
+              aria-label="Toggle Mobile Menu"
+              aria-expanded={isMobileMenuOpen}
+            >
               <FontAwesomeIcon icon={faBars} />
             </button>
           </div>

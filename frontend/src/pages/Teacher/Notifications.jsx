@@ -1,54 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faBell } from '@fortawesome/free-solid-svg-icons';
-import { notificationApi } from '../../api';
-import { useNotifications } from '../../hooks/useSocket';
-import { showAlert } from '../../utils/alert';
+import { useNotifications } from '../../context/NotificationContext';
+
 
 const Notifications = () => {
-  const raw = sessionStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
-  const userId = user?.id || user?.userId;
-
-  const [notifications, setNotifications] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  // Real-time notifications
-  useNotifications((notification) => {
-    showAlert(notification.title, notification.message, notification.type || 'info');
-    setNotifications(prev => [notification, ...prev]);
-  });
-
-  useEffect(() => {
-    if (userId) {
-      fetchNotifications();
-    }
-  }, [userId]);
-
-  const fetchNotifications = async () => {
-    try {
-      setLoading(true);
-      const response = await notificationApi.getAll({ userId });
-      setNotifications(response.notifications || []);
-    } catch (err) {
-      setNotifications([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleMarkAsRead = async (notificationId) => {
-    try {
-      await notificationApi.markAsRead(notificationId);
-      setNotifications(prev => 
-        prev.map(notif => 
-          notif.id === notificationId ? { ...notif, is_read: true } : notif
-        )
-      );
-    } catch (err) {
-      showAlert('Error', 'Failed to mark notification as read', 'error');
-    }
-  };
+  const { notifications, loading, markAsRead } = useNotifications();
 
   return (
     <div className="container">
@@ -72,7 +29,7 @@ const Notifications = () => {
             <div 
               key={notification.id}
               className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
-              onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
+              onClick={() => !notification.is_read && markAsRead(notification.id)}
             >
               <div className="notification-icon">
                 <FontAwesomeIcon icon={faBell} />
@@ -86,8 +43,7 @@ const Notifications = () => {
                     day: 'numeric',
                     hour: '2-digit',
                     minute: '2-digit',
-                    hour12: true,
-                    timeZone: 'Asia/Karachi'
+                    hour12: true
                   })}
                 </span>
               </div>
