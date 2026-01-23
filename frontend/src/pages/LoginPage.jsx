@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authApi } from '../api';
+import { isValidEmail, getEmailError } from '../utils/validation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faGraduationCap, 
@@ -49,12 +50,21 @@ const LoginPage = () => {
     let hasError = false;
     const errors = { identifier: '', password: '' };
     
-    // Validate empty fields
-    if (!formData.identifier.trim()) {
-      errors.identifier = 'Please fill in this field.';
-      hasError = true;
+    // Validate fields using utility
+    const emailError = getEmailError(formData.identifier);
+    if (emailError) {
+      // If it's just empty, it might be caught above, but getEmailError handles empty too.
+      // However, the original code had specific "fill in this field" errors.
+      // Let's refine based on the original structure but use the validator for the domain check.
+      if (!formData.identifier.trim()) {
+         errors.identifier = 'Please fill in this field.';
+         hasError = true;
+      } else if (!isValidEmail(formData.identifier)) {
+         errors.identifier = emailError; // This will return the specific domain error or generic valid error
+         hasError = true;
+      }
     }
-    
+
     if (!formData.password) {
       errors.password = 'Please fill in this field.';
       hasError = true;
@@ -66,18 +76,6 @@ const LoginPage = () => {
     }
     
     setLoading(true);
-    
-    const identifier = formData.identifier.trim();
-    
-    if (identifier.includes('@')) {
-      const lower = identifier.toLowerCase();
-      const allowedDomain = lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk');
-      if (!allowedDomain) {
-        setError('Only @szabist.pk or @szabist.edu.pk email addresses are allowed');
-        setLoading(false);
-        return;
-      }
-    }
     
     sessionStorage.clear();
     localStorage.removeItem('user');

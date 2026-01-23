@@ -1,4 +1,5 @@
 import { authApi } from '../api';
+import { isValidPassword } from '../utils/validation';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -32,7 +33,7 @@ const ResetPasswordPage = () => {
   }, [navigate]);
 
   const validatePassword = (password) => {
-    if (password.length < 6) {
+    if (!isValidPassword(password)) {
       return 'Password must be at least 6 characters long';
     }
     return '';
@@ -41,6 +42,16 @@ const ResetPasswordPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!newPassword) {
+      setError('Please enter a new password');
+      return;
+    }
+    
+    if (!confirmPassword) {
+      setError('Please confirm your new password');
+      return;
+    }
 
     // Validation
     const passwordError = validatePassword(newPassword);
@@ -138,7 +149,6 @@ const ResetPasswordPage = () => {
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
-                    required
                     disabled={loading}
                   />
                   <button
@@ -164,7 +174,6 @@ const ResetPasswordPage = () => {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     placeholder="Confirm new password"
-                    required
                     disabled={loading}
                   />
                   <button

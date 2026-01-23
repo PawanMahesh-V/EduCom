@@ -18,6 +18,8 @@ const MyCourses = ({ onNavigateToCommunity }) => {
   const userId = user?.id || user?.userId;
 
   const [courses, setCourses] = useState([]);
+  const [filteredCourses, setFilteredCourses] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -70,8 +72,10 @@ const MyCourses = ({ onNavigateToCommunity }) => {
       setLoading(true);
       const data = await courseApi.getTeacherCourses(userId);
       setCourses(data.courses || []);
+      setFilteredCourses(data.courses || []);
     } catch (err) {
       setCourses([]);
+      setFilteredCourses([]);
     } finally {
       setLoading(false);
     }
@@ -161,11 +165,39 @@ const MyCourses = ({ onNavigateToCommunity }) => {
     }
   };
 
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredCourses(courses);
+    } else {
+      const lower = searchTerm.toLowerCase();
+      const filtered = courses.filter(course => 
+        course.name.toLowerCase().includes(lower) ||
+        course.code.toLowerCase().includes(lower) ||
+        course.department.toLowerCase().includes(lower) ||
+        (course.semester && String(course.semester).toLowerCase().includes(lower))
+      );
+      setFilteredCourses(filtered);
+    }
+  }, [searchTerm, courses]);
+
   return (
     <div className="container">
-      <div className="header-actions mb-3">
+      <div className="header-actions mb-3" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="search-container" style={{ flex: 1, maxWidth: '400px' }}>
+          <div className="chat-search-wrapper">
+             <FontAwesomeIcon icon={faBook} className="chat-search-icon" />
+             <input
+              type="text"
+              className="chat-search-input"
+              placeholder="Search courses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
         <button 
           className="floating-join-btn"
+          style={{ position: 'relative', bottom: 'auto', right: 'auto', width: '48px', height: '48px' }}
           onClick={() => setIsCourseRequestModalOpen(true)}
         >
           <FontAwesomeIcon icon={faPlus} />
@@ -176,14 +208,14 @@ const MyCourses = ({ onNavigateToCommunity }) => {
         <div className="text-center p-4 text-secondary">
           Loading your courses...
         </div>
-      ) : courses.length === 0 ? (
+      ) : filteredCourses.length === 0 ? (
         <div className="empty-state text-center p-4 text-secondary">
           <FontAwesomeIcon icon={faBook} className="icon-xl mb-3 opacity-30" />
-          <p>No courses assigned yet.</p>
+          <p>{searchTerm ? 'No courses found matching your search.' : 'No courses assigned yet.'}</p>
         </div>
       ) : (
         <div className="course-card-grid">
-          {courses.map((course) => (
+          {filteredCourses.map((course) => (
             <div 
               key={course.id}
               className="course-card clickable"

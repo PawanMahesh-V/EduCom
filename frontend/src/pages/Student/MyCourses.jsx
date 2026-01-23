@@ -16,6 +16,8 @@ const MyCourses = ({ onNavigateToCommunity }) => {
   const userId = user?.id || user?.userId;
 
   const [courses, setCourses] = useState([]);
+  const [filteredCourses, setFilteredCourses] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
   // Join community modal states
@@ -47,9 +49,11 @@ const MyCourses = ({ onNavigateToCommunity }) => {
       setLoading(true);
       const data = await courseApi.getStudentCourses(userId);
       setCourses(data.courses || []);
+      setFilteredCourses(data.courses || []);
     } catch (err) {
       showAlert('Error', 'Error loading courses: ' + err, 'error');
       setCourses([]);
+      setFilteredCourses([]);
     } finally {
       setLoading(false);
     }
@@ -111,21 +115,49 @@ const MyCourses = ({ onNavigateToCommunity }) => {
     }
   };
 
+  useEffect(() => {
+    if (searchTerm.trim() === '') {
+      setFilteredCourses(courses);
+    } else {
+      const lower = searchTerm.toLowerCase();
+      const filtered = courses.filter(course => 
+        course.name.toLowerCase().includes(lower) ||
+        course.code.toLowerCase().includes(lower) ||
+        course.department.toLowerCase().includes(lower) ||
+        (course.teacher_name && course.teacher_name.toLowerCase().includes(lower))
+      );
+      setFilteredCourses(filtered);
+    }
+  }, [searchTerm, courses]);
+
   return (
     <>
       <div className="container">
+        <div className="search-container mb-4">
+          <div className="chat-search-wrapper">
+             <FontAwesomeIcon icon={faBook} className="chat-search-icon" />
+             <input
+              type="text"
+              className="chat-search-input"
+              placeholder="Search courses..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
+
         {loading ? (
           <div className="text-center p-4 text-secondary">
             Loading your courses...
           </div>
-        ) : courses.length === 0 ? (
+        ) : filteredCourses.length === 0 ? (
           <div className="empty-state text-center p-4 text-secondary">
             <FontAwesomeIcon icon={faBook} className="icon-xl mb-3 opacity-30" />
-            <p>You are not enrolled in any courses yet.</p>
+            <p>{searchTerm ? 'No courses found matching your search.' : 'You are not enrolled in any courses yet.'}</p>
           </div>
         ) : (
           <div className="course-card-grid">
-            {courses.map((course) => (
+            {filteredCourses.map((course) => (
               <div 
                 key={course.id}
                 className="course-card clickable"

@@ -1,4 +1,5 @@
 import { authApi } from '../api';
+import { isValidEmail, isValidPassword, isValidRegId, isValidName, getEmailError } from '../utils/validation';
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -67,10 +68,10 @@ const RegisterPage = () => {
       return;
     }
 
-    const allowedDomain = trimmedEmail.endsWith('@szabist.pk') || trimmedEmail.endsWith('@szabist.edu.pk');
-    if (!allowedDomain) {
-      setFieldErrors({ email: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
-      return;
+    const emailError = getEmailError(trimmedEmail);
+    if (emailError) {
+       setFieldErrors({ email: emailError });
+       return;
     }
 
     setLoading(true);
@@ -113,17 +114,23 @@ const RegisterPage = () => {
     if (!formData.reg_id.trim()) {
       errors.reg_id = 'Please fill in this field.';
       hasError = true;
+    } else if (!isValidRegId(formData.reg_id)) {
+      errors.reg_id = 'Registration ID must be alphanumeric';
+      hasError = true;
     }
 
     if (!formData.name.trim()) {
       errors.name = 'Please fill in this field.';
+      hasError = true;
+    } else if (!isValidName(formData.name)) {
+      errors.name = 'Name can only contain letters and spaces';
       hasError = true;
     }
 
     if (!formData.password) {
       errors.password = 'Please fill in this field.';
       hasError = true;
-    } else if (formData.password.length < 6) {
+    } else if (!isValidPassword(formData.password)) {
       errors.password = 'Password must be at least 6 characters';
       hasError = true;
     }

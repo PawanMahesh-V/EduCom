@@ -1,4 +1,5 @@
 import { authApi } from '../api';
+import { getEmailError } from '../utils/validation';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -30,16 +31,9 @@ const ForgotPasswordPage = () => {
     setMessage('');
     setFieldError('');
     
-    // Validate empty field
-    if (!email.trim()) {
-      setFieldError('Please fill in this field.');
-      return;
-    }
-    
-    // Validate @szabist.pk or @szabist.edu.pk domain
-    const lower = email.toLowerCase();
-    if (!(lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk'))) {
-      setFieldError('Only @szabist.pk or @szabist.edu.pk email addresses are allowed');
+    const emailError = getEmailError(email);
+    if (emailError) {
+      setFieldError(emailError);
       return;
     }
     

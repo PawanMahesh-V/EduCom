@@ -8,7 +8,7 @@ const ConfirmDialog = ({
   cancelText = 'Cancel',
   onConfirm,
   onCancel,
-  variant = 'danger' // 'danger' | 'primary'
+  variant = 'danger'
 }) => {
   if (!open) return null;
 

@@ -850,22 +850,9 @@ button {
   border-bottom: 1px solid var(--border-light);
 }
 
-.dashboard-content {
-  margin-top: 70px;
-  position: relative;
-  min-height: calc(100vh - 70px);
-}
 
-@media (max-width: 768px) {
-  .topnav {
-    height: 60px;
-  }
 
-  .dashboard-content {
-    margin-top: 60px;
-    min-height: calc(100vh - 60px);
-  }
-}
+
 
 /* ============================================
    Enhanced Mobile Responsiveness
@@ -5928,8 +5915,8 @@ window.alert {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  flex: 1;
-  justify-content: center;
+  /* flex: 1; removed to keep nav left-aligned */
+  /* justify-content: center; removed to keep nav left-aligned */
 }
 
 .topnav-item {

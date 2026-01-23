@@ -61,6 +61,8 @@ const UserManagement = () => {
   // Registration Requests states
   const [registrationRequests, setRegistrationRequests] = useState([]);
   const [requestsLoading, setRequestsLoading] = useState(false);
+  const [requestSearchTerm, setRequestSearchTerm] = useState('');
+  const [filteredRequests, setFilteredRequests] = useState([]);
 
   useEffect(() => {
     fetchUsers();
@@ -144,6 +146,24 @@ const UserManagement = () => {
       showError(err.message || 'Failed to approve registration');
     }
   };
+
+  // Filter requests
+  useEffect(() => {
+    let filtered = registrationRequests;
+
+    if (requestSearchTerm) {
+      const lower = requestSearchTerm.toLowerCase();
+      filtered = filtered.filter(req => 
+        req.name.toLowerCase().includes(lower) ||
+        req.email.toLowerCase().includes(lower) ||
+        req.reg_id.toLowerCase().includes(lower) ||
+        req.role.toLowerCase().includes(lower) ||
+        req.department.toLowerCase().includes(lower)
+      );
+    }
+
+    setFilteredRequests(filtered);
+  }, [requestSearchTerm, registrationRequests]);
 
   const handleRejectRequest = async (requestId) => {
     // Optimistic update - remove from pending list immediately
@@ -592,6 +612,18 @@ const UserManagement = () => {
           </div>
         ) : (
           <div className="container">
+            <div className="header-actions">
+              <div className="search-container">
+                <input
+                  className="search-input"
+                  type="text"
+                  placeholder="Search requests by name, email, ID..."
+                  value={requestSearchTerm}
+                  onChange={(e) => setRequestSearchTerm(e.target.value)}
+                />
+              </div>
+            </div>
+
             {requestsLoading ? (
               <div className="loading-container">
                 <div className="spinner"></div>
@@ -614,14 +646,14 @@ const UserManagement = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {registrationRequests.length === 0 ? (
+                    {filteredRequests.length === 0 ? (
                       <tr>
                         <td colSpan="8" className="text-center p-4">
-                          No registration requests available
+                          {requestSearchTerm ? 'No requests found matching your search' : 'No registration requests available'}
                         </td>
                       </tr>
                     ) : (
-                      registrationRequests.map((request) => (
+                      filteredRequests.map((request) => (
                         <tr key={request.id}>
                           <td data-label="Registration ID">{request.reg_id}</td>
                           <td data-label="Name">{request.name}</td>
@@ -658,12 +690,12 @@ const UserManagement = () => {
 
                 {/* Mobile Card View */}
                 <div className="mobile-cards-view">
-                  {registrationRequests.length === 0 ? (
+                  {filteredRequests.length === 0 ? (
                     <div className="empty-state">
-                      <p>No registration requests available</p>
+                      <p>{requestSearchTerm ? 'No requests found matching your search' : 'No registration requests available'}</p>
                     </div>
                   ) : (
-                    registrationRequests.map((request) => (
+                    filteredRequests.map((request) => (
                       <div key={request.id} className="user-card">
                         <div className="user-card-header">
                           <div className="user-card-info">

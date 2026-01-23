@@ -1,15 +1,18 @@
+//import required modules
 const express = require('express');
 const cors = require('cors');
 const http = require('http');
 const { Server } = require('socket.io');
 const dotenv = require('dotenv');
+
+//load environment variables
 const result = dotenv.config({ debug: false, quiet: true });
 
 if (result.error) {
     console.error('Error loading .env file:', result.error);
     process.exit(1);
 }
-
+// Initialize Express app and HTTP server
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -19,9 +22,9 @@ const io = new Server(server, {
         credentials: true
     }
 });
-
+// Database pool
 const pool = require('./config/database');
-
+// Import routes
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const courseRoutes = require('./routes/courses');
@@ -29,13 +32,13 @@ const dashboardRoutes = require('./routes/dashboard');
 const communityRoutes = require('./routes/communities');
 const notificationRoutes = require('./routes/notifications');
 const directMessageRoutes = require('./routes/directMessages');
-
+// Middleware
 app.use(cors({
     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
-
+// Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/courses', courseRoutes);
@@ -44,6 +47,7 @@ app.use('/api/communities', communityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
 
+// Health check endpoint
 app.get('/api/health', (req, res) => {
     res.json({ status: 'OK' });
 });
