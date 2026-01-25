@@ -12,10 +12,10 @@ class AuthController {
             const user = await User.findByIdentifier(identifier);
 
             if (!user) {
-                return res.status(401).json({ message: 'Invalid credentials or User not found' });
+                return res.status(401).json({ message: 'Invalid email or User not found' });
             }
             if (!user.password) {
-                return res.status(401).json({ message: 'Invalid credentials or User not found' });
+                return res.status(401).json({ message: 'Invalid Password or User not found' });
             }
 
             try {
@@ -59,7 +59,6 @@ class AuthController {
             res.status(500).json({ message: 'Server error during login' });
         }
     }
-
     static async verifyLogin(req, res) {
         try {
             const { email, code } = req.body;

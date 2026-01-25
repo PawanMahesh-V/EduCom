@@ -10,11 +10,11 @@ const result = dotenv.config({ debug: false, quiet: true });
 
 if (result.error) {
     console.error('Error loading .env file:', result.error);
-    process.exit(1);
+    process.exit(1); // Exit if .env cannot be loaded
 }
 // Initialize Express app and HTTP server
-const app = express();
-const server = http.createServer(app);
+const app = express(); 
+const server = http.createServer(app);// Initialize Socket.IO server
 const io = new Server(server, {
     cors: {
         origin: process.env.FRONTEND_URL || "http://localhost:5173",
@@ -53,10 +53,9 @@ app.get('/api/health', (req, res) => {
 });
 
 // Socket.IO connection handling
-const connectedUsers = new Map(); // userId -> socketId
+const connectedUsers = new Map(); // Map of userId to socket.id
 
 io.on('connection', (socket) => {
-    // User authentication and registration
     // User authentication and registration
     socket.on('register', async (userId) => {
         // Always store userId as integer for consistent lookup
@@ -101,12 +100,9 @@ io.on('connection', (socket) => {
                 'SELECT role FROM users WHERE id = $1',
                 [senderId]
             );
-
             const isAdmin = senderRole.rows.length > 0 && senderRole.rows[0].role === 'Admin';
-
             // If notificationOnly flag is set (from admin modal), skip saving to chat
             if (notificationOnly || isAdmin) {
-                // Only create notifications, don't save to messages table or broadcast to chat
             } else {
                 // Save message to database and broadcast to chat (normal chat behavior)
                 const result = await pool.query(
@@ -158,7 +154,7 @@ io.on('connection', (socket) => {
                         [communityId, senderId]
                     );
 
-                    console.log('📧 Notification recipients:');
+                    console.log('Notification recipients:');
                     console.log('Students:', enrolledStudents.rows);
                     console.log('Teachers:', courseTeacher.rows);
 
@@ -294,8 +290,8 @@ io.on('connection', (socket) => {
                 const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
                 const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
 
-                if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {
-                    socket.emit('message-error', { error: 'User not found' });
+                if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {//what is happening here? Ans:
+                    socket.emit('message-error', { error: 'User not found' }); 
                     return;
                 }
 
@@ -368,10 +364,8 @@ io.on('connection', (socket) => {
 
 // Make io accessible to routes
 app.set('io', io);
-
 const PORT = process.env.PORT || 5000;
 const HOST = process.env.HOST || '0.0.0.0';
-
 server.listen(PORT, HOST, () => {
     console.log(`Server is running on http://${HOST}:${PORT}`);
     console.log(`Socket.IO is ready for connections`);

@@ -47,7 +47,7 @@ class UserController {
                 query += ' WHERE ' + conditions.join(' AND ');
             }
 
-            // Add pagination
+            //pagination:
             queryParams.push(limit);
             queryParams.push(offset);
             query += ` LIMIT $${queryParams.length - 1} OFFSET $${queryParams.length}`;

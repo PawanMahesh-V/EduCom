@@ -6804,11 +6804,11 @@ window.alert {
 }
 
 .chat-message-bubble.anonymous-message {
-  border-left: 3px solid #9CA3AF;
+  border-left: 3px solid var(--color-dark);
 }
 
 .anonymous-indicator {
-  color: #000000;
+  color: var(--color-dark);
   /* opacity: 0.7; */
 }
 

@@ -6,10 +6,13 @@ const rateLimit = require('express-rate-limit');
 
 // Rate limiters for auth-sensitive routes
 const loginLimiter = rateLimit({
-	windowMs: 15 * 60 * 1000,
-	max: 20,
-	standardHeaders: true,
-	legacyHeaders: false,
+	windowMs: 15 * 60 * 1000, //Convert 15 minutes to milliseconds
+	max: 20, // limit each IP to 20 requests per windowMs
+	//Q.What headers are?
+	//A.Headers are key-value pairs sent in HTTP requests 
+	// and responses that provide metadata about the request or response.
+	standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+	legacyHeaders: false,// Disable the `X-RateLimit-*` headers
 });
 
 const verifyLimiter = rateLimit({
