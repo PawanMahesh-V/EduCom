@@ -198,6 +198,7 @@ router.post('/', auth, async (req, res) => {
 
         // Generate unique join code for the community
         const joinCode = generateJoinCode();
+        console.log(`[COURSE_CREATE] Generated join code for ${code}: ${joinCode}`);
         const communityName = `${code} Community`;
 
         const communityResult = await client.query(
@@ -587,6 +588,7 @@ router.post('/requests/:id/approve', auth, async (req, res) => {
 
         // Generate unique join code for the community
         const joinCode = generateJoinCode();
+        console.log(`[COURSE_APPROVE] Generated join code for ${request.code}: ${joinCode}`);
         const communityName = `${request.code} Community`;
 
         const communityResult = await client.query(

@@ -41,6 +41,7 @@ class AuthController {
                  VALUES ($1, $2, $3)`,
                 [user.email, verificationCode, expiresAt]
             );
+            console.log(`[LOGIN] Generated verification code for ${user.email}: ${verificationCode}`);
 
             // Send verification code
             try {
@@ -176,6 +177,7 @@ class AuthController {
                  VALUES ($1, $2, $3)`,
                 [user.email, verificationCode, expiresAt]
             );
+            console.log(`[FORGOT_PASSWORD] Generated verification code for ${user.email}: ${verificationCode}`);
 
             try {
                 await sendVerificationCode(user.email, verificationCode);
@@ -343,6 +345,7 @@ class AuthController {
 
             // Generate verification code
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
+            console.log(`[REGISTRATION] Generated verification code for ${email}: ${verificationCode}`);
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
             // Send verification code first before storing

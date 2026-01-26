@@ -292,7 +292,7 @@ const RegisterPage = () => {
           <span>Email Verified</span>
         </div>
         <h1 className="register-title">Complete Your Profile</h1>
-        <p className="register-subtitle">Fill in your details to finish registration</p>
+        <p className="register-subtitle">Note:Fill in your details & if Role is Teacher/HOD/PM, Skip Registration ID Field. </p>
       </div>
 
       <form className="register-form" onSubmit={handleSubmit}>

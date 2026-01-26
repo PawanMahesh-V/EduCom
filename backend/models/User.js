@@ -119,7 +119,9 @@ class User {
 
         const nextNum = maxNum + 1;
         // Pad with zeros to ensure at least 3 digits
-        return `${prefix}${nextNum.toString().padStart(3, '0')}`;
+        const nextId = `${prefix}${nextNum.toString().padStart(3, '0')}`;
+        console.log(`[USER] Generated Reg ID for ${role}: ${nextId}`);
+        return nextId;
     }
 }
 

@@ -196,6 +196,7 @@ router.post('/', auth, async (req, res) => {
         }
 
         const joinCode = generateJoinCode();
+        console.log(`[COMMUNITY_CREATE] Generated join code for ${name}: ${joinCode}`);
 
         const result = await pool.query(
             `INSERT INTO communities (id, name, join_code, status) 
