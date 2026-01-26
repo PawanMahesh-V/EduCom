@@ -825,6 +825,17 @@ const CourseManagement = () => {
                           <FontAwesomeIcon icon={faPenToSquare} />
                           Edit
                         </button>
+                        <button
+                          className="button primary"
+                          onClick={() => {
+                            setSelectedCommunityForMessage(community);
+                            setIsMessageModalOpen(true);
+                            setMessageFormData({ subject: '', message: '' });
+                          }}
+                        >
+                          <FontAwesomeIcon icon={faPaperPlane} />
+                          Send
+                        </button>
                       </div>
                     </div>
                   ))
