@@ -60,9 +60,7 @@ export const NotificationProvider = ({ children }) => {
           // Trigger global alert
           showAlert(notification.title || 'New Notification', 'info');
       };
-
       socketService.onNewNotification(handleNewNotification);
-
       return () => {
           socketService.offNewNotification();
       }
@@ -77,8 +75,7 @@ export const NotificationProvider = ({ children }) => {
           await notificationApi.markAsRead(id);
       } catch (err) {
           console.error("[NotificationProvider] Failed to mark read", err);
-          // Only revert if critical, usually UI consistency matters more than strict sync for read status
-      }
+       }
   };
 
   const markAllAsRead = async () => {
@@ -89,17 +86,6 @@ export const NotificationProvider = ({ children }) => {
       // Optimistic update
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
-
-      try {
-          // Assuming api has markAllAsRead, if not we'll need to implement it or loop (inefficient)
-          // Ideally: await notificationApi.markAllAsRead(userId);
-          // For now, if the API doesn't exist, we might skip the API call or iterate. 
-          // Let's assume singular updates for now if bulk endpoint missing.
-          // Checking api/notifications.js would confirm.
-          // For safety, I will implement a loop if I'm not sure, or just leave it optimistic.
-      } catch (err) {
-          console.error("Failed to mark all read", err);
-      }
   };
 
   return (

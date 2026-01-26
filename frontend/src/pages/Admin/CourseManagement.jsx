@@ -13,14 +13,20 @@ import { courseApi, communityApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useSocket } from '../../context/SocketContext';
 
-const CourseManagement = () => {
+const CourseManagement = ({ initialTab }) => {
   const raw = sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
 
   // Socket connection
   const { socketService, isConnected } = useSocket();
 
-  const [courseTab, setCourseTab] = useState('courses'); // 'courses', 'communities', or 'requests'
+  const [courseTab, setCourseTab] = useState(initialTab || 'courses'); // 'courses', 'communities', or 'requests'
+
+  useEffect(() => {
+    if (initialTab) {
+      setCourseTab(initialTab);
+    }
+  }, [initialTab]);
 
   // Listen for real-time course updates
   useEffect(() => {

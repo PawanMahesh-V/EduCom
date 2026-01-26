@@ -37,6 +37,7 @@ const Dashboard = () => {
   const role = user?.role?.toLowerCase();
 
   const [activeSection, setActiveSection] = useState(role === 'admin' ? 'overview' : 'courses');
+  const [courseInitialTab, setCourseInitialTab] = useState('courses');
   const [initialChat, setInitialChat] = useState(null);
   const [adminProfile, setAdminProfile] = useState(null);
 
@@ -86,11 +87,14 @@ const Dashboard = () => {
     navigate('/login', { replace: true });
   };
 
-  const handleMenuClick = (section) => {
+  const handleMenuClick = (section, tab) => {
     if (section !== 'community') {
       setInitialChat(null);
     }
     setActiveSection(section);
+    if (section === 'courses' && tab) {
+      setCourseInitialTab(tab);
+    }
   };
 
   // Menu items based on role
@@ -143,11 +147,11 @@ const Dashboard = () => {
   const renderAdminContent = () => {
     switch (activeSection) {
       case 'overview':
-        return <AdminOverview />;
+        return <AdminOverview onNavigate={handleMenuClick} />;
       case 'users':
         return <UserManagement />;
       case 'courses':
-        return <CourseManagement />;
+        return <CourseManagement initialTab={courseInitialTab} />;
       case 'messages':
         return <AdminMessages />;
       default:

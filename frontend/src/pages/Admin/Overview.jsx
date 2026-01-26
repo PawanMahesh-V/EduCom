@@ -13,8 +13,8 @@ import {
 import { dashboardApi } from '../../api';
 
 // Inline StatCard component
-const StatCard = ({ title, value, icon, colorClass, subtitle }) => (
-  <div className="stat-card">
+const StatCard = ({ title, value, icon, colorClass, subtitle, onClick }) => (
+  <div className={`stat-card ${onClick ? 'clickable' : ''}`} onClick={onClick}>
     <div className={`stat-icon ${colorClass || 'stat-icon-primary'}`}>
       <FontAwesomeIcon icon={icon} />
     </div>
@@ -26,7 +26,7 @@ const StatCard = ({ title, value, icon, colorClass, subtitle }) => (
   </div>
 );
 
-const Overview = () => {
+const Overview = ({ onNavigate }) => {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState(null);
@@ -72,12 +72,10 @@ const Overview = () => {
     <div className="admin-overview">
       <div className="overview-header">
         <div>
-          {/* <h2>Dashboard Overview</h2>
-          <p>Welcome back! Here's what's happening with your platform.</p> */}
         </div>
-        <button className="btn btn-primary" onClick={fetchDashboardData}>
+        {/* <button className="btn btn-primary" onClick={fetchDashboardData}>
           <FontAwesomeIcon icon={faRefresh} /> 
-        </button>
+        </button> */}
       </div>
       <div className="stats-grid">
         {[
@@ -86,28 +84,33 @@ const Overview = () => {
             value: stats?.totalUsers || 0,
             icon: faUsers,
             colorClass: 'stat-icon-primary',
-            subtitle: `${stats?.usersByRole?.Student || 0} Students, ${stats?.usersByRole?.Teacher || 0} Teachers`
+            subtitle: `${stats?.usersByRole?.Student || 0} Students, ${stats?.usersByRole?.Teacher || 0} Teachers`,
+            onClick: () => onNavigate && onNavigate('users')
           },
           {
             title: 'Total Courses',
             value: stats?.totalCourses || 0,
             icon: faBook,
             colorClass: 'stat-icon-accent',
-            subtitle: `${stats?.totalEnrollments || 0} Total Enrollments`
+            subtitle: `${stats?.totalEnrollments || 0} Total Enrollments`,
+            onClick: () => onNavigate && onNavigate('courses')
           },
           {
             title: 'Communities',
             value: stats?.totalCommunities || 0,
             icon: faComments,
             colorClass: 'stat-icon-secondary',
-            subtitle: `${stats?.totalMessages || 0} Messages`
+            subtitle: `${stats?.totalMessages || 0} Messages`,
+            onClick: () => onNavigate && onNavigate('courses', 'communities')
           },
           {
             title: 'Marketplace',
             value: stats?.totalMarketplaceItems || 0,
             icon: faStore,
             colorClass: 'stat-icon-info',
-            subtitle: `${stats?.pendingMarketplaceItems || 0} Pending Approval`
+            subtitle: `${stats?.pendingMarketplaceItems || 0} Items`,
+            onClick: () => onNavigate && onNavigate('marketplace')
+
           }
         ].map((card, index) => (
           <StatCard key={index} {...card} />

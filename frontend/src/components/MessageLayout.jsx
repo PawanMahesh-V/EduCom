@@ -2,7 +2,20 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { TEACHING_ROLES } from '../constants';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faPaperPlane, faComments, faUsers, faEllipsisVertical, faTrash, faCheckSquare, faUserSecret, faArrowLeft, faTimes, faChevronUp, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import { 
+  faSearch,
+  faPaperPlane,
+  faComments, 
+  faUsers, 
+  faEllipsisVertical, 
+  faTrash, 
+  faCheckSquare, 
+  faUserSecret, 
+  faArrowLeft, 
+  faTimes, 
+  faChevronUp, 
+  faChevronDown 
+} from '@fortawesome/free-solid-svg-icons';
 import directMessageApi from '../api/directMessages';
 
 const MessageLayout = ({
@@ -815,7 +828,7 @@ const MessageLayout = ({
                           <FontAwesomeIcon icon={faCheckSquare} />
                           <span>Select Messages</span>
                         </button>
-                        {selectedChat.onToggleStatus && (
+                        {/* {selectedChat.onToggleStatus && (
                           <button 
                             className={`chat-option-item ${selectedChat.status === 'inactive' ? 'text-success' : 'text-warning'}`} 
                             onClick={() => { setShowCommunityOptions(false); selectedChat.onToggleStatus(selectedChat); }}
@@ -823,7 +836,7 @@ const MessageLayout = ({
                             <FontAwesomeIcon icon={selectedChat.status === 'inactive' ? faCheckSquare : faTimes} />
                             <span>{selectedChat.status === 'inactive' ? 'Activate Community' : 'Deactivate Community'}</span>
                           </button>
-                        )}
+                        )} */}
                         {onLeaveCommunity && (
                           <button className="chat-option-item text-danger" onClick={() => { setShowCommunityOptions(false); onLeaveCommunity(selectedChat); }}>
                             <FontAwesomeIcon icon={faArrowLeft} />

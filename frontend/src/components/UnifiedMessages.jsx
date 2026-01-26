@@ -199,9 +199,9 @@ const UnifiedMessages = ({ defaultRole, allowAnonymous = false }) => {
     }
     
     setDmMessages([]);
-    await loadDirectMessages(conversation.user_id, false);
+    loadDirectMessages(conversation.user_id, false);
     // Refresh conversations to update unread count
-    await fetchConversations();
+    fetchConversations();
   };
 
   const handleStartNewConversation = async (selectedUser) => {

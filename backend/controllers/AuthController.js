@@ -522,16 +522,15 @@ class AuthController {
                 ['approved', requestId]
             );
 
-            // Send approval email and welcome email
-            try {
-                await sendRegistrationApprovalEmail(reqData.email, reqData.name);
-                await sendWelcomeEmail(reqData.email, reqData.name, reqData.role);
-            } catch (emailError) {
-                console.error('Error sending emails:', emailError);
-                // Continue even if email fails
-            }
-
+            // Send response immediately
             res.json({ message: 'Registration approved successfully' });
+
+            // Send approval email and welcome email in background
+            sendRegistrationApprovalEmail(reqData.email, reqData.name)
+                .then(() => sendWelcomeEmail(reqData.email, reqData.name, reqData.role))
+                .catch(emailError => {
+                    console.error('Error sending emails in background:', emailError);
+                });
 
         } catch (err) {
             console.error('Error approving registration:', err);
