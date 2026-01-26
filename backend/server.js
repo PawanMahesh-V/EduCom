@@ -13,7 +13,7 @@ if (result.error) {
     process.exit(1); // Exit if .env cannot be loaded
 }
 // Initialize Express app and HTTP server
-const app = express(); 
+const app = express();
 const server = http.createServer(app);// Initialize Socket.IO server
 const io = new Server(server, {
     cors: {
@@ -92,17 +92,30 @@ io.on('connection', (socket) => {
 
     // Send message to community
     socket.on('send-message', async (data) => {
-        const { communityId, message, senderId, senderName, notificationOnly } = data;
+        const { communityId, message, senderId, senderName, notificationOnly, subject } = data;
 
         try {
-            // Check if sender is Admin
             const senderRole = await pool.query(
                 'SELECT role FROM users WHERE id = $1',
                 [senderId]
             );
             const isAdmin = senderRole.rows.length > 0 && senderRole.rows[0].role === 'Admin';
+
+            // Check community status
+            const communityStatus = await pool.query(
+                'SELECT status FROM communities WHERE id = $1',
+                [communityId]
+            );
+
+            if (communityStatus.rows.length > 0 && communityStatus.rows[0].status === 'inactive' && !isAdmin) {
+                // If community is inactive, only Admin can send messages (optional, or just strict block)
+                // For now strict block for everyone except maybe system/admin
+                socket.emit('message-error', { error: 'This community is inactive. You cannot send messages.' });
+                return;
+            }
+
             // If notificationOnly flag is set (from admin modal), skip saving to chat
-            if (notificationOnly || isAdmin) {
+            if (notificationOnly) {
             } else {
                 // Save message to database and broadcast to chat (normal chat behavior)
                 const result = await pool.query(
@@ -166,7 +179,9 @@ io.on('connection', (socket) => {
 
                     // Create notification for each recipient
                     const notificationPromises = allRecipients.map(recipient => {
-                        const notifTitle = `New message in ${community.course_code}`;
+                        const notifTitle = subject
+                            ? `${subject} (${community.course_code})`
+                            : `New message in ${community.course_code}`;
                         const notifMessage = `${senderName}: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`;
 
                         return pool.query(
@@ -291,7 +306,7 @@ io.on('connection', (socket) => {
                 const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
 
                 if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {//what is happening here? Ans:
-                    socket.emit('message-error', { error: 'User not found' }); 
+                    socket.emit('message-error', { error: 'User not found' });
                     return;
                 }
 

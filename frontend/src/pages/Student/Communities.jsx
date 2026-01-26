@@ -176,7 +176,8 @@ const Communities = ({ initialChat, onChatSelected }) => {
         courseCode: community.course_code,
         lastMessage: 'Start chatting...',
         time: new Date(community.created_at).toLocaleDateString(),
-        unread: community.unread_count || 0
+        unread: community.unread_count || 0,
+        status: community.status // Include status so MessageLayout can disable input if inactive
       }));
       
       setChats(formattedChats);
@@ -189,6 +190,11 @@ const Communities = ({ initialChat, onChatSelected }) => {
 
   const handleSendMessage = () => {
     if (message.trim() && selectedChat) {
+      if (selectedChat.status === 'inactive') {
+        showAlert('Cannot send message. Community is inactive.', 'error');
+        return;
+      }
+
       // Optimistic update - add message to UI immediately
       const optimisticMessage = {
         id: `temp-${Date.now()}`,

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import MessageLayout from '../../components/MessageLayout';
 import { useCommunityMessages, useTypingIndicator } from '../../hooks/useSocket';
 import socketService from '../../services/socket';
-import { communityApi } from '../../api';
-import { showAlert } from '../../utils/alert';
+import { courseApi, communityApi } from '../../api';
+import { showAlert, showConfirm } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const Communities = ({ initialChat }) => {
@@ -62,7 +62,9 @@ const Communities = ({ initialChat }) => {
             courseCode: community.course_code,
             lastMessage: 'Start chatting...',
             time: new Date(community.created_at).toLocaleDateString('en-PK', { timeZone: 'Asia/Karachi' }),
-            unread: community.unread_count || 0
+            unread: community.unread_count || 0,
+            status: community.status,
+            onToggleStatus: (chat) => handleToggleStatus(chat)
           }));
           setChats(formattedChats);
         }).catch(() => {});
@@ -184,7 +186,10 @@ const Communities = ({ initialChat }) => {
         courseCode: community.course_code,
         lastMessage: 'Start chatting...',
         time: new Date(community.created_at).toLocaleDateString(),
-        unread: community.unread_count || 0
+        unread: community.unread_count || 0,
+        status: community.status,
+        // Bind the handler here to the chat object so MessageLayout can access it
+        onToggleStatus: (chat) => handleToggleStatus(chat) 
       }));
       
       setChats(formattedChats);
@@ -195,8 +200,46 @@ const Communities = ({ initialChat }) => {
     }
   };
 
+  const handleToggleStatus = async (chat) => {
+    const newStatus = chat.status === 'inactive' ? 'active' : 'inactive';
+    const action = newStatus === 'active' ? 'activate' : 'deactivate';
+    
+    const confirmed = await showConfirm(
+      `Are you sure you want to ${action} this community?`,
+      `${action.charAt(0).toUpperCase() + action.slice(1)} Community`
+    );
+
+    if (confirmed) {
+      communityApi.setStatus(chat.id, newStatus, chat.name)
+        .then(() => {
+          showAlert(`Community ${action}d successfully`, 'success');
+          // Update local state
+          setChats(prev => prev.map(c => 
+            c.id === chat.id ? { ...c, status: newStatus } : c
+          ));
+          // Update selectedChat using functional update to avoid stale closure issues
+          setSelectedChat(current => {
+            if (current && current.id === chat.id) {
+              return { ...current, status: newStatus };
+            }
+            return current;
+          });
+        })
+        .catch(err => {
+          console.error(err);
+          showAlert(`Failed to ${action} community`, 'error');
+        });
+    }
+  };
+
   const handleSendMessage = () => {
     if (message.trim() && selectedChat) {
+      // Prevent sending if inactive (client-side check, backend also enforces)
+      if (selectedChat.status === 'inactive') {
+        showAlert('Cannot send message. Community is inactive.', 'error');
+        return;
+      }
+
       const optimisticMessage = {
         id: `temp-${Date.now()}`,
         text: message,

@@ -73,7 +73,7 @@ router.get('/student/:studentId', auth, async (req, res) => {
              FROM communities c
              JOIN courses co ON c.course_id = co.id
              JOIN enrollments e ON co.id = e.course_id
-             WHERE e.student_id = $1 AND c.status = 'active'
+             WHERE e.student_id = $1
              ORDER BY c.created_at DESC`,
             [studentId]
         );
@@ -102,7 +102,7 @@ router.get('/teacher/:teacherId', auth, async (req, res) => {
                     ) as unread_count
              FROM communities c
              JOIN courses co ON c.course_id = co.id
-             WHERE co.teacher_id = $1 AND c.status = 'active'
+             WHERE co.teacher_id = $1
              ORDER BY c.created_at DESC`,
             [teacherId]
         );
@@ -143,7 +143,7 @@ router.get('/hod/:hodId', auth, async (req, res) => {
                     ) as unread_count
              FROM communities c
              JOIN courses co ON c.course_id = co.id
-             WHERE co.department = $2 AND c.status = 'active'
+             WHERE co.department = $2
              ORDER BY c.created_at DESC`,
             [hodId, department]
         );

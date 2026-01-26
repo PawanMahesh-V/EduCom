@@ -340,6 +340,7 @@ const CourseManagement = () => {
       socketService.sendMessage({
         communityId: selectedCommunityForMessage.id,
         message: messageFormData.message,
+        subject: messageFormData.subject,
         senderId: currentUser.id,
         senderName: currentUser.name || 'Admin',
         notificationOnly: true

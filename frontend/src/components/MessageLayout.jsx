@@ -792,7 +792,12 @@ const MessageLayout = ({
                   <div className="chat-user-info">
                     <div className="chat-avatar">{selectedChat.name.charAt(0)}</div>
                     <div>
-                      <h3 className="m-0 font-semibold">{selectedChat.name}</h3>
+                      <h3 className="m-0 font-semibold flex items-center gap-2">
+                        {selectedChat.name}
+                        {selectedChat.status === 'inactive' && (
+                          <span className="status-badge inactive">Inactive</span>
+                        )}
+                      </h3>
                       <p className="m-0 text-sm text-secondary">Course Community</p>
                     </div>
                   </div>
@@ -810,6 +815,15 @@ const MessageLayout = ({
                           <FontAwesomeIcon icon={faCheckSquare} />
                           <span>Select Messages</span>
                         </button>
+                        {selectedChat.onToggleStatus && (
+                          <button 
+                            className={`chat-option-item ${selectedChat.status === 'inactive' ? 'text-success' : 'text-warning'}`} 
+                            onClick={() => { setShowCommunityOptions(false); selectedChat.onToggleStatus(selectedChat); }}
+                          >
+                            <FontAwesomeIcon icon={selectedChat.status === 'inactive' ? faCheckSquare : faTimes} />
+                            <span>{selectedChat.status === 'inactive' ? 'Activate Community' : 'Deactivate Community'}</span>
+                          </button>
+                        )}
                         {onLeaveCommunity && (
                           <button className="chat-option-item text-danger" onClick={() => { setShowCommunityOptions(false); onLeaveCommunity(selectedChat); }}>
                             <FontAwesomeIcon icon={faArrowLeft} />
@@ -866,34 +880,42 @@ const MessageLayout = ({
               <div ref={messagesEndRef} />
             </div>
             
-            <div className="chat-input-wrapper">
-              <div className="chat-input-container">
-                <input 
-                  type="text"
-                  value={communityMessage}
-                  onChange={(e) => {
-                    setCommunityMessage(e.target.value);
-                    if (onCommunityTyping) onCommunityTyping();
-                  }}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      onSendCommunityMessage();
-                    }
-                  }}
-                  placeholder="Type a message..."
-                  className="chat-input"
-                />
-                <button 
-                  onClick={onSendCommunityMessage}
-                  className="chat-send-button"
-                  disabled={!communityMessage.trim()}
-                >
-                  <FontAwesomeIcon icon={faPaperPlane} />
-                  Send
-                </button>
+            {selectedChat.status === 'inactive' ? (
+              <div className="chat-input-wrapper">
+                <div className="inactive-message-banner p-3 text-center bg-gray-100 text-gray-500 rounded-md">
+                  <p>This community is currently inactive. You cannot send messages.</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="chat-input-wrapper">
+                <div className="chat-input-container">
+                  <input 
+                    type="text"
+                    value={communityMessage}
+                    onChange={(e) => {
+                      setCommunityMessage(e.target.value);
+                      if (onCommunityTyping) onCommunityTyping();
+                    }}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        onSendCommunityMessage();
+                      }
+                    }}
+                    placeholder="Type a message..."
+                    className="chat-input"
+                  />
+                  <button 
+                    onClick={onSendCommunityMessage}
+                    className="chat-send-button"
+                    disabled={!communityMessage.trim()}
+                  >
+                    <FontAwesomeIcon icon={faPaperPlane} />
+                    Send
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <div className="chat-empty-state flex-center flex-column gap-lg text-secondary">

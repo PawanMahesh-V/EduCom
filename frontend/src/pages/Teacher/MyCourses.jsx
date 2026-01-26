@@ -6,11 +6,13 @@ import {
   faUsers,
   faPlus,
   faKey,
-  faCopy
+  faCopy,
+  faTrash
 } from '@fortawesome/free-solid-svg-icons';
 import { courseApi, communityApi } from '../../api';
 import socketService from '../../services/socket';
 import { showAlert } from '../../utils/alert';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const MyCourses = ({ onNavigateToCommunity }) => {
   const raw = sessionStorage.getItem('user');
@@ -161,6 +163,48 @@ const MyCourses = ({ onNavigateToCommunity }) => {
     }
   };
 
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
+
+  const handleDisbandCourse = async (e, course) => {
+    e.stopPropagation(); // Prevent card click
+    
+    setConfirmDialog({
+      open: true,
+      title: 'Disband Community',
+      message: `Are you sure you want to disband the community for "${course.name}"? This will delete the community and all messages permanently.`,
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          // Fetch backend communities to find the correct ID
+          const allCommunities = await communityApi.getAll();
+          const courseCommunity = allCommunities.communities?.find(c => c.course_id === course.id);
+          
+          if (courseCommunity) {
+            await communityApi.delete(courseCommunity.id);
+            showAlert('Success', 'Community disbanded from course successfully', 'success');
+            // Optionally refresh courses or just stay here
+            fetchMyCourses(); 
+          } else {
+             // If no community found, checking if we should alert user
+            showAlert('Error', 'Could not find the community to disband.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('Error', 'Failed to disband community', 'error');
+        } finally {
+          setLoading(false);
+          setConfirmDialog(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
+  };
+
   return (
     <div className="container">
       <div className="header-actions mb-3">
@@ -191,6 +235,13 @@ const MyCourses = ({ onNavigateToCommunity }) => {
             >
               <div className="course-card-header">
                 <span className="course-card-code">{course.code}</span>
+                <button 
+                  className="course-leave-btn"
+                  onClick={(e) => handleDisbandCourse(e, course)}
+                  title="Disband Community"
+                >
+                  <FontAwesomeIcon icon={faTrash} />
+                </button>
               </div>
               
               <h3 className="course-card-title">
@@ -328,6 +379,16 @@ const MyCourses = ({ onNavigateToCommunity }) => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        confirmText="Disband"
+        variant="danger"
+      />
     </div>
   );
 };
