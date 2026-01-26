@@ -53,6 +53,10 @@ const communityApi = {
   joinCommunity: async (joinCode, studentId) => {
     return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.JOIN, { joinCode, studentId });
   },
+
+  leaveCommunity: async (id) => {
+    return await ApiClient.post(API_ENDPOINTS.COMMUNITIES.LEAVE(id));
+  },
 };
 
 export default communityApi;

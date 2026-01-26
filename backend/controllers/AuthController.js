@@ -162,13 +162,13 @@ class AuthController {
             const user = await User.findByIdentifier(email.trim());
 
             if (!user) {
-                return res.status(404).json({ 
-                    message: 'No account found with this email address.' 
+                return res.status(404).json({
+                    message: 'No account found with this email address.'
                 });
             }
 
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            
+
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
             await pool.query(
@@ -182,7 +182,7 @@ class AuthController {
             } catch (emailError) {
             }
 
-            res.json({ 
+            res.json({
                 message: 'If an account exists with this email, you will receive a verification code.',
                 devCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined
             });
@@ -222,9 +222,9 @@ class AuthController {
                 { expiresIn: '15m' }
             );
 
-            res.json({ 
+            res.json({
                 message: 'Code verified successfully',
-                resetToken 
+                resetToken
             });
 
         } catch (err) {
@@ -350,8 +350,8 @@ class AuthController {
                 await sendVerificationCode(email, verificationCode, 'registration');
             } catch (emailError) {
                 console.error('Error sending verification email:', emailError);
-                return res.status(400).json({ 
-                    message: 'Failed to send verification email. Please check if the email address is valid.' 
+                return res.status(400).json({
+                    message: 'Failed to send verification email. Please check if the email address is valid.'
                 });
             }
 
@@ -416,8 +416,16 @@ class AuthController {
             const { reg_id, name, email, password, role, department, semester, program_year } = req.body;
 
             // Validation
-            if (!reg_id || !name || !email || !password || !role || !department) {
+            if (!name || !email || !password || !role || !department) {
                 return res.status(400).json({ message: 'All required fields must be provided' });
+            }
+
+            // Auto-generate reg_id for specific roles
+            let finalRegId = reg_id;
+            if (['Teacher', 'HOD', 'PM'].includes(role)) {
+                finalRegId = await User.generateNextRegId(role);
+            } else {
+                if (!reg_id) return res.status(400).json({ message: 'Registration ID is required' });
             }
 
             // Validate email domain (@szabist.pk or @szabist.edu.pk)
@@ -430,7 +438,7 @@ class AuthController {
             // Check if user already exists
             const existingUser = await pool.query(
                 'SELECT id FROM users WHERE email = $1 OR reg_id = $2',
-                [email.toLowerCase(), reg_id]
+                [email.toLowerCase(), finalRegId]
             );
 
             if (existingUser.rows.length > 0) {
@@ -440,7 +448,7 @@ class AuthController {
             // Check if there's a pending request
             const existingRequest = await pool.query(
                 'SELECT id FROM registration_requests WHERE (email = $1 OR reg_id = $2) AND status = $3',
-                [email.toLowerCase(), reg_id, 'pending']
+                [email.toLowerCase(), finalRegId, 'pending']
             );
 
             if (existingRequest.rows.length > 0) {
@@ -455,7 +463,7 @@ class AuthController {
                 `INSERT INTO registration_requests 
                  (reg_id, name, email, password, role, department, semester, program_year, status, created_at) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)`,
-                [reg_id, name, email.toLowerCase(), hashedPassword, role, department, semester || null, program_year || null]
+                [finalRegId, name, email.toLowerCase(), hashedPassword, role, department, semester || null, program_year || null]
             );
 
             res.status(201).json({ message: 'Registration request submitted successfully. Please wait for admin approval.' });

@@ -97,8 +97,18 @@ class UserController {
         try {
             const { reg_id, name, email, password, role = 'Student', department = 'CS', semester, program_year, section } = req.body;
 
-            if (!reg_id || !name || !email) {
+            const User = require('../models/User'); // Ensure User model is imported
+
+            if (!name || !email) {
                 return res.status(400).json({ message: 'Missing required fields' });
+            }
+
+            // Auto-generate reg_id for specific roles
+            let finalRegId = reg_id;
+            if (['Teacher', 'HOD', 'PM'].includes(role)) {
+                finalRegId = await User.generateNextRegId(role);
+            } else {
+                if (!reg_id) return res.status(400).json({ message: 'Registration ID is required' });
             }
 
             let semesterValue = null;
@@ -127,7 +137,7 @@ class UserController {
 
             const userExists = await pool.query(
                 'SELECT * FROM users WHERE email = $1 OR reg_id = $2',
-                [email, reg_id]
+                [email, finalRegId]
             );
 
             if (userExists.rows.length > 0) {
@@ -141,7 +151,7 @@ class UserController {
             const hashedPassword = await bcrypt.hash(password, 10);
             const result = await pool.query(
                 'INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, section) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, reg_id, name, email, role, department, semester, program_year, section',
-                [reg_id, name, email, hashedPassword, role, department, semesterValue, programYearValue, section || null]
+                [finalRegId, name, email, hashedPassword, role, department, semesterValue, programYearValue, section || null]
             );
 
             const io = req.app.get('io');

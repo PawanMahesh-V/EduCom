@@ -16,18 +16,18 @@ router.get('/', auth, async (req, res) => {
              LEFT JOIN courses co ON c.course_id = co.id`;
         const queryParams = [];
         const conditions = [];
-        
+
         // Add status filter
         if (status && status !== 'All') {
             queryParams.push(status);
             conditions.push(`c.status = $${queryParams.length}`);
         }
-        
+
         // Append WHERE clause if filters exist
         if (conditions.length > 0) {
             query += ' WHERE ' + conditions.join(' AND ');
         }
-        
+
         // Add ordering and pagination
         queryParams.push(limit);
         queryParams.push(offset);
@@ -367,8 +367,8 @@ router.post('/join', auth, async (req, res) => {
         }
 
         if (studentResult.rows[0].department !== community.department) {
-            return res.status(403).json({ 
-                message: `This community is for ${community.department} department students only` 
+            return res.status(403).json({
+                message: `This community is for ${community.department} department students only`
             });
         }
 
@@ -378,7 +378,7 @@ router.post('/join', auth, async (req, res) => {
             [studentId, community.course_id]
         );
 
-        res.json({ 
+        res.json({
             message: 'Successfully joined community!',
             community: {
                 id: community.id,
@@ -391,6 +391,47 @@ router.post('/join', auth, async (req, res) => {
         if (err.code === '23505') {
             return res.status(400).json({ message: 'You are already a member of this community' });
         }
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Leave community (Student only)
+router.post('/:id/leave', auth, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const studentId = req.user.userId;
+        const userRole = req.user.role;
+
+        if (userRole !== 'Student') {
+            return res.status(403).json({ message: 'Only students can leave a community. Teachers must disband it.' });
+        }
+
+        // Get course_id for this community
+        const communityResult = await pool.query(
+            'SELECT course_id FROM communities WHERE id = $1',
+            [id]
+        );
+
+        if (communityResult.rows.length === 0) {
+            return res.status(404).json({ message: 'Community not found' });
+        }
+
+        const courseId = communityResult.rows[0].course_id;
+
+        // Remove enrollment
+        const result = await pool.query(
+            'DELETE FROM enrollments WHERE student_id = $1 AND course_id = $2 RETURNING *',
+            [studentId, courseId]
+        );
+
+        if (result.rowCount === 0) {
+            return res.status(400).json({ message: 'You are not a member of this community' });
+        }
+
+        res.json({ message: 'Successfully left the community' });
+
+    } catch (err) {
+        console.error('Leave community error:', err);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -452,8 +493,8 @@ router.post('/:communityId/messages/delete-multiple', auth, async (req, res) => 
             [messageIds, userId, communityId]
         );
 
-        res.json({ 
-            message: 'Messages deleted successfully', 
+        res.json({
+            message: 'Messages deleted successfully',
             deletedCount: result.rowCount,
             deletedIds: result.rows.map(r => r.id)
         });

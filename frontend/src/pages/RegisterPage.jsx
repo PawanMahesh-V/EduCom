@@ -111,12 +111,17 @@ const RegisterPage = () => {
     const errors = {};
     let hasError = false;
 
-    if (!formData.reg_id.trim()) {
-      errors.reg_id = 'Please fill in this field.';
-      hasError = true;
-    } else if (!isValidRegId(formData.reg_id)) {
-      errors.reg_id = 'Registration ID must be alphanumeric';
-      hasError = true;
+    // Skip reg_id validation for Teacher, HOD, PM as it's auto-generated
+    const isAutoRegIdRole = ['Teacher', 'HOD', 'PM'].includes(formData.role);
+
+    if (!isAutoRegIdRole) {
+      if (!formData.reg_id.trim()) {
+        errors.reg_id = 'Please fill in this field.';
+        hasError = true;
+      } else if (!isValidRegId(formData.reg_id)) {
+        errors.reg_id = 'Registration ID must be alphanumeric';
+        hasError = true;
+      }
     }
 
     if (!formData.name.trim()) {
@@ -292,27 +297,30 @@ const RegisterPage = () => {
 
       <form className="register-form" onSubmit={handleSubmit}>
         <div className="register-form-grid">
-          <div className="register-form-group">
-            <label className="register-label" htmlFor="reg_id">
-              Registration ID
-            </label>
-            <div className="register-input-wrapper">
-              <div className="register-input-icon">
-                <FontAwesomeIcon icon={faIdCard} />
+          {/* Only show Registration ID field for roles that require manual entry */}
+          {!['Teacher', 'HOD', 'PM'].includes(formData.role) && (
+            <div className="register-form-group">
+              <label className="register-label" htmlFor="reg_id">
+                Registration ID
+              </label>
+              <div className="register-input-wrapper">
+                <div className="register-input-icon">
+                  <FontAwesomeIcon icon={faIdCard} />
+                </div>
+                <input
+                  className={`register-input ${fieldErrors.reg_id ? 'register-input--error' : ''}`}
+                  type="text"
+                  id="reg_id"
+                  name="reg_id"
+                  value={formData.reg_id}
+                  onChange={handleInputChange}
+                  placeholder="e.g., BCSBS2212263"
+                  disabled={loading}
+                />
               </div>
-              <input
-                className={`register-input ${fieldErrors.reg_id ? 'register-input--error' : ''}`}
-                type="text"
-                id="reg_id"
-                name="reg_id"
-                value={formData.reg_id}
-                onChange={handleInputChange}
-                placeholder="e.g., BCSBS2212263"
-                disabled={loading}
-              />
+              {renderFieldError('reg_id')}
             </div>
-            {renderFieldError('reg_id')}
-          </div>
+          )}
 
           <div className="register-form-group">
             <label className="register-label" htmlFor="name">

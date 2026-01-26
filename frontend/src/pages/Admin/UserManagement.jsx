@@ -481,16 +481,18 @@ const UserManagement = () => {
                   <h2>{selectedUser ? 'Edit User' : 'Add New User'}</h2>
                   <form onSubmit={handleUserSubmit}>
                     <div className="grid-2col">
-                      <div className="form-group">
-                        <label>Registration ID:</label>
-                        <input
-                          type="text"
-                          name="reg_id"
-                          value={userFormData.reg_id}
-                          onChange={handleUserInputChange}
-                          required
-                        />
-                      </div>
+                      {!['Teacher', 'HOD', 'PM'].includes(userFormData.role) && (
+                        <div className="form-group">
+                          <label>Registration ID:</label>
+                          <input
+                            type="text"
+                            name="reg_id"
+                            value={userFormData.reg_id}
+                            onChange={handleUserInputChange}
+                            required
+                          />
+                        </div>
+                      )}
                       <div className="form-group">
                         <label>Full Name:</label>
                         <input

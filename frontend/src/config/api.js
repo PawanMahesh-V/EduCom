@@ -41,6 +41,7 @@ export const API_ENDPOINTS = {
     TEACHER: (teacherId) => `${API_BASE_URL}/communities/teacher/${teacherId}`,
     HOD: (hodId) => `${API_BASE_URL}/communities/hod/${hodId}`,
     JOIN: `${API_BASE_URL}/communities/join`,
+    LEAVE: (id) => `${API_BASE_URL}/communities/${id}/leave`,
   },
   NOTIFICATIONS: {
     BASE: `${API_BASE_URL}/notifications`,

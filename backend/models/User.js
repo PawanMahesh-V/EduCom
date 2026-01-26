@@ -89,6 +89,38 @@ class User {
         const result = await pool.query(query);
         return result.rows;
     }
+    static async generateNextRegId(role) {
+        let prefix = '';
+        if (role === 'Teacher') prefix = 'T';
+        else if (role === 'HOD') prefix = 'HOD';
+        else if (role === 'PM') prefix = 'PM';
+        else return null;
+
+        // Find the highest existing ID with this prefix
+        // We'll look in both users and registration_requests tables
+        const query = `
+            SELECT reg_id FROM users WHERE reg_id LIKE $1
+            UNION
+            SELECT reg_id FROM registration_requests WHERE reg_id LIKE $1
+        `;
+
+        const result = await pool.query(query, [`${prefix}%`]);
+
+        let maxNum = 0;
+        const regex = new RegExp(`^${prefix}(\\d+)$`);
+
+        result.rows.forEach(row => {
+            const match = row.reg_id.match(regex);
+            if (match) {
+                const num = parseInt(match[1], 10);
+                if (num > maxNum) maxNum = num;
+            }
+        });
+
+        const nextNum = maxNum + 1;
+        // Pad with zeros to ensure at least 3 digits
+        return `${prefix}${nextNum.toString().padStart(3, '0')}`;
+    }
 }
 
 module.exports = User;

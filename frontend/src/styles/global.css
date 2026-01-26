@@ -4142,6 +4142,26 @@ button {
   letter-spacing: 0.5px;
 }
 
+.course-leave-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.1rem;
+  color: var(--color-gray-400);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.course-leave-btn:hover {
+  background: var(--color-danger-light);
+  color: var(--color-danger);
+  transform: scale(1.1);
+}
+
 .course-card-title {
   font-size: var(--font-lg);
   font-weight: 700;

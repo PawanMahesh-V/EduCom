@@ -4,6 +4,7 @@ import { useCommunityMessages, useTypingIndicator } from '../../hooks/useSocket'
 import socketService from '../../services/socket';
 import { communityApi } from '../../api';
 import { showAlert } from '../../utils/alert';
+import ConfirmDialog from '../../components/ConfirmDialog';
 
 const Communities = ({ initialChat }) => {
   const raw = sessionStorage.getItem('user');
@@ -259,23 +260,67 @@ const Communities = ({ initialChat }) => {
     }
   };
 
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
+
+  const handleDisbandCommunity = (chat) => {
+    if (!chat) return;
+    
+    setConfirmDialog({
+      open: true,
+      title: 'Disband Community',
+      message: `Are you sure you want to disband "${chat.name}"? This will delete the community and all messages permanently.`,
+      onConfirm: () => {
+        communityApi.delete(chat.id)
+          .then(() => {
+            showAlert('Community disbanded successfully', 'success');
+            setSelectedChat(null);
+            setChats(prev => prev.filter(c => c.id !== chat.id));
+            setConfirmDialog(prev => ({ ...prev, open: false }));
+          })
+          .catch(err => {
+            console.error(err);
+            showAlert(err.message || 'Failed to disband community', 'error');
+            setConfirmDialog(prev => ({ ...prev, open: false }));
+          });
+      }
+    });
+  };
+
   return (
-    <MessageLayout
-      mode="community"
-      userId={userId}
-      messagesEndRef={messagesEndRef}
-      chats={chats}
-      selectedChat={selectedChat}
-      communityMessages={messages}
-      communityTypingUsers={typingUsers}
-      communityMessage={message}
-      setCommunityMessage={setMessage}
-      onSelectChat={handleChatSelect}
-      onSendCommunityMessage={handleSendMessage}
-      onCommunityTyping={startTyping}
-      onCommunityMessageDeleted={handleCommunityMessageDeleted}
-      loading={loading}
-    />
+    <>
+      <MessageLayout
+        mode="community"
+        userId={userId}
+        messagesEndRef={messagesEndRef}
+        chats={chats}
+        selectedChat={selectedChat}
+        communityMessages={messages}
+        communityTypingUsers={typingUsers}
+        communityMessage={message}
+        setCommunityMessage={setMessage}
+        onSelectChat={handleChatSelect}
+        onSendCommunityMessage={handleSendMessage}
+        onCommunityTyping={startTyping}
+        onCommunityMessageDeleted={handleCommunityMessageDeleted}
+        onDisbandCommunity={handleDisbandCommunity}
+        loading={loading}
+      />
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        confirmText="Disband"
+        variant="danger"
+      />
+    </>
   );
 };
 

@@ -4,10 +4,12 @@ import {
   faBook,
   faChalkboardTeacher,
   faCalendar,
-  faPlus
+  faPlus,
+  faSignOutAlt
 } from '@fortawesome/free-solid-svg-icons';
 import { courseApi, communityApi } from '../../api';
 import { showAlert } from '../../utils/alert';
+import ConfirmDialog from '../../components/ConfirmDialog';
 import { useSocket } from '../../context/SocketContext';
 
 const MyCourses = ({ onNavigateToCommunity }) => {
@@ -111,6 +113,47 @@ const MyCourses = ({ onNavigateToCommunity }) => {
     }
   };
 
+  // Confirmation Dialog State
+  const [confirmDialog, setConfirmDialog] = useState({
+    open: false,
+    title: '',
+    message: '',
+    onConfirm: null
+  });
+
+  const handleLeaveCourse = async (e, course) => {
+    e.stopPropagation(); // Prevent card click
+    
+    setConfirmDialog({
+      open: true,
+      title: 'Leave Community',
+      message: `Are you sure you want to leave the community for "${course.name}"? You will be unenrolled from the course.`,
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          // We need the community ID to leave, but we only have course ID here.
+          // Fetch communities to find the match.
+          const communities = await communityApi.getStudentCommunities(userId);
+          const courseCommunity = communities.find(c => c.course_id === course.id);
+          
+          if (courseCommunity) {
+            await communityApi.leaveCommunity(courseCommunity.id);
+            showAlert('Success', 'Successfully left the community', 'success');
+            fetchMyCourses(); // Refresh list
+          } else {
+            showAlert('Error', 'Could not find the community to leave.', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          showAlert('Error', 'Failed to leave community', 'error');
+        } finally {
+          setLoading(false);
+          setConfirmDialog(prev => ({ ...prev, open: false }));
+        }
+      }
+    });
+  };
+
   return (
     <>
       <div className="container">
@@ -133,6 +176,13 @@ const MyCourses = ({ onNavigateToCommunity }) => {
               >
                 <div className="course-card-header">
                   <span className="course-card-code">{course.code}</span>
+                  <button 
+                    className="course-leave-btn"
+                    onClick={(e) => handleLeaveCourse(e, course)}
+                    title="Leave Community"
+                  >
+                    <FontAwesomeIcon icon={faSignOutAlt} />
+                  </button>
                 </div>
                 
                 <h3 className="course-card-title">
@@ -216,6 +266,16 @@ const MyCourses = ({ onNavigateToCommunity }) => {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        confirmText="Leave"
+        variant="danger"
+      />
     </>
   );
 };

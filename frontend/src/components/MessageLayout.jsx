@@ -40,6 +40,8 @@ const MessageLayout = ({
   onSendCommunityMessage,
   onCommunityTyping,
   onCommunityMessageDeleted,
+  onLeaveCommunity,
+  onDisbandCommunity,
   
   // Loading state
   loading,
@@ -808,6 +810,18 @@ const MessageLayout = ({
                           <FontAwesomeIcon icon={faCheckSquare} />
                           <span>Select Messages</span>
                         </button>
+                        {onLeaveCommunity && (
+                          <button className="chat-option-item text-danger" onClick={() => { setShowCommunityOptions(false); onLeaveCommunity(selectedChat); }}>
+                            <FontAwesomeIcon icon={faArrowLeft} />
+                            <span>Leave Community</span>
+                          </button>
+                        )}
+                        {onDisbandCommunity && (
+                          <button className="chat-option-item text-danger" onClick={() => { setShowCommunityOptions(false); onDisbandCommunity(selectedChat); }}>
+                            <FontAwesomeIcon icon={faTrash} />
+                            <span>Disband Community</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
