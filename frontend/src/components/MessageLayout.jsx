@@ -828,15 +828,6 @@ const MessageLayout = ({
                           <FontAwesomeIcon icon={faCheckSquare} />
                           <span>Select Messages</span>
                         </button>
-                        {/* {selectedChat.onToggleStatus && (
-                          <button 
-                            className={`chat-option-item ${selectedChat.status === 'inactive' ? 'text-success' : 'text-warning'}`} 
-                            onClick={() => { setShowCommunityOptions(false); selectedChat.onToggleStatus(selectedChat); }}
-                          >
-                            <FontAwesomeIcon icon={selectedChat.status === 'inactive' ? faCheckSquare : faTimes} />
-                            <span>{selectedChat.status === 'inactive' ? 'Activate Community' : 'Deactivate Community'}</span>
-                          </button>
-                        )} */}
                         {onLeaveCommunity && (
                           <button className="chat-option-item text-danger" onClick={() => { setShowCommunityOptions(false); onLeaveCommunity(selectedChat); }}>
                             <FontAwesomeIcon icon={faArrowLeft} />
