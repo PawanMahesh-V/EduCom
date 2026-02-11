@@ -12,7 +12,11 @@ import {
   faUserSecret, 
   faPaperPlane, 
   faComments,
-  faUsers
+  faUsers,
+  faToggleOn,
+  faToggleOff,
+  faEye,
+  faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import MessageBubble from './MessageBubble';
 
@@ -241,19 +245,7 @@ const ChatWindow = ({
         </div>
       ) : (
         <div className="chat-input-wrapper">
-          {mode === 'direct' && canSendAnonymously && (
-            <div className="anonymous-toggle-container">
-               <button 
-                 className={`anonymous-toggle-btn ${isAnonymous ? 'active' : ''}`}
-                 onClick={() => setIsAnonymous(!isAnonymous)}
-                 title={isAnonymous ? 'Sending anonymously' : 'Send anonymously'}
-               >
-                 <FontAwesomeIcon icon={faUserSecret} />
-                 <span>{isAnonymous ? 'Anonymous Mode ON' : 'Send Anonymously'}</span>
-               </button>
-               {isAnonymous && <span className="anonymous-note">Your identity will be hidden</span>}
-            </div>
-          )}
+            {/* Anonymous Toggle moved to input container */}
 
           {mode === 'direct' && selectedItem.user_id === 'anonymous' ? (
              <div className="anonymous-reply-disabled">
@@ -264,6 +256,15 @@ const ChatWindow = ({
              </div>
           ) : (
             <div className="chat-input-container">
+              {mode === 'direct' && canSendAnonymously && (
+                <button
+                  className={`anonymous-toggle-btn-icon ${isAnonymous ? 'active' : ''}`}
+                  onClick={() => setIsAnonymous(!isAnonymous)}
+                  title={isAnonymous ? "Switch to public" : "Switch to anonymous"}
+                >
+                  <FontAwesomeIcon icon={isAnonymous ? faEyeSlash : faEye} />
+                </button>
+              )}
               <input
                 type="text"
                 className="chat-input"

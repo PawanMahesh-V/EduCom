@@ -7302,3 +7302,45 @@ window.alert {
 .stat-icon-accent {
   background: var(--color-accent);
 }
+
+/* ============================================
+   ANONYMOUS TOGGLE STYLES (ICON ONLY)
+   ============================================ */
+
+.anonymous-toggle-btn-icon {
+  background: none;
+  border: none;
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0 0.5rem;
+  transition: all var(--transition-base);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  /* Match typical input height */
+  width: 48px;
+  border-radius: 50%;
+  margin-right: 0.25rem;
+}
+
+.anonymous-toggle-btn-icon:hover {
+  color: var(--color-primary);
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.anonymous-toggle-btn-icon.active {
+  color: var(--color-primary-dark);
+}
+
+/* Ensure chat input container handles the new button nicely */
+.chat-input-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.chat-input {
+  flex: 1;
+}
