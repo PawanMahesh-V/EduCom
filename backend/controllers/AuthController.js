@@ -2,10 +2,10 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const User = require('../models/User');
 const pool = require('../config/database');
-const { sendVerificationCode, sendRegistrationApprovalEmail, sendWelcomeEmail } = require('../config/emailConfig');
+const EmailService = require('../services/EmailService');
 
 class AuthController {
-    static async login(req, res) {
+    static async login(req, res, next) {
         try {
             let { identifier, password } = req.body;
             identifier = identifier ? identifier.trim() : identifier;
@@ -31,36 +31,39 @@ class AuthController {
                 return res.status(401).json({ message: 'Invalid credentials or User not found' });
             }
 
-            // Generate verification code
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-            // Store verification code in login_verification_codes table
-            await pool.query(
-                `INSERT INTO login_verification_codes (email, code, expires_at) 
-                 VALUES ($1, $2, $3)`,
-                [user.email, verificationCode, expiresAt]
-            );
-            console.log(`[LOGIN] Generated verification code for ${user.email}: ${verificationCode}`);
-
-            // Send verification code
-            try {
-                await sendVerificationCode(user.email, verificationCode);
-            } catch (emailError) {
-                // Email sending failed silently
+            const jwtSecret = process.env.JWT_SECRET;
+            if (!jwtSecret) {
+                throw new Error('JWT_SECRET is not properly configured');
             }
 
-            res.json({
-                message: 'Verification code sent to your email',
+            const payload = {
+                userId: user.id,
                 email: user.email,
-                devCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined
+                role: user.role
+            };
+            const token = jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
+
+            const userResponse = {
+                id: user.id,
+                reg_id: user.reg_id,
+                email: user.email,
+                name: user.name,
+                role: user.role,
+                department: user.department
+            };
+
+            res.json({
+                message: 'Login successful',
+                user: userResponse,
+                token
             });
 
         } catch (err) {
-            res.status(500).json({ message: 'Server error during login' });
+            next(err);
         }
     }
-    static async verifyLogin(req, res) {
+
+    static async verifyLogin(req, res, next) {
         try {
             const { email, code } = req.body;
 
@@ -68,7 +71,6 @@ class AuthController {
                 return res.status(400).json({ message: 'Email and code are required' });
             }
 
-            // Verify the code
             const result = await pool.query(
                 `SELECT * FROM login_verification_codes 
                  WHERE email = $1 AND code = $2 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
@@ -80,13 +82,11 @@ class AuthController {
                 return res.status(400).json({ message: 'Invalid or expired verification code' });
             }
 
-            // Mark code as used
             await pool.query(
                 `UPDATE login_verification_codes SET used = TRUE WHERE id = $1`,
                 [result.rows[0].id]
             );
 
-            // Get user
             const user = await User.findByIdentifier(email);
             if (!user) {
                 return res.status(404).json({ message: 'User not found' });
@@ -103,7 +103,6 @@ class AuthController {
                 role: user.role
             };
             const token = jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
-            delete user.password;
 
             res.json({
                 user: {
@@ -118,10 +117,11 @@ class AuthController {
             });
 
         } catch (err) {
-            res.status(500).json({ message: 'Server error during verification' });
+            next(err);
         }
     }
-    static async getCurrentUser(req, res) {
+
+    static async getCurrentUser(req, res, next) {
         try {
             const userId = req.user.userId;
             const user = await User.findById(userId);
@@ -141,18 +141,19 @@ class AuthController {
                 }
             });
         } catch (err) {
-            res.status(500).json({ message: 'Server error' });
-        }
-    }
-    static async logout(req, res) {
-        try {
-            res.json({ message: 'Logged out successfully' });
-        } catch (err) {
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async forgotPassword(req, res) {
+    static async logout(req, res, next) {
+        try {
+            res.json({ message: 'Logged out successfully' });
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    static async forgotPassword(req, res, next) {
         try {
             const { email } = req.body;
 
@@ -169,7 +170,6 @@ class AuthController {
             }
 
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
             await pool.query(
@@ -177,11 +177,11 @@ class AuthController {
                  VALUES ($1, $2, $3)`,
                 [user.email, verificationCode, expiresAt]
             );
-            console.log(`[FORGOT_PASSWORD] Generated verification code for ${user.email}: ${verificationCode}`);
 
             try {
-                await sendVerificationCode(user.email, verificationCode);
+                await EmailService.sendVerificationCode(user.email, verificationCode, 'password-reset');
             } catch (emailError) {
+                console.error('Error sending reset email', emailError);
             }
 
             res.json({
@@ -190,11 +190,11 @@ class AuthController {
             });
 
         } catch (err) {
-            res.status(500).json({ message: 'Server error during password reset' });
+            next(err);
         }
     }
 
-    static async verifyResetCode(req, res) {
+    static async verifyResetCode(req, res, next) {
         try {
             const { email, code } = req.body;
 
@@ -230,11 +230,11 @@ class AuthController {
             });
 
         } catch (err) {
-            res.status(500).json({ message: 'Server error during code verification' });
+            next(err);
         }
     }
 
-    static async resetPassword(req, res) {
+    static async resetPassword(req, res, next) {
         try {
             const { resetToken, newPassword } = req.body;
 
@@ -262,17 +262,16 @@ class AuthController {
             }
 
             const hashedPassword = await bcrypt.hash(newPassword, 10);
-
             await User.updatePassword(user.id, hashedPassword);
 
             res.json({ message: 'Password reset successfully' });
 
         } catch (err) {
-            res.status(500).json({ message: 'Server error during password reset' });
+            next(err);
         }
     }
 
-    static async checkEmail(req, res) {
+    static async checkEmail(req, res, next) {
         try {
             const { email } = req.body;
 
@@ -280,7 +279,6 @@ class AuthController {
                 return res.status(400).json({ message: 'Email is required' });
             }
 
-            // Check if email exists in users table
             const existingUser = await pool.query(
                 'SELECT id FROM users WHERE email = $1',
                 [email.toLowerCase()]
@@ -290,7 +288,6 @@ class AuthController {
                 return res.json({ exists: true, pending: false });
             }
 
-            // Check if email has a pending registration request
             const pendingRequest = await pool.query(
                 'SELECT id FROM registration_requests WHERE email = $1 AND status = $2',
                 [email.toLowerCase(), 'pending']
@@ -303,12 +300,11 @@ class AuthController {
             return res.json({ exists: false, pending: false });
 
         } catch (err) {
-            console.error('Error checking email:', err);
-            res.status(500).json({ message: 'Server error checking email' });
+            next(err);
         }
     }
 
-    static async sendRegistrationCode(req, res) {
+    static async sendRegistrationCode(req, res, next) {
         try {
             const { email } = req.body;
 
@@ -316,68 +312,59 @@ class AuthController {
                 return res.status(400).json({ message: 'Email is required' });
             }
 
-            // Validate email domain (@szabist.pk or @szabist.edu.pk)
             const lowerEmail = email.toLowerCase();
             const allowedDomain = lowerEmail.endsWith('@szabist.pk') || lowerEmail.endsWith('@szabist.edu.pk');
             if (!allowedDomain) {
                 return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
-            // Check if email exists in users table
             const existingUser = await pool.query(
                 'SELECT id FROM users WHERE email = $1',
-                [email.toLowerCase()]
+                [lowerEmail]
             );
 
             if (existingUser.rows.length > 0) {
                 return res.status(400).json({ message: 'This email is already registered' });
             }
 
-            // Check if email has a pending registration request
             const pendingRequest = await pool.query(
                 'SELECT id FROM registration_requests WHERE email = $1 AND status = $2',
-                [email.toLowerCase(), 'pending']
+                [lowerEmail, 'pending']
             );
 
             if (pendingRequest.rows.length > 0) {
                 return res.status(400).json({ message: 'A registration request is already pending for this email' });
             }
 
-            // Generate verification code
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            console.log(`[REGISTRATION] Generated verification code for ${email}: ${verificationCode}`);
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-            // Send verification code first before storing
             try {
-                await sendVerificationCode(email, verificationCode, 'registration');
+                await EmailService.sendVerificationCode(lowerEmail, verificationCode, 'registration');
             } catch (emailError) {
-                console.error('Error sending verification email:', emailError);
                 return res.status(400).json({
                     message: 'Failed to send verification email. Please check if the email address is valid.'
                 });
             }
 
-            // Store verification code only if email was sent successfully
             await pool.query(
                 `INSERT INTO login_verification_codes (email, code, expires_at) 
                  VALUES ($1, $2, $3)`,
-                [email.toLowerCase(), verificationCode, expiresAt]
+                [lowerEmail, verificationCode, expiresAt]
             );
 
             res.json({
                 message: 'Verification code sent to your email',
-                email: email.toLowerCase(),
+                email: lowerEmail,
                 devCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined
             });
 
         } catch (err) {
-            console.error('Error sending registration code:', err);
-            res.status(500).json({ message: 'Server error sending verification code' });
+            next(err);
         }
     }
 
-    static async verifyRegistrationCode(req, res) {
+    static async verifyRegistrationCode(req, res, next) {
         try {
             const { email, code } = req.body;
 
@@ -385,7 +372,6 @@ class AuthController {
                 return res.status(400).json({ message: 'Email and code are required' });
             }
 
-            // Verify the code
             const result = await pool.query(
                 `SELECT * FROM login_verification_codes 
                  WHERE email = $1 AND code = $2 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
@@ -397,7 +383,6 @@ class AuthController {
                 return res.status(400).json({ message: 'Invalid or expired verification code' });
             }
 
-            // Mark code as used
             await pool.query(
                 `UPDATE login_verification_codes SET used = TRUE WHERE id = $1`,
                 [result.rows[0].id]
@@ -409,21 +394,18 @@ class AuthController {
             });
 
         } catch (err) {
-            console.error('Error verifying registration code:', err);
-            res.status(500).json({ message: 'Server error during verification' });
+            next(err);
         }
     }
 
-    static async register(req, res) {
+    static async register(req, res, next) {
         try {
             const { reg_id, name, email, password, role, department, semester, program_year } = req.body;
 
-            // Validation
             if (!name || !email || !password || !role || !department) {
                 return res.status(400).json({ message: 'All required fields must be provided' });
             }
 
-            // Auto-generate reg_id for specific roles
             let finalRegId = reg_id;
             if (['Teacher', 'HOD', 'PM'].includes(role)) {
                 finalRegId = await User.generateNextRegId(role);
@@ -431,53 +413,47 @@ class AuthController {
                 if (!reg_id) return res.status(400).json({ message: 'Registration ID is required' });
             }
 
-            // Validate email domain (@szabist.pk or @szabist.edu.pk)
             const lowerEmail = email.toLowerCase();
             const allowedDomain = lowerEmail.endsWith('@szabist.pk') || lowerEmail.endsWith('@szabist.edu.pk');
             if (!allowedDomain) {
                 return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
-            // Check if user already exists
             const existingUser = await pool.query(
                 'SELECT id FROM users WHERE email = $1 OR reg_id = $2',
-                [email.toLowerCase(), finalRegId]
+                [lowerEmail, finalRegId]
             );
 
             if (existingUser.rows.length > 0) {
                 return res.status(400).json({ message: 'User with this email or registration ID already exists' });
             }
 
-            // Check if there's a pending request
             const existingRequest = await pool.query(
                 'SELECT id FROM registration_requests WHERE (email = $1 OR reg_id = $2) AND status = $3',
-                [email.toLowerCase(), finalRegId, 'pending']
+                [lowerEmail, finalRegId, 'pending']
             );
 
             if (existingRequest.rows.length > 0) {
                 return res.status(400).json({ message: 'A registration request is already pending for this email or ID' });
             }
 
-            // Hash password
             const hashedPassword = await bcrypt.hash(password, 10);
 
-            // Insert into registration_requests table
             await pool.query(
                 `INSERT INTO registration_requests 
                  (reg_id, name, email, password, role, department, semester, program_year, status, created_at) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)`,
-                [finalRegId, name, email.toLowerCase(), hashedPassword, role, department, semester || null, program_year || null]
+                [finalRegId, name, lowerEmail, hashedPassword, role, department, semester || null, program_year || null]
             );
 
             res.status(201).json({ message: 'Registration request submitted successfully. Please wait for admin approval.' });
 
         } catch (err) {
-            console.error('Registration error:', err);
-            res.status(500).json({ message: 'Server error during registration' });
+            next(err);
         }
     }
 
-    static async getRegistrationRequests(req, res) {
+    static async getRegistrationRequests(req, res, next) {
         try {
             const result = await pool.query(
                 `SELECT id, reg_id, name, email, role, department, semester, program_year, status, created_at 
@@ -488,16 +464,14 @@ class AuthController {
 
             res.json({ requests: result.rows });
         } catch (err) {
-            console.error('Error fetching registration requests:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async approveRegistration(req, res) {
+    static async approveRegistration(req, res, next) {
         try {
             const { requestId } = req.params;
 
-            // Get the request
             const request = await pool.query(
                 'SELECT * FROM registration_requests WHERE id = $1 AND status = $2',
                 [requestId, 'pending']
@@ -509,36 +483,31 @@ class AuthController {
 
             const reqData = request.rows[0];
 
-            // Create user
             await pool.query(
                 `INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, created_at) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
                 [reqData.reg_id, reqData.name, reqData.email, reqData.password, reqData.role, reqData.department, reqData.semester, reqData.program_year]
             );
 
-            // Update request status
             await pool.query(
                 'UPDATE registration_requests SET status = $1 WHERE id = $2',
                 ['approved', requestId]
             );
 
-            // Send response immediately
             res.json({ message: 'Registration approved successfully' });
 
-            // Send approval email and welcome email in background
-            sendRegistrationApprovalEmail(reqData.email, reqData.name)
-                .then(() => sendWelcomeEmail(reqData.email, reqData.name, reqData.role))
+            EmailService.sendRegistrationApprovalEmail(reqData.email, reqData.name)
+                .then(() => EmailService.sendWelcomeEmail(reqData.email, reqData.name, reqData.role))
                 .catch(emailError => {
                     console.error('Error sending emails in background:', emailError);
                 });
 
         } catch (err) {
-            console.error('Error approving registration:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async rejectRegistration(req, res) {
+    static async rejectRegistration(req, res, next) {
         try {
             const { requestId } = req.params;
 
@@ -554,10 +523,10 @@ class AuthController {
             res.json({ message: 'Registration rejected' });
 
         } catch (err) {
-            console.error('Error rejecting registration:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 }
 
 module.exports = AuthController;
+

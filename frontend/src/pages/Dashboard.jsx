@@ -8,7 +8,6 @@ import {
   faTachometerAlt
 } from '@fortawesome/free-solid-svg-icons';
 import DashboardLayout from '../components/DashboardLayout';
-import { authApi } from '../api';
 import { useSocket } from '../context/SocketContext';
 import { showAlert } from '../utils/alert';
 
@@ -30,16 +29,20 @@ import TeacherCommunities from './Teacher/Communities';
 import TeacherMessages from './Teacher/Messages';
 import TeacherNotifications from './Teacher/Notifications';
 
+import { useAuth } from '../context/AuthContext';
+import { useDashboardData } from '../hooks/useDashboardData';
+
 const Dashboard = () => {
   const navigate = useNavigate();
-  const raw = sessionStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
+  const { user } = useAuth();
   const role = user?.role?.toLowerCase();
 
   const [activeSection, setActiveSection] = useState(role === 'admin' ? 'overview' : 'courses');
   const [courseInitialTab, setCourseInitialTab] = useState('courses');
   const [initialChat, setInitialChat] = useState(null);
-  const [adminProfile, setAdminProfile] = useState(null);
+
+  // Use React Query hook for admin profile
+  const { data: adminProfile } = useDashboardData(role);
 
   const { socketService, isConnected } = useSocket();
 
@@ -58,22 +61,6 @@ const Dashboard = () => {
     }
   }, [isConnected, socketService]);
 
-  // Fetch admin profile for admin users
-  useEffect(() => {
-    if (role === 'admin') {
-      fetchAdminProfile();
-    }
-  }, [role]);
-
-  const fetchAdminProfile = async () => {
-    try {
-      const data = await authApi.getCurrentUser();
-      setAdminProfile(data.user || data);
-    } catch (err) {
-      console.error('Failed to fetch admin profile:', err);
-    }
-  };
-
   const handleNavigateToCommunity = (chat) => {
     setInitialChat(chat);
     setActiveSection('community');
@@ -81,8 +68,8 @@ const Dashboard = () => {
 
   const handleLogout = () => {
     localStorage.removeItem('userToken');
-    sessionStorage.removeItem('userToken');
     localStorage.removeItem('user');
+    sessionStorage.removeItem('userToken');
     sessionStorage.removeItem('user');
     navigate('/login', { replace: true });
   };

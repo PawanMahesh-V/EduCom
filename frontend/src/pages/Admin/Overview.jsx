@@ -7,8 +7,7 @@ import {
   faStore,
   faUserGraduate,
   faChalkboardTeacher,
-  faExclamationTriangle,
-  faRefresh
+  faExclamationTriangle
 } from '@fortawesome/free-solid-svg-icons';
 import { dashboardApi } from '../../api';
 
@@ -100,7 +99,7 @@ const Overview = ({ onNavigate }) => {
             value: stats?.totalCommunities || 0,
             icon: faComments,
             colorClass: 'stat-icon-secondary',
-            subtitle: `${stats?.totalMessages || 0} Messages`,
+            subtitle: `${stats?.totalCommunities || 0} Communities`,
             onClick: () => onNavigate && onNavigate('courses', 'communities')
           },
           {

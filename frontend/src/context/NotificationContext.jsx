@@ -7,32 +7,31 @@ const NotificationContext = createContext();
 
 export const useNotifications = () => useContext(NotificationContext);
 
+import { useAuth } from './AuthContext';
+
+// ...
+
 export const NotificationProvider = ({ children }) => {
   const { socketService, isConnected } = useSocket();
+  const { user } = useAuth(); // Use centralized auth state
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
-
-  // Helper to get current user
-  const getUser = () => {
-    const raw = sessionStorage.getItem('user');
-    return raw ? JSON.parse(raw) : null;
-  };
 
   // Fetch initial notifications on mount
   useEffect(() => {
     const fetchNotifications = async () => {
         try {
-            setLoading(true);
-            const user = getUser();
-            const userId = user?.id || user?.userId;
-            
-            if (!userId) {
+            if (!user || (!user.id && !user.userId)) {
               setLoading(false);
               return;
             }
             
+            setLoading(true);
+            const userId = user.id || user.userId;
+            
             const data = await notificationApi.getAll(userId);
+            
             // Ensure data is an array
             if (Array.isArray(data)) {
                 setNotifications(data);
@@ -46,7 +45,7 @@ export const NotificationProvider = ({ children }) => {
     };
     
     fetchNotifications();
-  }, []);
+  }, [user]);
 
   // Listen for real-time notifications
   useEffect(() => {
@@ -79,7 +78,6 @@ export const NotificationProvider = ({ children }) => {
   };
 
   const markAllAsRead = async () => {
-      const user = getUser();
       const userId = user?.id || user?.userId;
       if (!userId) return;
 

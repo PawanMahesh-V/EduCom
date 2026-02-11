@@ -1,7 +1,7 @@
- 
+
 const getAuthToken = () => {
-  // Standardize on sessionStorage for auth token
-  return sessionStorage.getItem('userToken');
+  // Standardize on localStorage for auth token
+  return localStorage.getItem('userToken');
 };
 
 const getAuthHeaders = () => {
@@ -18,10 +18,20 @@ const handleResponse = async (response) => {
   const data = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
+    // Auto-logout on 401
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('user');
+
+    // Dispatch custom event for AuthContext to catch
+    window.dispatchEvent(new Event('auth:logout'));
+
+    // If we are not already on the login page, redirect
+    if (!window.location.pathname.includes('/login')) {
+      window.location.href = '/login';
+    }
     const error = (data && data.message) || response.statusText;
     return Promise.reject(error);
   }
-
   return data;
 };
 

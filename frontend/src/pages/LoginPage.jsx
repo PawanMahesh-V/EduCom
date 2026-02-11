@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authApi } from '../api';
+import { useAuth } from '../context/AuthContext';
 import { isValidEmail, getEmailError } from '../utils/validation';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -14,6 +14,8 @@ import {
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const { login, user } = useAuth();
+  
   const [formData, setFormData] = useState({
     identifier: '',
     password: ''
@@ -25,6 +27,36 @@ const LoginPage = () => {
   });
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  useEffect(() => {
+    // Check if we have both user object AND token in storage
+    const token = localStorage.getItem('userToken');
+    
+    if (user && token) {
+      switch (user.role) {
+        case 'Admin':
+          navigate('/admin', { replace: true });
+          break;
+        case 'Teacher':
+          navigate('/teacher', { replace: true });
+          break;
+        case 'Student':
+          navigate('/student', { replace: true });
+          break;
+        case 'HOD':
+          navigate('/hod', { replace: true });
+          break;
+        default:
+          navigate('/', { replace: true });
+      }
+    } else if (user && !token) {
+      // Logic gap: Context has user but storage doesn't (likely cleared by 401 interceptor)
+      // Force context reset to stop loop
+      // We can't easily call logout() here if it's async or complex, but cleaner to just not redirect
+      // Or explicitly clear user
+      // logout(); // Only if available from useAuth and doesn't cause issues
+    }
+  }, [user, navigate]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -53,9 +85,6 @@ const LoginPage = () => {
     // Validate fields using utility
     const emailError = getEmailError(formData.identifier);
     if (emailError) {
-      // If it's just empty, it might be caught above, but getEmailError handles empty too.
-      // However, the original code had specific "fill in this field" errors.
-      // Let's refine based on the original structure but use the validator for the domain check.
       if (!formData.identifier.trim()) {
          errors.identifier = 'Please fill in this field.';
          hasError = true;
@@ -77,24 +106,11 @@ const LoginPage = () => {
     
     setLoading(true);
     
-    sessionStorage.clear();
-    localStorage.removeItem('user');
-    localStorage.removeItem('userToken');
-    
     try {
-      const response = await authApi.login(formData.identifier, formData.password);
-      
-      // Store email, password (for resend), and flow type for VerifyCodePage
-      sessionStorage.setItem('verifyEmail', response.email);
-      sessionStorage.setItem('verifyFlow', 'login');
-      sessionStorage.setItem('loginPassword', formData.password);
-      
-      // Navigate to verify page
-      navigate('/verify-code');
-
+      await login(formData.identifier, formData.password);
+      // Navigation handled by useEffect on user change
     } catch (err) {
       setError(err.message || 'Failed to login. Please check your credentials.');
-    } finally {
       setLoading(false);
     }
   };

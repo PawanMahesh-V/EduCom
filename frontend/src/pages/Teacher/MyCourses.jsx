@@ -14,9 +14,10 @@ import socketService from '../../services/socket';
 import { showAlert } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
+import { useAuth } from '../../context/AuthContext';
+
 const MyCourses = ({ onNavigateToCommunity }) => {
-  const raw = sessionStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
+  const { user } = useAuth();
   const userId = user?.id || user?.userId;
 
   const [courses, setCourses] = useState([]);
@@ -325,7 +326,7 @@ const MyCourses = ({ onNavigateToCommunity }) => {
                   >
                     <option value="CS">CS</option>
                     <option value="BBA">BBA</option>
-                    <option value="IT">IT</option>
+                    {/* <option value="IT">IT</option> */}
                   </select>
                 </div>
                 <div className="form-group">

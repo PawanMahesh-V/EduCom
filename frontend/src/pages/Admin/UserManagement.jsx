@@ -278,7 +278,7 @@ const UserManagement = () => {
   };
 
   return (
-    <div className="course-management-wrapper">
+    <div className="user-management-wrapper">
       <div className="tabs-container">
         <button
           className={`tab-button ${userTab === 'users' ? 'active' : ''}`}
@@ -765,4 +765,3 @@ const UserManagement = () => {
 };
 
 export default UserManagement;
-

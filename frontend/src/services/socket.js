@@ -25,7 +25,9 @@ class SocketService {
     }
 
     console.log('[SocketService] Creating new socket connection to:', SOCKET_URL);
+    const token = localStorage.getItem('userToken');
     this.socket = io(SOCKET_URL, {
+      auth: { token },
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionDelay: 1000,

@@ -3834,7 +3834,8 @@ button {
 }
 
 /* Tabs */
-.course-management-wrapper {
+.course-management-wrapper,
+.user-management-wrapper {
   padding: var(--space-6);
   max-width: 1400px;
   margin: 0 auto;
@@ -3900,7 +3901,8 @@ button {
 
   .admin-overview,
   .container,
-  .course-management-wrapper {
+  .course-management-wrapper,
+  .user-management-wrapper {
     padding: var(--space-4);
   }
 

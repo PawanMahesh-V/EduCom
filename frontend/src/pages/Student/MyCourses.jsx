@@ -12,9 +12,10 @@ import { showAlert } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import { useSocket } from '../../context/SocketContext';
 
+import { useAuth } from '../../context/AuthContext';
+
 const MyCourses = ({ onNavigateToCommunity }) => {
-  const raw = sessionStorage.getItem('user');
-  const user = raw ? JSON.parse(raw) : null;
+  const { user } = useAuth();
   const userId = user?.id || user?.userId;
 
   const [courses, setCourses] = useState([]);

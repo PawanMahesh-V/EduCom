@@ -3,7 +3,7 @@ const bcrypt = require('bcrypt');
 const { ROLES: validRoles, DEPARTMENTS: validDepartments } = require('../config/constants');
 
 class UserController {
-    static async getTeachers(req, res) {
+    static async getTeachers(req, res, next) {
         try {
             const result = await pool.query(
                 `SELECT id, reg_id, name, email, department, role 
@@ -16,12 +16,11 @@ class UserController {
                 teachers: result.rows
             });
         } catch (err) {
-            console.error('Error fetching teachers:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async getUsers(req, res) {
+    static async getUsers(req, res, next) {
         try {
             const { page = 1, limit = 10, role, department } = req.query;
             const offset = (page - 1) * limit;
@@ -69,12 +68,11 @@ class UserController {
                 totalPages: Math.ceil(totalUsers / limit)
             });
         } catch (err) {
-            console.error('Error fetching users:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async getUserById(req, res) {
+    static async getUserById(req, res, next) {
         try {
             const { id } = req.params;
             const result = await pool.query(
@@ -88,12 +86,11 @@ class UserController {
 
             res.json(result.rows[0]);
         } catch (err) {
-            console.error('Error fetching user:', err);
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async createUser(req, res) {
+    static async createUser(req, res, next) {
         try {
             const { reg_id, name, email, password, role = 'Student', department = 'CS', semester, program_year, section } = req.body;
 
@@ -161,21 +158,11 @@ class UserController {
 
             res.status(201).json(result.rows[0]);
         } catch (err) {
-            if (err.code === '23505') {
-                return res.status(400).json({
-                    message: 'A user with this registration ID or email already exists',
-                    detail: err.detail
-                });
-            }
-
-            res.status(500).json({
-                message: 'Server error while creating user',
-                detail: process.env.NODE_ENV === 'development' ? err.message : undefined
-            });
+            next(err);
         }
     }
 
-    static async updateUser(req, res) {
+    static async updateUser(req, res, next) {
         try {
             const { id } = req.params;
             const { reg_id, name, email, password, role, department, semester, program_year, section } = req.body;
@@ -248,21 +235,11 @@ class UserController {
 
             res.json(result.rows[0]);
         } catch (err) {
-            if (err.code === '23505') {
-                return res.status(400).json({
-                    message: 'A user with this registration ID or email already exists',
-                    detail: err.detail
-                });
-            }
-
-            res.status(500).json({
-                message: 'Server error while updating user',
-                detail: process.env.NODE_ENV === 'development' ? err.message : undefined
-            });
+            next(err);
         }
     }
 
-    static async deleteUser(req, res) {
+    static async deleteUser(req, res, next) {
         const client = await pool.connect();
 
         try {
@@ -357,17 +334,13 @@ class UserController {
             res.json({ message: 'User deleted successfully' });
         } catch (err) {
             await client.query('ROLLBACK');
-            console.error('Delete user error:', err);
-            res.status(500).json({
-                message: 'Server error while deleting user',
-                detail: process.env.NODE_ENV === 'development' ? err.message : undefined
-            });
+            next(err);
         } finally {
             client.release();
         }
     }
 
-    static async getAdminProfile(req, res) {
+    static async getAdminProfile(req, res, next) {
         try {
             const result = await pool.query(
                 'SELECT id, reg_id, name, email, role, department FROM users WHERE id = $1 AND role = $2',
@@ -380,11 +353,11 @@ class UserController {
 
             res.json(result.rows[0]);
         } catch (err) {
-            res.status(500).json({ message: 'Server error' });
+            next(err);
         }
     }
 
-    static async resetInvalidPasswords(req, res) {
+    static async resetInvalidPasswords(req, res, next) {
         try {
             if (!req.user || req.user.role !== 'Admin') {
                 return res.status(403).json({ message: 'Forbidden: Admins only' });
@@ -425,9 +398,10 @@ class UserController {
                 client.release();
             }
         } catch (err) {
-            res.status(500).json({ message: 'Server error while resetting passwords' });
+            next(err);
         }
     }
 }
 
 module.exports = UserController;
+

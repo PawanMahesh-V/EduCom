@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import socketService from '../services/socket';
+import { useAuth } from './AuthContext';
 
 const SocketContext = createContext();
 
@@ -8,15 +9,13 @@ export const useSocket = () => useContext(SocketContext);
 export const SocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [socket, setSocket] = useState(null);
+  const { user } = useAuth(); // consume user from AuthContext
 
   useEffect(() => {
-    const raw = sessionStorage.getItem('user');
-    const user = raw ? JSON.parse(raw) : null;
-    const userId = user?.id || user?.userId;
-
-    if (userId) {
-       console.log('[SocketProvider] Initializing socket for user:', userId);
-       const socketInstance = socketService.connect(userId);
+    // Only connect if we have a valid logged-in user
+    if (user?.id) {
+       console.log('[SocketProvider] Initializing socket for user:', user.id);
+       const socketInstance = socketService.connect(user.id);
        setSocket(socketInstance);
        
        const onConnect = () => {
@@ -40,9 +39,16 @@ export const SocketProvider = ({ children }) => {
        return () => {
          socketInstance.off('connect', onConnect);
          socketInstance.off('disconnect', onDisconnect);
+         // Optionally disconnect on unmount or user change
+         socketService.disconnect();
        };
+    } else {
+        // If no user, ensure socket is disconnected
+        socketService.disconnect();
+        setIsConnected(false);
+        setSocket(null);
     }
-  }, []);
+  }, [user]); // Re-run when user changes (login/logout)
 
   return (
     <SocketContext.Provider value={{ socket, isConnected, socketService }}>

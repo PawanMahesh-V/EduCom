@@ -190,7 +190,6 @@ const CourseManagement = ({ initialTab }) => {
       setCourseRequests(response.requests || []);
       setCourseRequestsLoading(false);
     } catch (err) {
-      console.error('Error fetching course requests:', err);
       showError('Failed to fetch course requests');
       setCourseRequestsLoading(false);
     }
