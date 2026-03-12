@@ -69,7 +69,7 @@ const RegisterPage = () => {
 
     const validation = emailSchema.safeParse({ email: emailInput });
     if (!validation.success) {
-      setEmailError(validation.error.errors[0].message);
+      setEmailError(validation.error.issues[0]?.message || 'Invalid email');
       return;
     }
 

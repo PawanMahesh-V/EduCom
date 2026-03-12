@@ -4,8 +4,8 @@ export const emailSchema = z.object({
     email: z.string()
         .min(1, { message: 'Please enter your email address' })
         .email({ message: 'Please enter a valid email address' })
-        .refine((val) => val.endsWith('.edu.pk'), {
-            message: 'Only University emails (.edu.pk) are allowed'
+        .refine((val) => val.toLowerCase().endsWith('szabist.pk') || val.toLowerCase().endsWith('szabist.edu.pk'), {
+            message: 'Only SZABIST emails (@szabist.pk or @szabist.edu.pk) are allowed'
         })
 });
 

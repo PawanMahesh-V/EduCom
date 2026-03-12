@@ -6,17 +6,12 @@ const connectedUsers = new Map(); // Map of userId to socket.id
 
 const initSocket = (io) => {
     io.on('connection', (socket) => {
-        console.log(`[SocketHandler] New connection: ${socket.id}`);
-        
         // User authentication and registration
         socket.on('register', async (userId) => {
             // Always store userId as integer for consistent lookup
             const numericUserId = parseInt(userId);
             connectedUsers.set(numericUserId, socket.id);
             socket.userId = numericUserId;
-
-            console.log(`[SocketHandler] ✅ User registered - UserID: ${numericUserId}, SocketID: ${socket.id}`);
-            console.log(`[SocketHandler] Total connected users: ${connectedUsers.size}`);
 
             // Join user-specific room
             socket.join(`user-${numericUserId}`);
@@ -26,7 +21,6 @@ const initSocket = (io) => {
                 const userResult = await pool.query('SELECT role FROM users WHERE id = $1', [numericUserId]);
                 if (userResult.rows.length > 0 && userResult.rows[0].role === 'Admin') {
                     socket.join('admin-room');
-                    console.log(`[SocketHandler] Admin user ${numericUserId} joined admin room`);
                 }
             } catch (err) {
                 console.error('Error joining admin room:', err);
@@ -44,11 +38,7 @@ const initSocket = (io) => {
         socket.on('disconnect', () => {
             if (socket.userId) {
                 connectedUsers.delete(socket.userId);
-                console.log(`[SocketHandler] ❌ User disconnected - UserID: ${socket.userId}, SocketID: ${socket.id}`);
-                console.log(`[SocketHandler] Total connected users: ${connectedUsers.size}`);
                 io.emit('user-status', { userId: socket.userId, status: 'offline' });
-            } else {
-                console.log(`[SocketHandler] Unregistered socket disconnected: ${socket.id}`);
             }
         });
     });

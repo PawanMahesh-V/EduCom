@@ -9,14 +9,10 @@ export const useConversations = (userId) => {
         queryKey: ['conversations', userId],
         queryFn: async () => {
             if (!userId) return [];
-            const convs = await directMessageApi.getConversations(userId);
-            console.log('[useConversations] Fetched conversations:', convs.length);
-            return convs;
+            return await directMessageApi.getConversations(userId);
         },
         enabled: !!userId,
-        staleTime: 10 * 1000, // 10 seconds for conversation list
-        refetchOnMount: true,
-        refetchOnWindowFocus: false,
+        staleTime: 60 * 1000, // 1 minute
     });
 };
 
@@ -25,14 +21,11 @@ export const useDMMessages = (userId, otherUserId) => {
         queryKey: ['dm-messages', userId, otherUserId],
         queryFn: async () => {
             if (!userId || !otherUserId) return [];
-            const messages = await directMessageApi.getMessages(userId, otherUserId);
-            console.log('[useDMMessages] Fetched messages:', messages.length);
-            return messages;
+            return await directMessageApi.getMessages(userId, otherUserId);
         },
         enabled: !!userId && !!otherUserId,
-        staleTime: 0, // Always consider data stale for real-time updates
-        refetchOnMount: true,
-        refetchOnWindowFocus: false,
+        // Provide a small stale time so it doesn't refetch instantly on component re-mounts/focus
+        staleTime: 5 * 1000,
     });
 };
 
@@ -74,13 +67,9 @@ export const useCommunityMessages = (communityId, userId) => {
         queryKey: ['community-messages', communityId],
         queryFn: async () => {
             if (!communityId) return [];
-            const messages = await communityApi.getMessages(communityId, userId);
-            console.log('[useCommunityMessages] Fetched messages:', messages.length);
-            return messages;
+            return await communityApi.getMessages(communityId, userId);
         },
         enabled: !!communityId,
-        staleTime: 0, // Always consider data stale for real-time updates
-        refetchOnMount: true,
-        refetchOnWindowFocus: false,
+        staleTime: 5 * 1000,
     });
 };

@@ -88,97 +88,51 @@ const MessageLayout = ({
 
   // --- Socket Listeners (Invalidation) ---
   useEffect(() => {
-    if (!socketService || !socketService.socket) {
-      console.log('[MessageLayout] Socket service not available');
-      return;
-    }
+    if (!socketService) return;
 
-    console.log('[MessageLayout] Setting up socket listeners, mode:', mode);
-
-    const handleNewDirectMessage = (data) => {
-       console.log('[MessageLayout] ✅ Received new-direct-message:', data);
-       // Always refetch conversations to update unread counts
-       queryClient.refetchQueries(['conversations', userId]);
-       // Refetch messages for all DM queries to ensure UI updates
-       queryClient.refetchQueries(['dm-messages']);
-    };
-
-    const handleDirectMessageSent = (data) => {
-       console.log('[MessageLayout] ✅ Received direct-message-sent:', data);
-       // Refetch conversations and messages
-       queryClient.refetchQueries(['conversations', userId]);
-       queryClient.refetchQueries(['dm-messages']);
-    };
-
-    const handleNewCommunityMessage = (data) => {
-       console.log('[MessageLayout] ✅ Received new-message:', data);
-       // Community message - refetch all community data
-       queryClient.refetchQueries(['communities']);
-       queryClient.refetchQueries(['community-messages']);
-    };
-
-    const handleMessageDeleted = (data) => {
-       console.log('[MessageLayout] ✅ Received message-deleted:', data);
-       // Refetch all relevant queries
-       queryClient.refetchQueries(['dm-messages']);
-       queryClient.refetchQueries(['community-messages']);
-       queryClient.refetchQueries(['conversations']);
+    const handleNewMessage = (data) => {
+       // Ideally verify if message belongs to current context, but usually safe to invalidate all
+       if (mode === 'direct') {
+          queryClient.invalidateQueries(['conversations', userId]);
+          if (selectedItem && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id)) {
+             queryClient.invalidateQueries(['dm-messages', userId, selectedItem.user_id]);
+          }
+       } else {
+          // Community
+          if (data.community_id) {
+             queryClient.invalidateQueries(['communities']); // update unread
+             if (selectedItem?.id === data.community_id) {
+                queryClient.invalidateQueries(['community-messages', selectedItem.id]);
+             }
+          }
+       }
     };
 
     const handleTyping = (data) => {
-        console.log('[MessageLayout] Typing indicator:', data);
-        // Community typing indicator
+        // Simple typing indicator handling
         if (data.isTyping) {
-             setTypingUsers(prev => [...new Set([...prev, data.userName])]);
+             setTypingUsers(prev => [...new Set([...prev, data.senderName || data.userName])]);
         } else {
-             setTypingUsers(prev => prev.filter(u => u !== data.userName));
+             setTypingUsers(prev => prev.filter(u => u !== (data.senderName || data.userName)));
         }
     };
 
-    const handleDMTyping = (data) => {
-        console.log('[MessageLayout] DM Typing indicator:', data);
-        // Direct message typing indicator
-        if (data.isTyping) {
-             setTypingUsers(prev => [...new Set([...prev, data.senderName])]);
-        } else {
-             setTypingUsers(prev => prev.filter(u => u !== data.senderName));
-        }
-    };
-
-    // Attach ALL listeners regardless of mode - messages can come in at any time
-    socketService.socket.on('new-direct-message', handleNewDirectMessage);
-    socketService.socket.on('direct-message-sent', handleDirectMessageSent);
-    socketService.socket.on('dm-user-typing', handleDMTyping);
-    socketService.socket.on('new-message', handleNewCommunityMessage);
-    socketService.socket.on('message-deleted', handleMessageDeleted);
-    socketService.socket.on('user-typing', handleTyping);
-
-    console.log('[MessageLayout] Socket listeners attached successfully');
+    // We need to attach listeners based on mode
+    // Note: The original SocketContext might emit generic events.
+    // 'receive_private_message' / 'receive_group_message'
+    
+    // We'll rely on global socketService listeners if exposed, OR just bind here.
+    // Since useSocket exposes socketService instance which follows a pattern:
+    socketService.socket?.on('receive_private_message', handleNewMessage);
+    socketService.socket?.on('receive_group_message', handleNewMessage);
+    socketService.socket?.on('user_typing', handleTyping); // Specific event names might vary
 
     return () => {
-      console.log('[MessageLayout] Cleaning up socket listeners');
-      // Clean up all listeners
-      socketService.socket.off('new-direct-message', handleNewDirectMessage);
-      socketService.socket.off('direct-message-sent', handleDirectMessageSent);
-      socketService.socket.off('new-message', handleNewCommunityMessage);
-      socketService.socket.off('message-deleted', handleMessageDeleted);
-      socketService.socket.off('user-typing', handleTyping);
-      socketService.socket.off('dm-user-typing', handleDMTyping);
+        socketService.socket?.off('receive_private_message', handleNewMessage);
+        socketService.socket?.off('receive_group_message', handleNewMessage);
+        socketService.socket?.off('user_typing', handleTyping);
     };
-  }, [socketService, queryClient, userId, mode]); // Removed selectedItem from dependencies
-
-  // Join/Leave community rooms when selection changes
-  useEffect(() => {
-      if (mode === 'community' && socketService && selectedItem?.id) {
-          console.log('[MessageLayout] Joining community room:', selectedItem.id);
-          socketService.joinCommunity(selectedItem.id);
-          
-          return () => {
-              console.log('[MessageLayout] Leaving community room:', selectedItem.id);
-              socketService.leaveCommunity(selectedItem.id);
-          };
-      }
-  }, [mode, socketService, selectedItem?.id]);
+  }, [socketService, queryClient, userId, selectedItem, mode]);
 
   // Initial Selection
   useEffect(() => {
@@ -193,7 +147,6 @@ const MessageLayout = ({
   // --- Handlers ---
 
   const handleSelect = (item) => {
-      console.log('[MessageLayout] Selecting item:', item, 'mode:', mode);
       setSelectedItem(item);
       setInputValue('');
       setTypingUsers([]);
@@ -201,13 +154,6 @@ const MessageLayout = ({
       setIsSearchMode(false);
       setIsSelectMode(false);
       setSelectedMessages([]);
-      
-      // Join community room if in community mode
-      if (mode === 'community' && item?.id && socketService) {
-          console.log('[MessageLayout] Joining community room:', item.id);
-          socketService.joinCommunity(item.id);
-      }
-      
       if (onChatSelected) onChatSelected(item);
       
       // Mark read? usually handled by fetching messages which updates 'unread' on backend or explicit call
@@ -232,8 +178,7 @@ const MessageLayout = ({
               if (selectedItem.status === 'inactive') return;
               await sendCommunityMessage.mutateAsync({
                   communityId: selectedItem.id,
-                  senderId: userId,
-                  senderName: userName || 'User',
+                  userId: userId,
                   text: inputValue
               });
           }

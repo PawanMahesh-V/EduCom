@@ -172,6 +172,15 @@ class AuthController {
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
+            // Log verification code to terminal
+            console.log('\n=================================');
+            console.log('🔑 PASSWORD RESET VERIFICATION CODE');
+            console.log('=================================');
+            console.log(`Email: ${user.email}`);
+            console.log(`Code: ${verificationCode}`);
+            console.log(`Expires: ${expiresAt.toLocaleString()}`);
+            console.log('=================================\n');
+
             await pool.query(
                 `INSERT INTO password_reset_codes (email, code, expires_at) 
                  VALUES ($1, $2, $3)`,
@@ -339,19 +348,29 @@ class AuthController {
             const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
             const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-            try {
-                await EmailService.sendVerificationCode(lowerEmail, verificationCode, 'registration');
-            } catch (emailError) {
-                return res.status(400).json({
-                    message: 'Failed to send verification email. Please check if the email address is valid.'
-                });
-            }
+            // Log verification code to terminal
+            console.log('\n=================================');
+            console.log('📧 REGISTRATION VERIFICATION CODE');
+            console.log('=================================');
+            console.log(`Email: ${lowerEmail}`);
+            console.log(`Code: ${verificationCode}`);
+            console.log(`Expires: ${expiresAt.toLocaleString()}`);
+            console.log('=================================\n');
 
+            // Save code to database first
             await pool.query(
                 `INSERT INTO login_verification_codes (email, code, expires_at) 
                  VALUES ($1, $2, $3)`,
                 [lowerEmail, verificationCode, expiresAt]
             );
+
+            // Try to send email (but don't fail if it doesn't work)
+            try {
+                await EmailService.sendVerificationCode(lowerEmail, verificationCode, 'registration');
+            } catch (emailError) {
+                console.error('Error sending registration email:', emailError.message);
+                // Still continue - code is saved and logged to console
+            }
 
             res.json({
                 message: 'Verification code sent to your email',

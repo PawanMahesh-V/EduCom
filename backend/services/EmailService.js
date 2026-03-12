@@ -20,7 +20,7 @@ class EmailService {
         }
 
         const html = `
-            <p>Hello,${userName}</p>
+            <p>Hello,</p>
             <p>${messageText}</p>
             <p>Your verification code is:</p>
             <p><b>${code}</b></p>

@@ -6,20 +6,16 @@ module.exports = (io, socket, connectedUsers) => {
     // Join a community/course room
     socket.on('join-community', (communityId) => {
         socket.join(`community-${communityId}`);
-        console.log(`[ChatHandler] 🔵 Socket ${socket.id} joined community-${communityId}`);
     });
 
     // Leave a community/course room
     socket.on('leave-community', (communityId) => {
         socket.leave(`community-${communityId}`);
-        console.log(`[ChatHandler] 🔴 Socket ${socket.id} left community-${communityId}`);
     });
 
     // Send message to community
     socket.on('send-message', async (data) => {
         const { communityId, message, senderId, senderName, notificationOnly, subject } = data;
-
-        console.log(`[ChatHandler] 💬 Community message - Community: ${communityId}, Sender: ${senderId}, NotificationOnly: ${notificationOnly}`);
 
         try {
             const senderRole = await pool.query(
@@ -28,8 +24,6 @@ module.exports = (io, socket, connectedUsers) => {
             );
             const isAdmin = senderRole.rows.length > 0 && senderRole.rows[0].role === 'Admin';
 
-            console.log(`[ChatHandler] Sender is Admin: ${isAdmin}`);
-
             // Check community status
             const communityStatus = await pool.query(
                 'SELECT status FROM communities WHERE id = $1',
@@ -37,7 +31,6 @@ module.exports = (io, socket, connectedUsers) => {
             );
 
             if (communityStatus.rows.length > 0 && communityStatus.rows[0].status === 'inactive' && !isAdmin) {
-                console.log(`[ChatHandler] ⚠️ Community ${communityId} is inactive`);
                 socket.emit('message-error', { error: 'This community is inactive. You cannot send messages.' });
                 return;
             }
@@ -54,15 +47,11 @@ module.exports = (io, socket, connectedUsers) => {
 
                 const newMessage = result.rows[0];
 
-                console.log(`[ChatHandler] ✅ Community message saved - ID: ${newMessage.id}`);
-
                 // Broadcast to all users in the community
                 io.to(`community-${communityId}`).emit('new-message', {
                     ...newMessage,
                     sender_name: senderName
                 });
-                
-                console.log(`[ChatHandler] 📢 Broadcasted 'new-message' to community-${communityId}`);
             }
 
             // Create notifications if admin or notificationOnly flag
@@ -158,8 +147,6 @@ module.exports = (io, socket, connectedUsers) => {
     socket.on('send-direct-message', async (data) => {
         const { senderId, receiverId, message, senderName, isAnonymous = false } = data;
 
-        console.log(`[ChatHandler] 📨 Direct message - From: ${senderId} To: ${receiverId}, Anonymous: ${isAnonymous}`);
-
         try {
             if (isAnonymous) {
                 const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
@@ -189,26 +176,19 @@ module.exports = (io, socket, connectedUsers) => {
             const newMessage = result.rows[0];
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
 
-            console.log(`[ChatHandler] ✅ Message saved - ID: ${newMessage.id}`);
-            console.log(`[ChatHandler] Receiver ${receiverId} socketId:`, receiverSocketId);
-
             if (receiverSocketId) {
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
                     sender_name: isAnonymous ? 'Anonymous Student' : senderName
                 });
-                console.log(`[ChatHandler] ✉️ Sent 'new-direct-message' to receiver ${receiverId}`);
-            } else {
-                console.log(`[ChatHandler] ⚠️ Receiver ${receiverId} not connected`);
             }
 
             socket.emit('direct-message-sent', {
                 ...newMessage,
                 sender_name: senderName
             });
-            console.log(`[ChatHandler] ✉️ Sent 'direct-message-sent' to sender ${senderId}`);
         } catch (error) {
-            console.error('[ChatHandler] ❌ Error sending direct message:', error);
+            console.error('Error sending direct message:', error);
             socket.emit('message-error', { error: 'Failed to send message' });
         }
     });
