@@ -14,17 +14,14 @@ export const SocketProvider = ({ children }) => {
   useEffect(() => {
     // Only connect if we have a valid logged-in user
     if (user?.id) {
-       console.log('[SocketProvider] Initializing socket for user:', user.id);
        const socketInstance = socketService.connect(user.id);
        setSocket(socketInstance);
        
        const onConnect = () => {
-         console.log('[SocketProvider] Socket connected');
          setIsConnected(true);
        };
 
        const onDisconnect = () => {
-         console.log('[SocketProvider] Socket disconnected');
          setIsConnected(false);
        };
 

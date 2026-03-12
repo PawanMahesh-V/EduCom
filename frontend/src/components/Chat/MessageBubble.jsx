@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUserSecret } from '@fortawesome/free-solid-svg-icons';
+import { faUserSecret, faCheck } from '@fortawesome/free-solid-svg-icons';
 
 const MessageBubble = ({ 
   msg, 
@@ -19,6 +19,21 @@ const MessageBubble = ({
   const time = msg.created_at 
     ? new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' }) 
     : msg.time;
+
+  // Message status for tick marks (only for own messages and direct messages)
+  const getMessageStatus = () => {
+    if (!isOwnMessage || msg.community_id) return null; // No ticks for received messages or community messages
+    
+    if (msg.read_at || msg.is_read) {
+      return 'read'; // Double blue ticks
+    } else if (msg.delivered_at) {
+      return 'delivered'; // Double grey ticks
+    } else {
+      return 'sent'; // Single grey tick
+    }
+  };
+
+  const messageStatus = getMessageStatus();
 
   return (
     <div 
@@ -56,6 +71,23 @@ const MessageBubble = ({
           {isAnonymous && isOwnMessage && (
             <span className="anonymous-indicator" title="Sent anonymously">
               <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-right" />
+            </span>
+          )}
+          {messageStatus && (
+            <span className={`message-status-ticks ${messageStatus}`} title={
+              messageStatus === 'read' ? 'Read' :
+              messageStatus === 'delivered' ? 'Delivered' :
+              'Sent'
+            }>
+              {messageStatus === 'sent' && (
+                <FontAwesomeIcon icon={faCheck} className="tick-icon" />
+              )}
+              {(messageStatus === 'delivered' || messageStatus === 'read') && (
+                <>
+                  <FontAwesomeIcon icon={faCheck} className="tick-icon tick-1" />
+                  <FontAwesomeIcon icon={faCheck} className="tick-icon tick-2" />
+                </>
+              )}
             </span>
           )}
         </div>

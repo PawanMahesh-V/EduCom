@@ -115,14 +115,12 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
     const socket = socketService.connect(userId);
 
     const handleNewMessage = (message) => {
-      console.log('[useDirectMessages] Received new-direct-message:', message);
       if (onNewMessageRef.current) {
         onNewMessageRef.current(message);
       }
     };
 
     const handleMessageSent = (message) => {
-      console.log('[useDirectMessages] Received direct-message-sent:', message);
       if (onMessageSentRef.current) {
         onMessageSentRef.current(message);
       }
@@ -130,7 +128,6 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
 
     // Set up listener - may need to wait for connection
     const setupListener = () => {
-      console.log('[useDirectMessages] Setting up new-direct-message listener');
       socket.off('new-direct-message', handleNewMessage); // Remove any existing
       socket.on('new-direct-message', handleNewMessage);
       socket.off('direct-message-sent', handleMessageSent);
@@ -146,7 +143,6 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
     }
 
     return () => {
-      console.log('[useDirectMessages] Cleaning up listener');
       socket.off('new-direct-message', handleNewMessage);
       socket.off('direct-message-sent', handleMessageSent);
     };
@@ -154,7 +150,6 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
 
   return {
     sendDirectMessage: (receiverId, message, senderName, isAnonymous = false) => {
-      console.log('[useSocket] sendDirectMessage called with isAnonymous:', isAnonymous);
       const data = {
         senderId: userId,
         receiverId,
@@ -162,7 +157,6 @@ export const useDirectMessages = (userId, onNewMessage, onMessageSent) => {
         senderName,
         isAnonymous
       };
-      console.log('[useSocket] Sending data to socket:', data);
       socketService.sendDirectMessage(data);
     }
   };

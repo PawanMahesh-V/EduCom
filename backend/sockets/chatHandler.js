@@ -169,7 +169,7 @@ module.exports = (io, socket, connectedUsers) => {
             const result = await pool.query(
                 `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
                  VALUES ($1, $2, $3, false, $4, NULL, 'approved')
-                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at`,
+                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at, delivered_at, read_at`,
                 [senderId, receiverId, message, isAnonymous]
             );
 
@@ -177,9 +177,22 @@ module.exports = (io, socket, connectedUsers) => {
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
 
             if (receiverSocketId) {
+                // Mark as delivered since receiver is online
+                await pool.query(
+                    'UPDATE messages SET delivered_at = CURRENT_TIMESTAMP WHERE id = $1',
+                    [newMessage.id]
+                );
+                newMessage.delivered_at = new Date();
+
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
                     sender_name: isAnonymous ? 'Anonymous Student' : senderName
+                });
+
+                // Notify sender that message was delivered
+                socket.emit('message-delivered', {
+                    messageId: newMessage.id,
+                    delivered_at: newMessage.delivered_at
                 });
             }
 
@@ -202,6 +215,99 @@ module.exports = (io, socket, connectedUsers) => {
                 senderName,
                 isTyping
             });
+        }
+    });
+
+    // Mark direct message as delivered (when user's socket connects and fetches messages)
+    socket.on('mark-message-delivered', async (data) => {
+        const { messageId } = data;
+        try {
+            const result = await pool.query(
+                `UPDATE messages 
+                 SET delivered_at = CURRENT_TIMESTAMP 
+                 WHERE id = $1 AND delivered_at IS NULL
+                 RETURNING id, sender_id, delivered_at`,
+                [messageId]
+            );
+
+            if (result.rows.length > 0) {
+                const { sender_id, delivered_at } = result.rows[0];
+                const senderSocketId = connectedUsers.get(parseInt(sender_id));
+                if (senderSocketId) {
+                    io.to(senderSocketId).emit('message-delivered', {
+                        messageId,
+                        delivered_at
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error marking message as delivered:', error);
+        }
+    });
+
+    // Mark direct message as read
+    socket.on('mark-message-read', async (data) => {
+        const { messageId, userId } = data;
+        try {
+            const result = await pool.query(
+                `UPDATE messages 
+                 SET is_read = true, read_at = CURRENT_TIMESTAMP 
+                 WHERE id = $1 AND receiver_id = $2 AND is_read = false
+                 RETURNING id, sender_id, read_at`,
+                [messageId, userId]
+            );
+
+            if (result.rows.length > 0) {
+                const { sender_id, read_at } = result.rows[0];
+                const senderSocketId = connectedUsers.get(parseInt(sender_id));
+                if (senderSocketId) {
+                    io.to(senderSocketId).emit('message-read', {
+                        messageId,
+                        read_at
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error marking message as read:', error);
+        }
+    });
+
+    // Mark multiple messages as read (for conversation view)
+    socket.on('mark-messages-read', async (data) => {
+        const { messageIds, userId } = data;
+        if (!messageIds || messageIds.length === 0) return;
+
+        try {
+            const result = await pool.query(
+                `UPDATE messages 
+                 SET is_read = true, read_at = CURRENT_TIMESTAMP 
+                 WHERE id = ANY($1) AND receiver_id = $2 AND is_read = false
+                 RETURNING id, sender_id, read_at`,
+                [messageIds, userId]
+            );
+
+            // Group by sender and notify
+            const senderMap = {};
+            result.rows.forEach(row => {
+                if (!senderMap[row.sender_id]) {
+                    senderMap[row.sender_id] = [];
+                }
+                senderMap[row.sender_id].push({
+                    messageId: row.id,
+                    read_at: row.read_at
+                });
+            });
+
+            Object.keys(senderMap).forEach(senderId => {
+                const senderSocketId = connectedUsers.get(parseInt(senderId));
+                if (senderSocketId) {
+                    senderMap[senderId].forEach(msg => {
+                        io.to(senderSocketId).emit('message-read', msg);
+                    });
+                }
+            });
+        } catch (error) {
+            console.error('Error marking messages as read:', error);
         }
     });
 };

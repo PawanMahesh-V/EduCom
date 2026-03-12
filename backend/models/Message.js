@@ -100,7 +100,7 @@ class Message {
         // Mark messages as read happens in controller or separate methods
         const query = `
             SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    m.created_at,
+                    m.created_at, m.delivered_at, m.read_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
@@ -121,7 +121,7 @@ class Message {
     static async getAnonymousMessages(teacherId, limit = 50) {
         const query = `
              SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    m.created_at,
+                    m.created_at, m.delivered_at, m.read_at,
                     'Anonymous Student' as sender_name
              FROM messages m
              WHERE m.community_id IS NULL
@@ -137,7 +137,7 @@ class Message {
     static async markDirectMessagesRead(userId, otherUserId) {
         await pool.query(
             `UPDATE messages 
-             SET is_read = TRUE 
+             SET is_read = TRUE, read_at = CURRENT_TIMESTAMP 
              WHERE community_id IS NULL 
                AND receiver_id = $1 
                AND sender_id = $2 
@@ -149,7 +149,7 @@ class Message {
     static async markAnonymousMessagesRead(teacherId) {
         await pool.query(
             `UPDATE messages 
-             SET is_read = TRUE 
+             SET is_read = TRUE, read_at = CURRENT_TIMESTAMP 
              WHERE community_id IS NULL 
                AND receiver_id = $1 
                AND is_anonymous = true
@@ -161,7 +161,7 @@ class Message {
     static async searchDirectMessages(userId, otherUserId, searchTerm) {
         const query = `
              SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    m.created_at,
+                    m.created_at, m.delivered_at, m.read_at,
                     u.name as sender_name
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
@@ -180,7 +180,7 @@ class Message {
     static async searchAnonymousMessages(teacherId, searchTerm) {
         const query = `
              SELECT m.id, m.sender_id, m.receiver_id, m.content, m.is_read, m.is_anonymous,
-                    m.created_at,
+                    m.created_at, m.delivered_at, m.read_at,
                     'Anonymous Student' as sender_name
              FROM messages m
              WHERE m.community_id IS NULL

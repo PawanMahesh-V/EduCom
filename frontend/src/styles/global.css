@@ -4642,6 +4642,64 @@ button {
   margin-top: 0.15rem;
   opacity: 0.6;
   font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Message Status Ticks (WhatsApp-style) */
+.message-status-ticks {
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  margin-left: 0.25rem;
+  gap: 0;
+}
+
+.message-status-ticks .tick-icon {
+  font-size: 0.7rem;
+  transition: color 0.2s ease;
+}
+
+/* Single tick for sent */
+.message-status-ticks.sent .tick-icon {
+  color: #95a5a6;
+}
+
+/* Double ticks for delivered */
+.message-status-ticks.delivered {
+  position: relative;
+}
+
+.message-status-ticks.delivered .tick-1 {
+  color: #95a5a6;
+  position: relative;
+  z-index: 1;
+}
+
+.message-status-ticks.delivered .tick-2 {
+  color: #95a5a6;
+  position: absolute;
+  left: 3px;
+  z-index: 2;
+}
+
+/* Double blue ticks for read */
+.message-status-ticks.read {
+  position: relative;
+}
+
+.message-status-ticks.read .tick-1 {
+  color: #34b7f1;
+  position: relative;
+  z-index: 1;
+}
+
+.message-status-ticks.read .tick-2 {
+  color: #34b7f1;
+  position: absolute;
+  left: 3px;
+  z-index: 2;
 }
 
 /* Chat Input */

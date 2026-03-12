@@ -88,7 +88,7 @@ const MessageLayout = ({
 
   // --- Socket Listeners (Invalidation) ---
   useEffect(() => {
-    if (!socketService) return;
+    if (!socketService || !socketService.socket) return;
 
     const handleNewMessage = (data) => {
        // Ideally verify if message belongs to current context, but usually safe to invalidate all
@@ -108,6 +108,15 @@ const MessageLayout = ({
        }
     };
 
+    const handleNewDirectMessage = (data) => {
+       if (mode === 'direct') {
+          queryClient.invalidateQueries(['conversations', userId]);
+          if (selectedItem && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id)) {
+             queryClient.invalidateQueries(['dm-messages', userId, selectedItem.user_id]);
+          }
+       }
+    };
+
     const handleTyping = (data) => {
         // Simple typing indicator handling
         if (data.isTyping) {
@@ -117,22 +126,85 @@ const MessageLayout = ({
         }
     };
 
-    // We need to attach listeners based on mode
-    // Note: The original SocketContext might emit generic events.
-    // 'receive_private_message' / 'receive_group_message'
-    
-    // We'll rely on global socketService listeners if exposed, OR just bind here.
-    // Since useSocket exposes socketService instance which follows a pattern:
-    socketService.socket?.on('receive_private_message', handleNewMessage);
-    socketService.socket?.on('receive_group_message', handleNewMessage);
-    socketService.socket?.on('user_typing', handleTyping); // Specific event names might vary
+    const handleDMTyping = (data) => {
+        // DM typing indicator handling
+        if (data.isTyping) {
+             setTypingUsers(prev => [...new Set([...prev, data.senderName])]);
+        } else {
+             setTypingUsers(prev => prev.filter(u => u !== data.senderName));
+        }
+    };
+
+    const handleMessageDelivered = (data) => {
+        // Update message status in cache
+        if (mode === 'direct') {
+            queryClient.setQueryData(['dm-messages', userId, selectedItem?.user_id], (oldData) => {
+                if (!oldData) return oldData;
+                return oldData.map(msg => 
+                    msg.id === data.messageId 
+                        ? { ...msg, delivered_at: data.delivered_at }
+                        : msg
+                );
+            });
+        }
+    };
+
+    const handleMessageRead = (data) => {
+        // Update message status in cache
+        if (mode === 'direct') {
+            queryClient.setQueryData(['dm-messages', userId, selectedItem?.user_id], (oldData) => {
+                if (!oldData) return oldData;
+                return oldData.map(msg => 
+                    msg.id === data.messageId 
+                        ? { ...msg, is_read: true, read_at: data.read_at }
+                        : msg
+                );
+            });
+            // Also update conversations to reflect read status
+            queryClient.invalidateQueries(['conversations', userId]);
+        }
+    };
+
+    // Listen to correct socket events based on backend implementation
+    socketService.socket.on('new-message', handleNewMessage); // Community messages
+    socketService.socket.on('new-direct-message', handleNewDirectMessage); // Direct messages
+    socketService.socket.on('user-typing', handleTyping); // Community typing
+    socketService.socket.on('dm-user-typing', handleDMTyping); // DM typing
+    socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
+    socketService.socket.on('message-read', handleMessageRead); // Read receipts
 
     return () => {
-        socketService.socket?.off('receive_private_message', handleNewMessage);
-        socketService.socket?.off('receive_group_message', handleNewMessage);
-        socketService.socket?.off('user_typing', handleTyping);
+        socketService.socket.off('new-message', handleNewMessage);
+        socketService.socket.off('new-direct-message', handleNewDirectMessage);
+        socketService.socket.off('user-typing', handleTyping);
+        socketService.socket.off('dm-user-typing', handleDMTyping);
+        socketService.socket.off('message-delivered', handleMessageDelivered);
+        socketService.socket.off('message-read', handleMessageRead);
     };
   }, [socketService, queryClient, userId, selectedItem, mode]);
+
+  // Join/leave community room when selected (for community mode)
+  useEffect(() => {
+    if (mode === 'community' && selectedItem?.id && socketService?.socket) {
+      socketService.socket.emit('join-community', selectedItem.id);
+      
+      return () => {
+        socketService.socket.emit('leave-community', selectedItem.id);
+      };
+    }
+  }, [mode, selectedItem?.id, socketService]);
+
+  // Refresh conversations after selecting a chat (to update unread count)
+  useEffect(() => {
+    if (mode === 'direct' && selectedItem && userId) {
+      // Give time for messages to be fetched and marked as read, then refresh conversations
+      const timer = setTimeout(() => {
+        queryClient.invalidateQueries(['conversations', userId]);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [mode, selectedItem, userId, queryClient]);
 
   // Initial Selection
   useEffect(() => {
@@ -229,6 +301,35 @@ const MessageLayout = ({
   useEffect(() => {
       messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
   }, [activeMessages]);
+
+  // Mark messages as delivered and read (for direct messages only)
+  useEffect(() => {
+    if (mode !== 'direct' || !activeMessages || activeMessages.length === 0 || !socketService?.socket || !selectedItem) {
+      return;
+    }
+
+    // Mark messages as delivered (messages we received that haven't been delivered yet)
+    const undeliveredMessages = activeMessages.filter(
+      msg => msg.receiver_id === userId && !msg.delivered_at
+    );
+    undeliveredMessages.forEach(msg => {
+      socketService.markMessageDelivered(msg.id);
+    });
+
+    // Mark messages as read (messages we received that haven't been read yet)
+    const unreadMessages = activeMessages.filter(
+      msg => msg.receiver_id === userId && !msg.is_read
+    );
+    if (unreadMessages.length > 0) {
+      const unreadIds = unreadMessages.map(msg => msg.id);
+      socketService.markMessagesRead(unreadIds, userId);
+      
+      // Invalidate conversations to update unread count
+      setTimeout(() => {
+        queryClient.invalidateQueries(['conversations', userId]);
+      }, 300);
+    }
+  }, [activeMessages, mode, userId, socketService, selectedItem, queryClient]);
 
   const onStartNewConversation = (user) => {
     // Check if conversation exists

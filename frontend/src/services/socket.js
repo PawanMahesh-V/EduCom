@@ -14,17 +14,14 @@ class SocketService {
     }
 
     if (this.socket?.connected) {
-      console.log('[SocketService] Already connected, socket id:', this.socket.id);
       return this.socket;
     }
 
     // If socket exists but not connected, don't create new one - just return existing
     if (this.socket) {
-      console.log('[SocketService] Socket exists, waiting for connection...');
       return this.socket;
     }
 
-    console.log('[SocketService] Creating new socket connection to:', SOCKET_URL);
     const token = localStorage.getItem('userToken');
     this.socket = io(SOCKET_URL, {
       auth: { token },
@@ -35,25 +32,17 @@ class SocketService {
     });
     this.socket.on('connect', () => {
       this.isConnected = true;
-      console.log('[SocketService] Connected! Socket id:', this.socket.id);
 
       // Register user
       if (this.userId) {
-        console.log('[SocketService] Registering user:', this.userId);
         this.socket.emit('register', this.userId);
       }
     });
     this.socket.on('disconnect', () => {
-      console.log('[SocketService] Disconnected');
       this.isConnected = false;
     });
     this.socket.on('connect_error', (error) => {
       console.error('[SocketService] Connection error:', error);
-    });
-
-    // Debug: log all incoming events
-    this.socket.onAny((event, ...args) => {
-      console.log('[SocketService] Received event:', event, args);
     });
 
     return this.socket;
@@ -169,23 +158,17 @@ class SocketService {
   }
   // Direct Message methods
   sendDirectMessage(data) {
-    console.log('[SocketService] sendDirectMessage called with data:', data);
-
     // If socket doesn't exist, try to connect first
     if (!this.socket && this.userId) {
-      console.log('[SocketService] Socket not found, attempting to connect...');
       this.connect(this.userId);
     }
 
     if (this.socket) {
       if (this.socket.connected) {
-        console.log('[SocketService] Emitting send-direct-message event');
         this.socket.emit('send-direct-message', data);
       } else {
-        console.log('[SocketService] Socket exists but not connected, waiting...');
         // Wait for connection and then send
         this.socket.once('connect', () => {
-          console.log('[SocketService] Now connected, emitting send-direct-message event');
           this.socket.emit('send-direct-message', data);
         });
       }
@@ -226,6 +209,49 @@ class SocketService {
   offDMUserTyping() {
     if (this.socket) {
       this.socket.off('dm-user-typing');
+    }
+  }
+
+  // Message delivery and read receipts
+  markMessageDelivered(messageId) {
+    if (this.socket) {
+      this.socket.emit('mark-message-delivered', { messageId });
+    }
+  }
+
+  markMessageRead(messageId, userId) {
+    if (this.socket) {
+      this.socket.emit('mark-message-read', { messageId, userId });
+    }
+  }
+
+  markMessagesRead(messageIds, userId) {
+    if (this.socket && messageIds && messageIds.length > 0) {
+      this.socket.emit('mark-messages-read', { messageIds, userId });
+    }
+  }
+
+  onMessageDelivered(callback) {
+    if (this.socket) {
+      this.socket.on('message-delivered', callback);
+    }
+  }
+
+  onMessageRead(callback) {
+    if (this.socket) {
+      this.socket.on('message-read', callback);
+    }
+  }
+
+  offMessageDelivered() {
+    if (this.socket) {
+      this.socket.off('message-delivered');
+    }
+  }
+
+  offMessageRead() {
+    if (this.socket) {
+      this.socket.off('message-read');
     }
   }
 }
