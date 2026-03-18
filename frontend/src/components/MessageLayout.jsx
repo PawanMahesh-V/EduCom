@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '../context/SocketContext';
 import { TEACHING_ROLES } from '../constants';
@@ -29,6 +29,10 @@ const MessageLayout = ({
   const queryClient = useQueryClient();
   const { socketService } = useSocket();
   const messagesEndRef = React.useRef(null);
+  const blockedStorageKey = useMemo(() => {
+    if (!userId) return null;
+    return `blocked-messages-${userId}`;
+  }, [userId]);
 
   // --- State ---
   const [selectedItem, setSelectedItem] = useState(null);
@@ -55,6 +59,7 @@ const MessageLayout = ({
   const [showOptions, setShowOptions] = useState(false);
 
   const [typingUsers, setTypingUsers] = useState([]);
+  const [blockedMessages, setBlockedMessages] = useState([]);
 
   // --- Data Fetching ---
   const { data: conversations, isLoading: loadingConversations } = useConversations(mode === 'direct' ? userId : null);
@@ -75,6 +80,50 @@ const MessageLayout = ({
   const activeMessages = mode === 'direct' ? (dmMessages || []) : (commMessages || []);
   const activeList = mode === 'direct' ? (conversations || []) : (communities || []);
   const loading = mode === 'direct' ? loadingConversations : loadingCommunities;
+
+  const selectedChatKey = useMemo(() => {
+    if (!selectedItem) return null;
+    if (mode === 'direct') return `direct-${selectedItem.user_id}`;
+    return `community-${selectedItem.id}`;
+  }, [mode, selectedItem]);
+
+  useEffect(() => {
+    if (!blockedStorageKey) return;
+
+    try {
+      const raw = localStorage.getItem(blockedStorageKey);
+      if (!raw) return;
+
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+
+      setBlockedMessages(parsed);
+    } catch (error) {
+      console.error('Failed to restore blocked messages from storage', error);
+    }
+  }, [blockedStorageKey]);
+
+  useEffect(() => {
+    if (!blockedStorageKey) return;
+
+    try {
+      localStorage.setItem(blockedStorageKey, JSON.stringify(blockedMessages));
+    } catch (error) {
+      console.error('Failed to persist blocked messages to storage', error);
+    }
+  }, [blockedMessages, blockedStorageKey]);
+
+  const visibleBlockedMessages = useMemo(() => {
+    if (!selectedChatKey) return [];
+    return blockedMessages.filter((msg) => msg.chat_key === selectedChatKey);
+  }, [blockedMessages, selectedChatKey]);
+
+  const renderedMessages = useMemo(() => {
+    if (!visibleBlockedMessages.length) return activeMessages;
+    const all = [...activeMessages, ...visibleBlockedMessages];
+    all.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
+    return all;
+  }, [activeMessages, visibleBlockedMessages]);
 
   // --- Mutations ---
   const { 
@@ -165,6 +214,41 @@ const MessageLayout = ({
         }
     };
 
+        const handleMessageBlocked = (data) => {
+          const chatKey = mode === 'direct'
+            ? `direct-${data.receiver_id}`
+            : `community-${data.community_id}`;
+
+          const baseBlockedMessage = {
+            id: data.id || `blocked-${Date.now()}`,
+            chat_key: chatKey,
+            client_message_id: data.client_message_id,
+            sender_id: data.sender_id,
+            receiver_id: data.receiver_id,
+            community_id: data.community_id,
+            sender_name: data.sender_name || userName || 'You',
+            content: data.content,
+            created_at: data.created_at || new Date().toISOString(),
+            is_anonymous: Boolean(data.is_anonymous),
+            moderation_blocked: true,
+            blocked_reason: data.blocked_reason || 'content_moderation',
+            confidence: data.confidence || 0,
+            local_only: true
+          };
+
+          setBlockedMessages((prev) => {
+            const exists = prev.some((msg) => {
+              if (data.client_message_id && msg.client_message_id) {
+                return msg.client_message_id === data.client_message_id;
+              }
+              return msg.id === baseBlockedMessage.id;
+            });
+
+            if (exists) return prev;
+            return [...prev, baseBlockedMessage];
+          });
+        };
+
     // Listen to correct socket events based on backend implementation
     socketService.socket.on('new-message', handleNewMessage); // Community messages
     socketService.socket.on('new-direct-message', handleNewDirectMessage); // Direct messages
@@ -172,6 +256,7 @@ const MessageLayout = ({
     socketService.socket.on('dm-user-typing', handleDMTyping); // DM typing
     socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
     socketService.socket.on('message-read', handleMessageRead); // Read receipts
+    socketService.socket.on('message-blocked', handleMessageBlocked); // Moderation blocked (local only)
 
     return () => {
         socketService.socket.off('new-message', handleNewMessage);
@@ -180,8 +265,9 @@ const MessageLayout = ({
         socketService.socket.off('dm-user-typing', handleDMTyping);
         socketService.socket.off('message-delivered', handleMessageDelivered);
         socketService.socket.off('message-read', handleMessageRead);
+        socketService.socket.off('message-blocked', handleMessageBlocked);
     };
-  }, [socketService, queryClient, userId, selectedItem, mode]);
+  }, [socketService, queryClient, userId, selectedItem, mode, userName]);
 
   // Join/leave community room when selected (for community mode)
   useEffect(() => {
@@ -235,14 +321,18 @@ const MessageLayout = ({
   const handleSend = async (anon) => {
       if (!inputValue.trim() || !selectedItem) return;
 
+      const messageText = inputValue;
+      const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
       try {
           if (mode === 'direct') {
               await sendDM.mutateAsync({
                   senderId: userId,
                   receiverId: selectedItem.user_id,
-                  message: inputValue,
+            message: messageText,
                   senderName: userName || 'User',
-                  isAnonymous: anon
+            isAnonymous: anon,
+            clientMessageId
               });
 // ...
               // Optimistic UI handled by mutation invalidation, but can clear input immediately
@@ -251,7 +341,9 @@ const MessageLayout = ({
               await sendCommunityMessage.mutateAsync({
                   communityId: selectedItem.id,
                   userId: userId,
-                  text: inputValue
+            text: messageText,
+            senderName: userName || 'User',
+            clientMessageId
               });
           }
           setInputValue('');
@@ -299,8 +391,8 @@ const MessageLayout = ({
 
   // Scroll to bottom when messages change
   useEffect(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-  }, [activeMessages]);
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, [renderedMessages]);
 
   // Mark messages as delivered and read (for direct messages only)
   useEffect(() => {
@@ -380,10 +472,12 @@ const MessageLayout = ({
             userId={userId}
             selectedItem={selectedItem}
             // Simplify onBack to just clear selection
-            onBack={() => setSelectedItem(null)}
+            onBack={() => {
+              setSelectedItem(null);
+            }}
             
             // Messages
-            messages={activeMessages}
+            messages={renderedMessages}
             typingUsers={typingUsers}
             messagesEndRef={messagesEndRef}
             

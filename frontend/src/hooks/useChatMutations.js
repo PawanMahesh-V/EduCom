@@ -10,7 +10,7 @@ export const useChatMutations = () => {
     // --- Direct Messages ---
 
     const sendDM = useMutation({
-        mutationFn: async ({ senderId, receiverId, message, senderName, isAnonymous }) => {
+        mutationFn: async ({ senderId, receiverId, message, senderName, isAnonymous, clientMessageId }) => {
             return new Promise((resolve, reject) => {
                 try {
                     // Correct payload structure matching useSocket.js
@@ -19,7 +19,8 @@ export const useChatMutations = () => {
                         receiverId,
                         message, // Changed from text to message
                         senderName,
-                        isAnonymous
+                        isAnonymous,
+                        clientMessageId
                     });
                     resolve({ success: true });
                 } catch (e) {
@@ -58,15 +59,16 @@ export const useChatMutations = () => {
     // --- Community Messages ---
 
     const sendCommunityMessage = useMutation({
-        mutationFn: async ({ communityId, userId, text }) => {
+        mutationFn: async ({ communityId, userId, text, senderName, clientMessageId }) => {
             return new Promise((resolve, reject) => {
                 try {
-                    // Correct method name from sendCommunityMessage to sendMessage
-                    // And typically community message payload needs communityId, userId, message (text)
-                    // socket.js sendMessage takes 'data'.
-                    // Let's see what socket.js sendMessage expects... it emits 'send-message' with data.
-                    // Backend likely expects { communityId, userId, message }
-                    socketService.sendMessage({ communityId, userId, message: text });
+                    socketService.sendMessage({
+                        communityId,
+                        senderId: userId,
+                        senderName,
+                        message: text,
+                        clientMessageId
+                    });
                     resolve({ success: true });
                 } catch (e) {
                     reject(e);

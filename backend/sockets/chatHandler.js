@@ -1,5 +1,6 @@
 const pool = require('../config/database');
 const { TEACHING_ROLES } = require('../config/constants');
+const ModerationService = require('../services/ModerationService');
 
 module.exports = (io, socket, connectedUsers) => {
 
@@ -15,7 +16,7 @@ module.exports = (io, socket, connectedUsers) => {
 
     // Send message to community
     socket.on('send-message', async (data) => {
-        const { communityId, message, senderId, senderName, notificationOnly, subject } = data;
+        const { communityId, message, senderId, senderName, notificationOnly, subject, clientMessageId } = data;
 
         try {
             const senderRole = await pool.query(
@@ -37,6 +38,28 @@ module.exports = (io, socket, connectedUsers) => {
 
             // If notificationOnly flag is set (from admin modal), skip saving to chat
             if (!notificationOnly) {
+                const moderation = await ModerationService.moderateText(message);
+                if (moderation.toxic) {
+                    socket.emit('message-blocked', {
+                        id: `blocked-community-${Date.now()}`,
+                        client_message_id: clientMessageId,
+                        community_id: communityId,
+                        sender_id: senderId,
+                        sender_name: senderName,
+                        content: message,
+                        created_at: new Date().toISOString(),
+                        moderation_blocked: true,
+                        blocked_reason: 'content_moderation',
+                        confidence: moderation.confidence
+                    });
+                    socket.emit('message-error', {
+                        error: 'Message blocked by content moderation',
+                        toxic: true,
+                        confidence: moderation.confidence
+                    });
+                    return;
+                }
+
                 // Save message to database and broadcast to chat (normal chat behavior)
                 const result = await pool.query(
                     `INSERT INTO messages (community_id, sender_id, content, status)
@@ -145,7 +168,7 @@ module.exports = (io, socket, connectedUsers) => {
 
     // Direct message events
     socket.on('send-direct-message', async (data) => {
-        const { senderId, receiverId, message, senderName, isAnonymous = false } = data;
+        const { senderId, receiverId, message, senderName, isAnonymous = false, clientMessageId } = data;
 
         try {
             if (isAnonymous) {
@@ -164,6 +187,29 @@ module.exports = (io, socket, connectedUsers) => {
                     socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers, HODs, or PMs' });
                     return;
                 }
+            }
+
+            const moderation = await ModerationService.moderateText(message);
+            if (moderation.toxic) {
+                socket.emit('message-blocked', {
+                    id: `blocked-dm-${Date.now()}`,
+                    client_message_id: clientMessageId,
+                    sender_id: senderId,
+                    receiver_id: receiverId,
+                    sender_name: isAnonymous ? 'Anonymous Student' : senderName,
+                    content: message,
+                    is_anonymous: isAnonymous,
+                    created_at: new Date().toISOString(),
+                    moderation_blocked: true,
+                    blocked_reason: 'content_moderation',
+                    confidence: moderation.confidence
+                });
+                socket.emit('message-error', {
+                    error: 'Direct message blocked by content moderation',
+                    toxic: true,
+                    confidence: moderation.confidence
+                });
+                return;
             }
 
             const result = await pool.query(

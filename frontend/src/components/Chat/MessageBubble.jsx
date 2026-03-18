@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUserSecret, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faUserSecret, faCheck, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
 
 const MessageBubble = ({ 
   msg, 
@@ -10,7 +10,8 @@ const MessageBubble = ({
   onToggleSelection, 
   onContextMenu 
 }) => {
-  const isOwnMessage = msg.sender_id === userId || msg.senderId === userId;
+  const senderId = msg.sender_id ?? msg.senderId;
+  const isOwnMessage = Number(senderId) === Number(userId);
   const isAnonymous = msg.is_anonymous;
   
   // Normalizing properties between DM and Community messages
@@ -22,7 +23,13 @@ const MessageBubble = ({
 
   // Message status for tick marks (only for own messages and direct messages)
   const getMessageStatus = () => {
-    if (!isOwnMessage || msg.community_id) return null; // No ticks for received messages or community messages
+    if (!isOwnMessage) return null;
+
+    if (msg.moderation_blocked) {
+      return 'blocked';
+    }
+
+    if (msg.community_id) return null; // No ticks for normal community messages
     
     if (msg.read_at || msg.is_read) {
       return 'read'; // Double blue ticks
@@ -75,10 +82,14 @@ const MessageBubble = ({
           )}
           {messageStatus && (
             <span className={`message-status-ticks ${messageStatus}`} title={
+              messageStatus === 'blocked' ? 'Blocked: not delivered' :
               messageStatus === 'read' ? 'Read' :
               messageStatus === 'delivered' ? 'Delivered' :
               'Sent'
             }>
+              {messageStatus === 'blocked' && (
+                <FontAwesomeIcon icon={faCircleExclamation} className="status-icon-blocked" />
+              )}
               {messageStatus === 'sent' && (
                 <FontAwesomeIcon icon={faCheck} className="tick-icon" />
               )}
