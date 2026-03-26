@@ -1,4 +1,4 @@
-﻿::-webkit-scrollbar {
+::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
@@ -4664,6 +4664,15 @@ button {
 .message-status-ticks.blocked .status-icon-blocked {
   font-size: 0.7rem;
   color: #ff0000;
+}
+
+.blocked-message-warning-outside {
+  align-self: center;
+  margin-right: 8px;
+  font-size: 0.75rem;
+  color: var(--color-danger, #ef4444);
+  font-weight: 500;
+  animation: fade-in 0.3s ease;
 }
 
 /* Single tick for sent */

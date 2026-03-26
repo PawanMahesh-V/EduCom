@@ -50,7 +50,7 @@ export const useCommunities = (role, userId) => {
             // Logic extracted from original MessageLayout to fetch based on role
             if (!role || !userId) return [];
             if (role === 'Student') return await communityApi.getStudentCommunities(userId);
-            if (role === 'Teacher') return await communityApi.getTeacherCommunities(userId);
+            if (role === 'Teacher' || role === 'PM') return await communityApi.getTeacherCommunities(userId);
             if (role === 'HOD') return await communityApi.getHodCommunities(userId);
             if (role === 'Admin') return await communityApi.getAll();
             // PM maps to PM communities if api exists, or maybe generic getAll?

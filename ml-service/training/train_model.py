@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+from datetime import datetime
 
 import joblib
 import pandas as pd
@@ -18,8 +19,7 @@ from utils.preprocess import clean_text
 
 DATASET_PATH = PROJECT_ROOT / "dataset" / "toxic_comments.csv"
 MODELS_DIR = PROJECT_ROOT / "models"
-MODEL_PATH = MODELS_DIR / "moderation_model.pkl"
-VECTORIZER_PATH = MODELS_DIR / "vectorizer.pkl"
+LATEST_MODEL_INFO_PATH = MODELS_DIR / "latest_model.txt"
 
 
 def load_dataset(path: Path) -> pd.DataFrame:
@@ -86,11 +86,15 @@ def train() -> None:
     print(classification_report(y_test, predictions, digits=4))
 
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
-    joblib.dump(pipeline.named_steps["classifier"], MODEL_PATH)
-    joblib.dump(pipeline.named_steps["vectorizer"], VECTORIZER_PATH)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    model_filename = f"moderation_model_{timestamp}.pkl"
+    model_path = MODELS_DIR / model_filename
+    
+    joblib.dump(pipeline, model_path)
+    LATEST_MODEL_INFO_PATH.write_text(model_filename)
 
-    print(f"Saved model: {MODEL_PATH}")
-    print(f"Saved vectorizer: {VECTORIZER_PATH}")
+    print(f"Saved model pipeline: {model_path}")
 
 
 if __name__ == "__main__":

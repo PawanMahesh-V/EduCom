@@ -18,16 +18,20 @@ const handleResponse = async (response) => {
   const data = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
-    // Auto-logout on 401
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('user');
+    if (response.status === 401) {
+      // Auto-logout on 401
+      localStorage.removeItem('userToken');
+      localStorage.removeItem('user');
+      sessionStorage.removeItem('userToken');
+      sessionStorage.removeItem('user');
 
-    // Dispatch custom event for AuthContext to catch
-    window.dispatchEvent(new Event('auth:logout'));
+      // Dispatch custom event for AuthContext to catch
+      window.dispatchEvent(new Event('auth:logout'));
 
-    // If we are not already on the login page, redirect
-    if (!window.location.pathname.includes('/login')) {
-      window.location.href = '/login';
+      // If we are not already on the login page, redirect
+      if (!window.location.pathname.includes('/login')) {
+        window.location.href = '/login';
+      }
     }
     const error = (data && data.message) || response.statusText;
     return Promise.reject(error);

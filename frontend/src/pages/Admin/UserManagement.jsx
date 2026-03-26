@@ -13,7 +13,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 import { useSocket } from '../../context/SocketContext';
 
 const UserManagement = () => {
-  const raw = sessionStorage.getItem('user');
+  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
 
   // Real-time notifications

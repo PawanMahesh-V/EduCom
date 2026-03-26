@@ -59,6 +59,11 @@ const MessageBubble = ({
           />
         </div>
       )}
+      {messageStatus === 'blocked' && (
+        <div className="blocked-message-warning-outside">
+          (Message blocked: Abusive or sensitive content)
+        </div>
+      )}
       <div className={`chat-message-bubble ${isOwnMessage ? 'sent' : 'received'} ${isAnonymous ? 'anonymous-message' : ''}`}>
         {!isOwnMessage && (
           <div className="chat-message-sender">

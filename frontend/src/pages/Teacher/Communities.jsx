@@ -7,7 +7,7 @@ import { showAlert, showConfirm } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
 const Communities = ({ initialChat }) => {
-  const raw = sessionStorage.getItem('user');
+  const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
   const user = raw ? JSON.parse(raw) : null;
   const userId = user?.id || user?.userId;
 
@@ -172,12 +172,20 @@ const Communities = ({ initialChat }) => {
   }, [messages]);
 
   const fetchCommunities = async (silent = false) => {
+    if (!userId) {
+      console.warn('[TeacherCommunities] No userId found! user:', user);
+      if (!silent) setLoading(false);
+      return;
+    }
     try {
       if (!silent) setLoading(true);
+      console.log('[TeacherCommunities] Fetching communities for userId:', userId, 'isHod:', isHod);
       const teacherCommunities = isHod 
         ? await communityApi.getHodCommunities(userId)
         : await communityApi.getTeacherCommunities(userId);
       
+      console.log('[TeacherCommunities] Got communities:', teacherCommunities);
+
       const formattedChats = teacherCommunities.map(community => ({
         id: community.id,
         name: community.course_name || community.name,
@@ -194,6 +202,7 @@ const Communities = ({ initialChat }) => {
       
       setChats(formattedChats);
     } catch (err) {
+      console.error('[TeacherCommunities] fetchCommunities error:', err);
       setChats([]);
     } finally {
       if (!silent) setLoading(false);
@@ -340,19 +349,9 @@ const Communities = ({ initialChat }) => {
       <MessageLayout
         mode="community"
         userId={userId}
-        messagesEndRef={messagesEndRef}
-        chats={chats}
-        selectedChat={selectedChat}
-        communityMessages={messages}
-        communityTypingUsers={typingUsers}
-        communityMessage={message}
-        setCommunityMessage={setMessage}
-        onSelectChat={handleChatSelect}
-        onSendCommunityMessage={handleSendMessage}
-        onCommunityTyping={startTyping}
-        onCommunityMessageDeleted={handleCommunityMessageDeleted}
+        userRole={user?.role}
+        userName={user?.name}
         onDisbandCommunity={handleDisbandCommunity}
-        loading={loading}
       />
       <ConfirmDialog
         open={confirmDialog.open}
