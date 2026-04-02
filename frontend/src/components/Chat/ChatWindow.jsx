@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowLeft, 
@@ -203,17 +203,54 @@ const ChatWindow = ({
       </div>
 
       <div className="chat-messages">
-        {messages.map((msg, index) => (
-          <MessageBubble 
-            key={`${msg.id || index}-${index}`}
-            msg={msg}
-            userId={userId}
-            isSelectionMode={isSelectMode}
-            isSelected={selectedMessages.includes(msg.id)}
-            onToggleSelection={toggleMessageSelection}
-            onContextMenu={handleMessageContextMenu}
-          />
-        ))}
+        {(() => {
+          const getDateLabel = (dateStr) => {
+            if (!dateStr) return null;
+            const d = new Date(dateStr);
+            const today = new Date();
+            const yesterday = new Date();
+            yesterday.setDate(today.getDate() - 1);
+            const sameDay = (a, b) =>
+              a.getFullYear() === b.getFullYear() &&
+              a.getMonth() === b.getMonth() &&
+              a.getDate() === b.getDate();
+            if (sameDay(d, today)) return 'Today';
+            if (sameDay(d, yesterday)) return 'Yesterday';
+            return d.toLocaleDateString('en-GB', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric',
+            });
+          };
+
+          let lastDateLabel = null;
+          const items = [];
+
+          messages.forEach((msg, index) => {
+            const dateLabel = getDateLabel(msg.created_at);
+            if (dateLabel && dateLabel !== lastDateLabel) {
+              lastDateLabel = dateLabel;
+              items.push(
+                <div key={`date-sep-${index}`} className="chat-date-separator">
+                  <span>{dateLabel}</span>
+                </div>
+              );
+            }
+            items.push(
+              <MessageBubble
+                key={`${msg.id || index}-${index}`}
+                msg={msg}
+                userId={userId}
+                isSelectionMode={isSelectMode}
+                isSelected={selectedMessages.includes(msg.id)}
+                onToggleSelection={toggleMessageSelection}
+                onContextMenu={handleMessageContextMenu}
+              />
+            );
+          });
+
+          return items;
+        })()}
 
         {/* Message Context Menu */}
         {contextMenuMessage && (
