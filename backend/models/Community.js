@@ -176,7 +176,7 @@ class Community {
 
     static async getMembers(id) {
         const query = `
-             SELECT u.id, u.username, u.name, u.email
+             SELECT u.id, u.name, u.email, u.reg_id
              FROM communities c
              JOIN courses co ON c.course_id = co.id
              JOIN enrollments e ON co.id = e.course_id

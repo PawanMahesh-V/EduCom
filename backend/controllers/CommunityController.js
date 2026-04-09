@@ -192,6 +192,17 @@ class CommunityController {
 
             await Course.assignStudents(community.course_id, [studentId]);
 
+            // Broadcast join notification to everyone currently in the community room
+            const io = req.app.get('io');
+            if (io) {
+                io.to(`community-${community.id}`).emit('user-joined-community', {
+                    communityId: community.id,
+                    userId: studentId,
+                    userName: student.name,
+                    joinedAt: new Date().toISOString()
+                });
+            }
+
             res.json({
                 message: 'Successfully joined community!',
                 community: {

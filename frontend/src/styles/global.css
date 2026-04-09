@@ -4624,11 +4624,11 @@ button {
 }
 
 .chat-message-sender {
-  font-size: var(--font-xs);
+  font-size: 0.82rem;
   font-weight: 600;
-  margin-bottom: var(--space-2);
-  color: var(--color-accent);
-  opacity: 0.9;
+  margin-bottom: 0.2rem;
+  color: #e28e46; /* WhatsApp style orange name */
+  opacity: 1;
 }
 
 .chat-message-text {
@@ -7449,4 +7449,28 @@ window.alert {
 .dark .chat-date-separator span {
   background: rgba(255, 255, 255, 0.1);
   color: rgba(255, 255, 255, 0.6);
+}
+
+/* ============================================
+   SYSTEM JOIN MESSAGE BUBBLE
+   ============================================ */
+
+.chat-system-message {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0.75rem 0;
+  pointer-events: none;
+  user-select: none;
+}
+
+.chat-system-message span {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08); /* Dark subtle pill */
+  color: #aebAC1; /* WhatsApp dark mode grey text */
+  font-size: 0.75rem;
+  font-weight: 400;
+  padding: 0.4rem 0.9rem;
+  border-radius: 10px;
+  border: none;
 }

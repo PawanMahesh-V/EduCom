@@ -8,7 +8,7 @@ const MessageBubble = ({
   isSelectionMode, 
   isSelected, 
   onToggleSelection, 
-  onContextMenu 
+  onContextMenu
 }) => {
   const senderId = msg.sender_id ?? msg.senderId;
   const isOwnMessage = Number(senderId) === Number(userId);
@@ -70,10 +70,10 @@ const MessageBubble = ({
             {isAnonymous ? (
               <>
                 <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-left" />
-                Anonymous Student
+                 Anonymous Student
               </>
             ) : (
-              senderName
+              `${senderName}`
             )}
           </div>
         )}

@@ -5,8 +5,23 @@ const ModerationService = require('../services/ModerationService');
 module.exports = (io, socket, connectedUsers) => {
 
     // Join a community/course room
-    socket.on('join-community', (communityId) => {
+    socket.on('join-community', async (data) => {
+        // Support both old format (just communityId) and new format ({communityId, userId, userName})
+        const communityId = typeof data === 'object' ? data.communityId : data;
+        const userId = typeof data === 'object' ? data.userId : null;
+        const userName = typeof data === 'object' ? data.userName : null;
+
         socket.join(`community-${communityId}`);
+
+        // Broadcast join notification to OTHER members (not the joiner)
+        if (userId && userName) {
+            socket.to(`community-${communityId}`).emit('user-joined-community', {
+                communityId,
+                userId,
+                userName,
+                joinedAt: new Date().toISOString()
+            });
+        }
     });
 
     // Leave a community/course room

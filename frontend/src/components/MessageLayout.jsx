@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '../context/SocketContext';
 import { TEACHING_ROLES } from '../constants';
@@ -54,12 +54,13 @@ const MessageLayout = ({
   
   const [isSelectMode, setIsSelectMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState([]);
-  const [contextMenuMessage, setContextMenuMessage] = useState(null);
-  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
   const [showOptions, setShowOptions] = useState(false);
 
   const [typingUsers, setTypingUsers] = useState([]);
   const [blockedMessages, setBlockedMessages] = useState([]);
+
+  // System messages for join notifications
+  const [systemMessages, setSystemMessages] = useState([]);
 
   // --- Data Fetching ---
   const { data: conversations, isLoading: loadingConversations } = useConversations(mode === 'direct' ? userId : null);
@@ -119,25 +120,39 @@ const MessageLayout = ({
   }, [blockedMessages, selectedChatKey]);
 
   const renderedMessages = useMemo(() => {
-    if (!visibleBlockedMessages.length) return activeMessages;
-    const all = [...activeMessages, ...visibleBlockedMessages];
+    const all = [...activeMessages, ...visibleBlockedMessages, ...systemMessages];
     all.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     return all;
-  }, [activeMessages, visibleBlockedMessages]);
+  }, [activeMessages, visibleBlockedMessages, systemMessages]);
 
   // --- Mutations ---
   const { 
     sendDM, 
-    deleteDM, 
     deleteMultipleDMs, 
     sendCommunityMessage, 
-    deleteCommunityMessage,
     deleteMultipleCommunityMessages
   } = useChatMutations();
 
   // --- Socket Listeners (Invalidation) ---
   useEffect(() => {
     if (!socketService || !socketService.socket) return;
+
+    // Handle user joining community — show system message
+    const handleUserJoined = (data) => {
+      console.log('[JOIN] user-joined-community received:', data, 'current community:', selectedItem?.id, 'mode:', mode);
+      if (mode !== 'community') return;
+      // Use loose comparison — communityId from backend may be integer, selectedItem.id may be string
+      if (selectedItem?.id && String(data.communityId) !== String(selectedItem.id)) return;
+
+      const sysMsg = {
+        id: `sys-join-${data.userId}-${Date.now()}`,
+        message_type: 'system_join',
+        content: `${data.userName} joined the community`,
+        created_at: data.joinedAt || new Date().toISOString(),
+        community_id: data.communityId
+      };
+      setSystemMessages(prev => [...prev, sysMsg]);
+    };
 
     const handleNewMessage = (data) => {
        // Ideally verify if message belongs to current context, but usually safe to invalidate all
@@ -257,6 +272,7 @@ const MessageLayout = ({
     socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
     socketService.socket.on('message-read', handleMessageRead); // Read receipts
     socketService.socket.on('message-blocked', handleMessageBlocked); // Moderation blocked (local only)
+    socketService.socket.on('user-joined-community', handleUserJoined); // Join notifications
 
     return () => {
         socketService.socket.off('new-message', handleNewMessage);
@@ -266,19 +282,25 @@ const MessageLayout = ({
         socketService.socket.off('message-delivered', handleMessageDelivered);
         socketService.socket.off('message-read', handleMessageRead);
         socketService.socket.off('message-blocked', handleMessageBlocked);
+        socketService.socket.off('user-joined-community', handleUserJoined);
     };
   }, [socketService, queryClient, userId, selectedItem, mode, userName]);
 
   // Join/leave community room when selected (for community mode)
   useEffect(() => {
     if (mode === 'community' && selectedItem?.id && socketService?.socket) {
-      socketService.socket.emit('join-community', selectedItem.id);
-      
+      // Pass userId and userName so other members get a join notification
+      socketService.socket.emit('join-community', {
+        communityId: selectedItem.id,
+        userId,
+        userName
+      });
+
       return () => {
         socketService.socket.emit('leave-community', selectedItem.id);
       };
     }
-  }, [mode, selectedItem?.id, socketService]);
+  }, [mode, selectedItem?.id, socketService, userId, userName]);
 
   // Refresh conversations after selecting a chat (to update unread count)
   useEffect(() => {
@@ -308,6 +330,7 @@ const MessageLayout = ({
       setSelectedItem(item);
       setInputValue('');
       setTypingUsers([]);
+      setSystemMessages([]); // Clear join notifications when switching chats
       // Reset search/select modes
       setIsSearchMode(false);
       setIsSelectMode(false);
@@ -371,22 +394,6 @@ const MessageLayout = ({
       } catch (err) {
           console.error(err);
       }
-  };
-
-  const handleMessageContextMenu = (e, msg) => {
-      const msgSenderId = msg.sender_id || msg.senderId;
-      if (msgSenderId !== userId) return;
-      e.preventDefault();
-      setContextMenuMessage(msg);
-      setContextMenuPosition({ x: e.clientX, y: e.clientY });
-  };
-  
-  const handleDeleteSingle = async (msgId) => {
-      try {
-          if (mode === 'direct') await deleteDM.mutateAsync(msgId);
-          else await deleteCommunityMessage.mutateAsync({ communityId: selectedItem.id, messageId: msgId });
-          setContextMenuMessage(null);
-      } catch (err) { console.error(err); }
   };
 
   // Scroll to bottom when messages change
@@ -502,12 +509,6 @@ const MessageLayout = ({
             toggleMessageSelection={(id) => {
                 setSelectedMessages(prev => prev.includes(id) ? prev.filter(x => x!==id) : [...prev, id]);
             }}
-            
-            // Context Menu
-            handleMessageContextMenu={handleMessageContextMenu}
-            contextMenuMessage={contextMenuMessage}
-            contextMenuPosition={contextMenuPosition}
-            handleDeleteMessage={handleDeleteSingle}
             
             // Options
             showOptions={showOptions}

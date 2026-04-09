@@ -55,10 +55,9 @@ class SocketService {
     }
   }
   // Community/Chat methods
-  joinCommunity(communityId) {
+  joinCommunity(communityId, userId, userName) {
     if (this.socket) {
-      this.socket.emit('join-community', communityId);
-    } else {
+      this.socket.emit('join-community', { communityId, userId, userName });
     }
   }
   leaveCommunity(communityId) {

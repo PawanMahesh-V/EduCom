@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faArrowLeft, 
@@ -13,17 +13,22 @@ import {
   faPaperPlane, 
   faComments,
   faUsers,
-  faToggleOn,
-  faToggleOff,
   faEye,
   faEyeSlash
 } from '@fortawesome/free-solid-svg-icons';
 import MessageBubble from './MessageBubble';
 
+// ── System join notification bubble ────────────────────────────────────────
+const JoinNotification = ({ msg }) => (
+  <div className="chat-system-message">
+    <span>~ {msg.content}</span>
+  </div>
+);
+
 const ChatWindow = ({
-  mode = 'direct', // 'direct' or 'community'
+  mode = 'direct',
   userId,
-  selectedItem, // conversation or chat
+  selectedItem,
   onBack,
   
   // Messages
@@ -49,12 +54,6 @@ const ChatWindow = ({
   handleDeleteSelected,
   toggleMessageSelection,
   setIsSearchMode,
-  
-  // Context Menu
-  handleMessageContextMenu,
-  contextMenuMessage,
-  contextMenuPosition,
-  handleDeleteMessage,
   
   // Options
   showOptions,
@@ -193,6 +192,22 @@ const ChatWindow = ({
     );
   };
 
+  // ── Date separator helper ──────────────────────────────────────────────
+  const getDateLabel = (dateStr) => {
+    if (!dateStr) return null;
+    const d = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+    const sameDay = (a, b) =>
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate();
+    if (sameDay(d, today)) return 'Today';
+    if (sameDay(d, yesterday)) return 'Yesterday';
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  };
+
   return (
     <div className={`chat-main ${selectedItem ? 'mobile-visible' : 'mobile-hidden'}`}>
       <div className="chat-main-header">
@@ -204,29 +219,11 @@ const ChatWindow = ({
 
       <div className="chat-messages">
         {(() => {
-          const getDateLabel = (dateStr) => {
-            if (!dateStr) return null;
-            const d = new Date(dateStr);
-            const today = new Date();
-            const yesterday = new Date();
-            yesterday.setDate(today.getDate() - 1);
-            const sameDay = (a, b) =>
-              a.getFullYear() === b.getFullYear() &&
-              a.getMonth() === b.getMonth() &&
-              a.getDate() === b.getDate();
-            if (sameDay(d, today)) return 'Today';
-            if (sameDay(d, yesterday)) return 'Yesterday';
-            return d.toLocaleDateString('en-GB', {
-              day: '2-digit',
-              month: '2-digit',
-              year: 'numeric',
-            });
-          };
-
           let lastDateLabel = null;
           const items = [];
 
           messages.forEach((msg, index) => {
+            // Date separator
             const dateLabel = getDateLabel(msg.created_at);
             if (dateLabel && dateLabel !== lastDateLabel) {
               lastDateLabel = dateLabel;
@@ -236,6 +233,14 @@ const ChatWindow = ({
                 </div>
               );
             }
+
+            // System join notification
+            if (msg.message_type === 'system_join') {
+              items.push(<JoinNotification key={msg.id} msg={msg} />);
+              return;
+            }
+
+            // Regular message bubble
             items.push(
               <MessageBubble
                 key={`${msg.id || index}-${index}`}
@@ -244,27 +249,12 @@ const ChatWindow = ({
                 isSelectionMode={isSelectMode}
                 isSelected={selectedMessages.includes(msg.id)}
                 onToggleSelection={toggleMessageSelection}
-                onContextMenu={handleMessageContextMenu}
               />
             );
           });
 
           return items;
         })()}
-
-        {/* Message Context Menu */}
-        {contextMenuMessage && (
-           <div 
-             className="message-context-menu"
-             style={{ top: contextMenuPosition.y, left: contextMenuPosition.x }}
-           >
-             <button onClick={() => handleDeleteMessage(contextMenuMessage.id)}>
-               <FontAwesomeIcon icon={faTrash} />
-               Delete Message
-             </button>
-           </div>
-        )}
-
         {typingUsers.length > 0 && (
           <div className="chat-typing-indicator">
             <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'is' : 'are'} typing...</span>
@@ -282,8 +272,6 @@ const ChatWindow = ({
         </div>
       ) : (
         <div className="chat-input-wrapper">
-            {/* Anonymous Toggle moved to input container */}
-
           {mode === 'direct' && selectedItem.user_id === 'anonymous' ? (
              <div className="anonymous-reply-disabled">
                 <p className="anonymous-reply-disabled-text">

@@ -14,7 +14,6 @@ app = FastAPI(title="Moderation API", version="1.0.0")
 
 _model = None
 
-
 class ModerationRequest(BaseModel):
     text: str = Field(min_length=1, max_length=5000)
 

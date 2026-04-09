@@ -303,12 +303,40 @@ class CourseController {
 
             const io = req.app.get('io');
             if (io && newEnrollments > 0) {
+                // Notify each enrolled student that they've been added
                 student_ids.forEach(sid => {
                     io.to(`user-${sid}`).emit('user-enrolled', {
                         courseId: id,
                         courseName: course.name
                     });
                 });
+
+                // Notify the community room so existing members see a join notification
+                const communityResult = await pool.query(
+                    'SELECT id FROM communities WHERE course_id = $1 LIMIT 1',
+                    [id]
+                );
+                console.log(`[ASSIGN] Course ${id} -> community lookup:`, communityResult.rows);
+                if (communityResult.rows.length > 0) {
+                    const communityId = communityResult.rows[0].id;
+
+                    // Broadcast one join notification per newly enrolled student
+                    for (const sid of student_ids) {
+                        const studentResult = await pool.query(
+                            'SELECT name FROM users WHERE id = $1',
+                            [sid]
+                        );
+                        const studentName = studentResult.rows[0]?.name || 'A new member';
+
+                        console.log(`[ASSIGN] Emitting user-joined-community to community-${communityId} for ${studentName}`);
+                        io.to(`community-${communityId}`).emit('user-joined-community', {
+                            communityId,
+                            userId: sid,
+                            userName: studentName,
+                            joinedAt: new Date().toISOString()
+                        });
+                    }
+                }
             }
 
             res.json({
