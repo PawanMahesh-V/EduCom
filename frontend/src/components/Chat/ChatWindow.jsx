@@ -12,9 +12,10 @@ import {
   faUserSecret, 
   faPaperPlane, 
   faComments,
+  faEyeSlash,
+  faBan,
   faUsers,
-  faEye,
-  faEyeSlash
+  faEye
 } from '@fortawesome/free-solid-svg-icons';
 import MessageBubble from './MessageBubble';
 
@@ -68,6 +69,7 @@ const ChatWindow = ({
   // Input
   inputValue,
   setInputValue,
+  isChatBanned,
   onTyping,
   onSend,
   
@@ -268,6 +270,13 @@ const ChatWindow = ({
         <div className="chat-input-wrapper">
           <div className="inactive-message-banner p-3 text-center bg-gray-100 text-gray-500 rounded-md">
              <p>This community is currently inactive. You cannot send messages.</p>
+          </div>
+        </div>
+      ) : isChatBanned && !(mode === 'direct' && selectedItem.user_role === 'Admin') ? (
+        <div className="chat-input-wrapper">
+          <div className="inactive-message-banner p-3 text-center" style={{ backgroundColor: '#fee2e2', color: '#dc2626', borderRadius: '0.375rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+             <FontAwesomeIcon icon={faBan} />
+             <p style={{ margin: 0 }}>You are banned from chatting. Please contact an Admin.</p>
           </div>
         </div>
       ) : (

@@ -111,6 +111,7 @@ class Message {
                  m.is_anonymous = false 
                  OR m.sender_id = $1
                )
+               AND (m.status IS NULL OR m.status != 'pending_review')
              ORDER BY m.created_at ASC
              LIMIT $3
         `;
@@ -127,6 +128,7 @@ class Message {
              WHERE m.community_id IS NULL
                AND m.receiver_id = $1
                AND m.is_anonymous = true
+               AND (m.status IS NULL OR m.status != 'pending_review')
              ORDER BY m.created_at ASC
              LIMIT $2
         `;

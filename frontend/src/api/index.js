@@ -5,4 +5,5 @@ export { default as communityApi } from './communities';
 export { default as notificationApi } from './notifications';
 export { default as dashboardApi } from './dashboard';
 export { default as directMessageApi } from './directMessages';
+export { default as moderationApi } from './moderation';
 export { default as ApiClient } from './client';

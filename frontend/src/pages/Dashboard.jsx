@@ -5,7 +5,8 @@ import {
   faComments,
   faBell,
   faUsers,
-  faTachometerAlt
+  faTachometerAlt,
+  faShieldHalved
 } from '@fortawesome/free-solid-svg-icons';
 import DashboardLayout from '../components/DashboardLayout';
 import { useSocket } from '../context/SocketContext';
@@ -16,6 +17,7 @@ import AdminOverview from './Admin/Overview';
 import UserManagement from './Admin/UserManagement';
 import CourseManagement from './Admin/CourseManagement';
 import AdminMessages from './Admin/Messages';
+import AdminModeration from './Admin/Moderation';
 
 // Student components
 import StudentMessages from './Student/Messages';
@@ -93,6 +95,7 @@ const Dashboard = () => {
           { id: 'users', name: 'User Management', icon: faUsers },
           { id: 'courses', name: 'Course Management', icon: faBook },
           { id: 'messages', name: 'Messages', icon: faComments },
+          { id: 'moderation', name: 'Content Moderation', icon: faShieldHalved },
         ];
       case 'student':
         return [
@@ -141,6 +144,8 @@ const Dashboard = () => {
         return <CourseManagement initialTab={courseInitialTab} />;
       case 'messages':
         return <AdminMessages />;
+      case 'moderation':
+        return <AdminModeration />;
       default:
         return <AdminOverview />;
     }

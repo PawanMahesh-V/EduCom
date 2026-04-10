@@ -62,6 +62,18 @@ const MessageLayout = ({
   // System messages for join notifications
   const [systemMessages, setSystemMessages] = useState([]);
 
+  // Banned state
+  const [isChatBanned, setIsChatBanned] = useState(() => {
+     try {
+         const userStr = localStorage.getItem('user');
+         if (userStr) {
+             const userObj = JSON.parse(userStr);
+             return userObj.is_active === false;
+         }
+     } catch (e) {}
+     return false;
+  });
+
   // --- Data Fetching ---
   const { data: conversations, isLoading: loadingConversations } = useConversations(mode === 'direct' ? userId : null);
   const { data: communities, isLoading: loadingCommunities } = useCommunities(mode === 'community' ? userRole : null, userId);
@@ -116,8 +128,14 @@ const MessageLayout = ({
 
   const visibleBlockedMessages = useMemo(() => {
     if (!selectedChatKey) return [];
-    return blockedMessages.filter((msg) => msg.chat_key === selectedChatKey);
-  }, [blockedMessages, selectedChatKey]);
+    
+    // If the message has been approved and fetched into activeMessages, hide the blocked version immediately
+    const activeIds = new Set((activeMessages || []).map(m => String(m.id)));
+    
+    return blockedMessages.filter((msg) => 
+      msg.chat_key === selectedChatKey && !activeIds.has(String(msg.id))
+    );
+  }, [blockedMessages, selectedChatKey, activeMessages]);
 
   const renderedMessages = useMemo(() => {
     const all = [...activeMessages, ...visibleBlockedMessages, ...systemMessages];
@@ -154,7 +172,10 @@ const MessageLayout = ({
       setSystemMessages(prev => [...prev, sysMsg]);
     };
 
-    const handleNewMessage = (data) => {
+     const handleNewMessage = (data) => {
+       // Remove from blocked messages if it was approved
+       setBlockedMessages(prev => prev.filter(msg => String(msg.id) !== String(data.id)));
+
        // Ideally verify if message belongs to current context, but usually safe to invalidate all
        if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
@@ -173,6 +194,9 @@ const MessageLayout = ({
     };
 
     const handleNewDirectMessage = (data) => {
+       // Remove from blocked messages if it was approved
+       setBlockedMessages(prev => prev.filter(msg => String(msg.id) !== String(data.id)));
+
        if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
           if (selectedItem && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id)) {
@@ -226,7 +250,31 @@ const MessageLayout = ({
             });
             // Also update conversations to reflect read status
             queryClient.invalidateQueries(['conversations', userId]);
-        }
+         }
+    };
+
+    const handleChatBanned = (data) => {
+        setIsChatBanned(true);
+        try {
+             const userStr = localStorage.getItem('user');
+             if (userStr) {
+                 const userObj = JSON.parse(userStr);
+                 userObj.is_active = false;
+                 localStorage.setItem('user', JSON.stringify(userObj));
+             }
+         } catch (e) {}
+    };
+
+    const handleChatUnbanned = (data) => {
+        setIsChatBanned(false);
+        try {
+             const userStr = localStorage.getItem('user');
+             if (userStr) {
+                 const userObj = JSON.parse(userStr);
+                 userObj.is_active = true;
+                 localStorage.setItem('user', JSON.stringify(userObj));
+             }
+         } catch (e) {}
     };
 
         const handleMessageBlocked = (data) => {
@@ -273,6 +321,8 @@ const MessageLayout = ({
     socketService.socket.on('message-read', handleMessageRead); // Read receipts
     socketService.socket.on('message-blocked', handleMessageBlocked); // Moderation blocked (local only)
     socketService.socket.on('user-joined-community', handleUserJoined); // Join notifications
+    socketService.socket.on('chat-banned', handleChatBanned);
+    socketService.socket.on('chat-unbanned', handleChatUnbanned);
 
     return () => {
         socketService.socket.off('new-message', handleNewMessage);
@@ -526,6 +576,7 @@ const MessageLayout = ({
             // Input
             inputValue={inputValue}
             setInputValue={setInputValue}
+            isChatBanned={isChatBanned}
             // Typing omitted for brevity
             onTyping={() => {}}
             onSend={(anon) => handleSend(anon || isAnonymous)}

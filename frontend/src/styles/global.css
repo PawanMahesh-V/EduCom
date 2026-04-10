@@ -3847,6 +3847,12 @@ button {
   border-bottom: 2px solid var(--color-medium-light);
   margin-bottom: var(--space-6);
   overflow-x: auto;
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.tabs-container::-webkit-scrollbar {
+  display: none;
 }
 
 .tab-button {

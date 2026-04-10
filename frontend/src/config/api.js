@@ -63,6 +63,14 @@ export const API_ENDPOINTS = {
     SEARCH: (userId, otherUserId, query) => `${API_BASE_URL}/direct-messages/messages/${userId}/${otherUserId}/search?q=${encodeURIComponent(query)}`,
     DELETE: (messageId) => `${API_BASE_URL}/direct-messages/message/${messageId}`,
     DELETE_MULTIPLE: `${API_BASE_URL}/direct-messages/message/delete-multiple`,
+  },
+  MODERATION: {
+    REPORTED_MESSAGES: `${API_BASE_URL}/moderation/reported-messages`,
+    APPROVE: (id) => `${API_BASE_URL}/moderation/messages/${id}/approve`,
+    REJECT: (id) => `${API_BASE_URL}/moderation/messages/${id}/reject`,
+    BAN_USER: (userId, messageId) => `${API_BASE_URL}/moderation/users/${userId}/messages/${messageId}/ban`,
+    BANNED_USERS: `${API_BASE_URL}/moderation/banned-users`,
+    UNBAN_USER: (userId) => `${API_BASE_URL}/moderation/users/${userId}/unban`,
   }
 };
 

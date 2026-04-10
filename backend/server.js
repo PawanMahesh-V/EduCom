@@ -32,6 +32,7 @@ const dashboardRoutes = require('./routes/dashboard');
 const communityRoutes = require('./routes/communities');
 const notificationRoutes = require('./routes/notifications');
 const directMessageRoutes = require('./routes/directMessages');
+const moderationRoutes = require('./routes/moderation');
 
 // Middleware
 const helmet = require('helmet');
@@ -53,6 +54,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/communities', communityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
+app.use('/api/moderation', moderationRoutes);
 
 // Error Handling Middleware (Must be last)
 const errorHandler = require('./middleware/errorHandler');

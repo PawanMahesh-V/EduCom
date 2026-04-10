@@ -34,6 +34,20 @@ module.exports = (io, socket, connectedUsers) => {
         const { communityId, message, senderId, senderName, notificationOnly, subject, clientMessageId } = data;
 
         try {
+            // Check if user is banned from chatting
+            const userCheck = await pool.query('SELECT is_active FROM users WHERE id = $1', [senderId]);
+            if (userCheck.rows.length > 0 && userCheck.rows[0].is_active === false) {
+                socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
+                socket.emit('message-blocked', { 
+                    client_message_id: clientMessageId,
+                    moderation_blocked: true,
+                    blocked_reason: 'chat_banned',
+                    content: message,
+                    error: 'You are banned from chatting and can only view messages.'
+                });
+                return;
+            }
+
             const senderRole = await pool.query(
                 'SELECT role FROM users WHERE id = $1',
                 [senderId]
@@ -55,23 +69,36 @@ module.exports = (io, socket, connectedUsers) => {
             if (!notificationOnly) {
                 const moderation = await ModerationService.moderateText(message);
                 if (moderation.toxic) {
+                    // Save message as pending review
+                    const result = await pool.query(
+                        `INSERT INTO messages (community_id, sender_id, content, status)
+                         VALUES ($1, $2, $3, 'pending_review')
+                         RETURNING id, community_id, sender_id, content, status, created_at`,
+                        [communityId, senderId, message]
+                    );
+                    const reportedMessage = result.rows[0];
+
                     socket.emit('message-blocked', {
-                        id: `blocked-community-${Date.now()}`,
+                        id: reportedMessage.id,
                         client_message_id: clientMessageId,
                         community_id: communityId,
                         sender_id: senderId,
                         sender_name: senderName,
                         content: message,
-                        created_at: new Date().toISOString(),
+                        created_at: reportedMessage.created_at,
                         moderation_blocked: true,
-                        blocked_reason: 'content_moderation',
+                        blocked_reason: 'pending_review',
                         confidence: moderation.confidence
                     });
+                    
                     socket.emit('message-error', {
-                        error: 'Message blocked by content moderation',
+                        error: 'Message pending admin review due to policy violation',
                         toxic: true,
                         confidence: moderation.confidence
                     });
+                    
+                    // Notify admins
+                    io.emit('new-reported-message');
                     return;
                 }
 
@@ -186,6 +213,20 @@ module.exports = (io, socket, connectedUsers) => {
         const { senderId, receiverId, message, senderName, isAnonymous = false, clientMessageId } = data;
 
         try {
+            // Check if user is banned from chatting
+            const userCheck = await pool.query('SELECT is_active FROM users WHERE id = $1', [senderId]);
+            if (userCheck.rows.length > 0 && userCheck.rows[0].is_active === false) {
+                socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
+                socket.emit('message-blocked', { 
+                    client_message_id: clientMessageId,
+                    moderation_blocked: true,
+                    blocked_reason: 'chat_banned',
+                    content: message,
+                    error: 'You are banned from chatting and can only view messages.'
+                });
+                return;
+            }
+
             if (isAnonymous) {
                 const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
                 const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
@@ -206,24 +247,37 @@ module.exports = (io, socket, connectedUsers) => {
 
             const moderation = await ModerationService.moderateText(message);
             if (moderation.toxic) {
+                // Save message as pending review
+                const result = await pool.query(
+                    `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
+                     VALUES ($1, $2, $3, false, $4, NULL, 'pending_review')
+                     RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at, status`,
+                    [senderId, receiverId, message, isAnonymous]
+                );
+                const reportedMessage = result.rows[0];
+
                 socket.emit('message-blocked', {
-                    id: `blocked-dm-${Date.now()}`,
+                    id: reportedMessage.id,
                     client_message_id: clientMessageId,
                     sender_id: senderId,
                     receiver_id: receiverId,
                     sender_name: isAnonymous ? 'Anonymous Student' : senderName,
                     content: message,
                     is_anonymous: isAnonymous,
-                    created_at: new Date().toISOString(),
+                    created_at: reportedMessage.created_at,
                     moderation_blocked: true,
-                    blocked_reason: 'content_moderation',
+                    blocked_reason: 'pending_review',
                     confidence: moderation.confidence
                 });
+                
                 socket.emit('message-error', {
-                    error: 'Direct message blocked by content moderation',
+                    error: 'Direct message pending admin review due to policy violation',
                     toxic: true,
                     confidence: moderation.confidence
                 });
+                
+                // Notify admins
+                io.emit('new-reported-message');
                 return;
             }
 

@@ -49,7 +49,8 @@ class AuthController {
                 email: user.email,
                 name: user.name,
                 role: user.role,
-                department: user.department
+                department: user.department,
+                is_active: user.is_active
             };
 
             res.json({
@@ -111,7 +112,8 @@ class AuthController {
                     email: user.email,
                     name: user.name,
                     role: user.role,
-                    department: user.department
+                    department: user.department,
+                    is_active: user.is_active
                 },
                 token
             });
@@ -137,7 +139,8 @@ class AuthController {
                     email: user.email,
                     name: user.name,
                     role: user.role,
-                    department: user.department
+                    department: user.department,
+                    is_active: user.is_active
                 }
             });
         } catch (err) {
