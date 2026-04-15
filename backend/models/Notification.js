@@ -34,6 +34,24 @@ class Notification {
         );
     }
 
+    static async markAsReadByCourseId(userId, courseId) {
+        await pool.query(
+            `UPDATE notifications 
+             SET is_read = true 
+             WHERE user_id = $1 AND course_id = $2 AND is_read = false`,
+            [userId, courseId]
+        );
+    }
+
+    static async markAsReadBySenderId(userId, senderId) {
+        await pool.query(
+            `UPDATE notifications 
+             SET is_read = true 
+             WHERE user_id = $1 AND sender_id = $2 AND is_read = false`,
+            [userId, senderId]
+        );
+    }
+
     static async delete(id, userId) {
         const result = await pool.query(
             `DELETE FROM notifications 

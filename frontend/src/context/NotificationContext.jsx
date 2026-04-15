@@ -56,8 +56,8 @@ export const NotificationProvider = ({ children }) => {
           setNotifications(prev => [notification, ...prev]);
           setUnreadCount(prev => prev + 1);
           
-          // Trigger global alert
-          showAlert(notification.title || 'New Notification', 'info');
+          // Trigger global alert - Removing as it is too intrusive for chat communities
+          // showAlert(notification.title || 'New Notification', 'info');
       };
       socketService.onNewNotification(handleNewNotification);
       return () => {
@@ -86,8 +86,37 @@ export const NotificationProvider = ({ children }) => {
       setUnreadCount(0);
   };
 
+  const clearContextNotifications = async (courseId, senderId) => {
+      // Optimistic update
+      setNotifications(prev => prev.map(n => {
+          if (courseId && n.course_id === courseId) return { ...n, is_read: true };
+          if (senderId && n.sender_id === senderId) return { ...n, is_read: true };
+          return n;
+      }));
+      
+      // Recalculate unread count based on current notifications
+      setUnreadCount(prev => {
+          const count = notifications.filter(n => {
+              if (courseId && n.course_id === courseId) return false;
+              if (senderId && n.sender_id === senderId) return false;
+              return !n.is_read;
+          }).length;
+          return count;
+      });
+
+      try {
+          if (courseId) {
+              await notificationApi.markAsReadByContext(courseId);
+          } else if (senderId) {
+              await notificationApi.markAsReadBySender(senderId);
+          }
+      } catch (err) {
+          console.error("[NotificationProvider] Failed to clear context notifications", err);
+      }
+  };
+
   return (
-      <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, loading }}>
+      <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, clearContextNotifications, loading }}>
           {children}
       </NotificationContext.Provider>
   );

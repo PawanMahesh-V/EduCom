@@ -13,6 +13,10 @@ router.put('/:id/read', auth, NotificationController.markRead);
 // Mark all as read
 router.put('/read-all', auth, NotificationController.markAllRead);
 
+// Mark context read
+router.put('/mark-read/course/:courseId', auth, NotificationController.markReadByContext);
+router.put('/mark-read/sender/:senderId', auth, NotificationController.markReadBySender);
+
 // Delete notification
 router.delete('/:id', auth, NotificationController.deleteNotification);
 

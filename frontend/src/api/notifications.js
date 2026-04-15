@@ -15,6 +15,14 @@ const notificationApi = {
     return await ApiClient.put(API_ENDPOINTS.NOTIFICATIONS.READ_ALL);
   },
 
+  markAsReadByContext: async (courseId) => {
+    return await ApiClient.put(API_ENDPOINTS.NOTIFICATIONS.MARK_READ_COURSE(courseId));
+  },
+
+  markAsReadBySender: async (senderId) => {
+    return await ApiClient.put(API_ENDPOINTS.NOTIFICATIONS.MARK_READ_SENDER(senderId));
+  },
+
   delete: async (id) => {
     return await ApiClient.delete(API_ENDPOINTS.NOTIFICATIONS.BY_ID(id));
   },

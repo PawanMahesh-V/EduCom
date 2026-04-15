@@ -62,18 +62,34 @@ export const useChatMutations = () => {
         mutationFn: async ({ communityId, userId, text, senderName, clientMessageId }) => {
             return new Promise((resolve, reject) => {
                 try {
+                    const timeout = setTimeout(() => {
+                        reject(new Error('Message send timed out. Please try again.'));
+                    }, 10000);
+
                     socketService.sendMessage({
                         communityId,
                         senderId: userId,
                         senderName,
                         message: text,
                         clientMessageId
+                    }, (response) => {
+                        clearTimeout(timeout);
+
+                        if (response?.success) {
+                            resolve(response);
+                            return;
+                        }
+
+                        reject(new Error(response?.error || 'Failed to send message'));
                     });
-                    resolve({ success: true });
                 } catch (e) {
                     reject(e);
                 }
             });
+        },
+        onSuccess: (data, variables) => {
+            queryClient.invalidateQueries(['community-messages', variables.communityId]);
+            queryClient.invalidateQueries(['communities']);
         }
     });
 

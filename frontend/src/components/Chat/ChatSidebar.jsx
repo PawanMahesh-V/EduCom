@@ -187,9 +187,9 @@ const ChatSidebar = ({
                     <span className="chat-time">{chat.time}</span>
                   </div>
                   <div className="chat-preview">
-                    <p className="chat-message-preview">{chat.lastMessage}</p>
-                    {chat.unread > 0 && (
-                      <span className="chat-unread-badge">{chat.unread}</span>
+                    <p className="chat-message-preview">{chat.lastMessage || chat.last_message || 'Start chatting...'}</p>
+                    {(chat.unread_count > 0 || chat.unread > 0) && (
+                      <span className="chat-unread-badge">{chat.unread_count || chat.unread}</span>
                     )}
                   </div>
                 </div>

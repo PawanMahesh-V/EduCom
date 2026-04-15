@@ -37,6 +37,28 @@ class NotificationController {
         }
     }
 
+    static async markReadByContext(req, res, next) {
+        try {
+            const userId = req.user.userId;
+            const { courseId } = req.params;
+            await Notification.markAsReadByCourseId(userId, courseId);
+            res.json({ message: 'Notifications for course marked as read' });
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    static async markReadBySender(req, res, next) {
+        try {
+            const userId = req.user.userId;
+            const { senderId } = req.params;
+            await Notification.markAsReadBySenderId(userId, senderId);
+            res.json({ message: 'Notifications from sender marked as read' });
+        } catch (err) {
+            next(err);
+        }
+    }
+
     static async deleteNotification(req, res, next) {
         try {
             const { id } = req.params;

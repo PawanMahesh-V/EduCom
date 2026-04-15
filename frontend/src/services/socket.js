@@ -65,10 +65,13 @@ class SocketService {
       this.socket.emit('leave-community', communityId);
     }
   }
-  sendMessage(data) {
+  sendMessage(data, callback) {
     if (this.socket) {
-      this.socket.emit('send-message', data);
-    } else {
+      if (typeof callback === 'function') {
+        this.socket.emit('send-message', data, callback);
+      } else {
+        this.socket.emit('send-message', data);
+      }
     }
   }
   deleteMessage(messageId, communityId) {
@@ -155,21 +158,26 @@ class SocketService {
       this.socket.off('user-enrolled');
     }
   }
-  // Direct Message methods
-  sendDirectMessage(data) {
+  sendDirectMessage(data, callback) {
     // If socket doesn't exist, try to connect first
     if (!this.socket && this.userId) {
       this.connect(this.userId);
     }
 
     if (this.socket) {
+      const emit = () => {
+        if (typeof callback === 'function') {
+          this.socket.emit('send-direct-message', data, callback);
+        } else {
+          this.socket.emit('send-direct-message', data);
+        }
+      };
+
       if (this.socket.connected) {
-        this.socket.emit('send-direct-message', data);
+        emit();
       } else {
         // Wait for connection and then send
-        this.socket.once('connect', () => {
-          this.socket.emit('send-direct-message', data);
-        });
+        this.socket.once('connect', emit);
       }
     } else {
       console.error('[SocketService] Socket not available and no userId to connect');

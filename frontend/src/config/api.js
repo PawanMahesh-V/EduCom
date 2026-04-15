@@ -49,6 +49,8 @@ export const API_ENDPOINTS = {
     BROADCAST: `${API_BASE_URL}/notifications/broadcast`,
     BY_ID: (id) => `${API_BASE_URL}/notifications/${id}`,
     MARK_READ: (id) => `${API_BASE_URL}/notifications/${id}/read`,
+    MARK_READ_COURSE: (courseId) => `${API_BASE_URL}/notifications/mark-read/course/${courseId}`,
+    MARK_READ_SENDER: (senderId) => `${API_BASE_URL}/notifications/mark-read/sender/${senderId}`,
   },
   DASHBOARD: {
     STATS: `${API_BASE_URL}/dashboard/admin/stats`,

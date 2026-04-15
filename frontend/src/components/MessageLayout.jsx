@@ -4,6 +4,7 @@ import { useSocket } from '../context/SocketContext';
 import { TEACHING_ROLES } from '../constants';
 import ChatSidebar from './Chat/ChatSidebar';
 import ChatWindow from './Chat/ChatWindow';
+import { useNotifications } from '../context/NotificationContext';
 
 // Hooks
 import { 
@@ -28,6 +29,7 @@ const MessageLayout = ({
 }) => {
   const queryClient = useQueryClient();
   const { socketService } = useSocket();
+  const { clearContextNotifications } = useNotifications();
   const messagesEndRef = React.useRef(null);
   const blockedStorageKey = useMemo(() => {
     if (!userId) return null;
@@ -170,6 +172,15 @@ const MessageLayout = ({
         community_id: data.communityId
       };
       setSystemMessages(prev => [...prev, sysMsg]);
+    };
+
+    const handleNewNotification = (data) => {
+      console.log('[NOTIFICATION] new-notification received in Layout:', data);
+      if (mode === 'direct') {
+          queryClient.invalidateQueries(['conversations', userId]);
+      } else {
+          queryClient.invalidateQueries(['communities']);
+      }
     };
 
      const handleNewMessage = (data) => {
@@ -323,6 +334,7 @@ const MessageLayout = ({
     socketService.socket.on('user-joined-community', handleUserJoined); // Join notifications
     socketService.socket.on('chat-banned', handleChatBanned);
     socketService.socket.on('chat-unbanned', handleChatUnbanned);
+    socketService.socket.on('new-notification', handleNewNotification);
 
     return () => {
         socketService.socket.off('new-message', handleNewMessage);
@@ -333,6 +345,7 @@ const MessageLayout = ({
         socketService.socket.off('message-read', handleMessageRead);
         socketService.socket.off('message-blocked', handleMessageBlocked);
         socketService.socket.off('user-joined-community', handleUserJoined);
+        socketService.socket.off('new-notification', handleNewNotification);
     };
   }, [socketService, queryClient, userId, selectedItem, mode, userName]);
 
@@ -387,8 +400,14 @@ const MessageLayout = ({
       setSelectedMessages([]);
       if (onChatSelected) onChatSelected(item);
       
-      // Mark read? usually handled by fetching messages which updates 'unread' on backend or explicit call
-      // For now we assume fetch does it or we ignore unread clearing logic for simplicity in this step
+      // Invalidate the list query to clear unread badges immediately
+      if (mode === 'direct') {
+          queryClient.invalidateQueries(['conversations', userId]);
+          clearContextNotifications(null, item.user_id);
+      } else {
+          queryClient.invalidateQueries(['communities', userRole, userId]);
+          clearContextNotifications(item.course_id, null);
+      }
   };
 
   const handleSend = async (anon) => {
@@ -402,21 +421,19 @@ const MessageLayout = ({
               await sendDM.mutateAsync({
                   senderId: userId,
                   receiverId: selectedItem.user_id,
-            message: messageText,
+                  message: messageText,
                   senderName: userName || 'User',
-            isAnonymous: anon,
-            clientMessageId
+                  isAnonymous: anon,
+                  clientMessageId
               });
-// ...
-              // Optimistic UI handled by mutation invalidation, but can clear input immediately
           } else {
               if (selectedItem.status === 'inactive') return;
               await sendCommunityMessage.mutateAsync({
                   communityId: selectedItem.id,
                   userId: userId,
-            text: messageText,
-            senderName: userName || 'User',
-            clientMessageId
+                  text: messageText,
+                  senderName: userName || 'User',
+                  clientMessageId
               });
           }
           setInputValue('');

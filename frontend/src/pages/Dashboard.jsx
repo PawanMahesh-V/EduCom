@@ -6,7 +6,8 @@ import {
   faBell,
   faUsers,
   faTachometerAlt,
-  faShieldHalved
+  faShieldHalved,
+  faStore
 } from '@fortawesome/free-solid-svg-icons';
 import DashboardLayout from '../components/DashboardLayout';
 import { useSocket } from '../context/SocketContext';
@@ -18,6 +19,7 @@ import UserManagement from './Admin/UserManagement';
 import CourseManagement from './Admin/CourseManagement';
 import AdminMessages from './Admin/Messages';
 import AdminModeration from './Admin/Moderation';
+import AdminMarketplace from './Admin/Marketplace';
 
 // Student components
 import StudentMessages from './Student/Messages';
@@ -146,6 +148,8 @@ const Dashboard = () => {
         return <AdminMessages />;
       case 'moderation':
         return <AdminModeration />;
+      case 'marketplace':
+        return <AdminMarketplace />;
       default:
         return <AdminOverview />;
     }
@@ -161,6 +165,8 @@ const Dashboard = () => {
         return <StudentMessages />;
       case 'notifications':
         return <StudentNotifications />;
+      case 'marketplace':
+        return <AdminMarketplace />;
       default:
         return <StudentMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
     }
@@ -176,6 +182,8 @@ const Dashboard = () => {
         return <TeacherMessages />;
       case 'notifications':
         return <TeacherNotifications />;
+      case 'marketplace':
+        return <AdminMarketplace />;
       default:
         return <TeacherMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
     }

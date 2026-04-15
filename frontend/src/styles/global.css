@@ -1,3 +1,4 @@
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -4629,6 +4630,57 @@ button {
   border: none;
 }
 
+/* ============================================
+   FLOATING MARKETPLACE BUTTON (ADMIN)
+   ============================================ */
+
+.floating-marketplace-btn {
+  position: fixed;
+  bottom: 2.5rem;
+  right: 2.5rem;
+  width: 60px;
+  height: 60px;
+  background: var(--color-accent);
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  box-shadow: 0 10px 25px rgba(18, 130, 162, 0.4);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 9999;
+  border: 4px solid white;
+}
+
+.floating-marketplace-btn:hover {
+  transform: scale(1.1) rotate(10deg);
+  background: var(--color-accent-dark);
+  box-shadow: 0 15px 30px rgba(18, 130, 162, 0.6);
+}
+
+.floating-marketplace-btn:active {
+  transform: scale(0.95);
+}
+
+.floating-marketplace-btn .cart-badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.75rem;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  font-weight: bold;
+}
+
 .chat-message-sender {
   font-size: 0.82rem;
   font-weight: 600;
@@ -7479,4 +7531,405 @@ window.alert {
   padding: 0.4rem 0.9rem;
   border-radius: 10px;
   border: none;
+}
+/* ============================================
+   ADMIN COMMAND CENTER BENTO LAYOUT (ov- prefix)
+   ============================================ */
+.ov-bento-layout {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Inter', system-ui, sans-serif;
+  box-sizing: border-box;
+}
+
+/* Quick Actions */
+.ov-quick-actions-panel {
+  margin-bottom: 2.5rem;
+}
+
+.ov-quick-actions-panel .ov-section-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.25rem;
+  letter-spacing: -0.01em;
+}
+
+.ov-quick-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.ov-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 16px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-align: left;
+  box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+}
+
+.ov-action-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.05);
+}
+
+.ov-action-btn.warning .ov-action-icon { background: rgba(18, 130, 162, 0.1); color: #1282A2; }
+.ov-action-btn.success .ov-action-icon { background: rgba(18, 130, 162, 0.1); color: #1282A2; }
+.ov-action-btn.primary .ov-action-icon { background: rgba(18, 130, 162, 0.1); color: #1282A2; }
+
+.ov-action-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.ov-action-text {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.ov-action-title {
+  font-weight: 600;
+  color: #111827;
+  font-size: 1rem;
+}
+
+.ov-action-desc {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-top: 0.25rem;
+}
+
+.ov-action-arrow {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.2s;
+}
+
+.ov-action-btn:hover .ov-action-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Bento Grid */
+.ov-bento-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.ov-bento-grid.ov-bento-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ov-bento-card {
+  background: white;
+  border-radius: 20px;
+  border: 1px solid #f3f4f6;
+  padding: 1.5rem;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+  display: flex;
+  flex-direction: column;
+}
+
+.ov-bento-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.ov-bento-header h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.ov-bento-badge {
+  background: rgba(18, 130, 162, 0.1);
+  color: #1282A2;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ov-span-1 { grid-column: span 1; }
+.ov-span-2 { grid-column: span 2; }
+
+/* Security Card */
+.ov-security-card {
+  background: linear-gradient(145deg, #ffffff, #f9fafb);
+}
+
+.ov-security-stats {
+  display: flex;
+  gap: 1.5rem;
+  margin-bottom: auto;
+}
+
+.ov-sec-stat {
+  display: flex;
+  flex-direction: column;
+}
+
+.ov-sec-val {
+  font-size: 2.25rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.ov-text-warning { color: #d97706; }
+.ov-text-danger { color: #dc2626; }
+.ov-text-success { color: #16a34a; }
+
+.ov-sec-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+  font-weight: 500;
+  margin-top: 0.25rem;
+}
+
+.ov-security-note {
+  font-size: 0.8rem;
+  color: #9ca3af;
+  margin: 0;
+  margin-top: 1.5rem;
+  background: #f3f4f6;
+  padding: 0.75rem;
+  border-radius: 8px;
+}
+
+/* Default Stat Cards */
+.ov-bento-card.ov-stat-card {
+  align-items: flex-start;
+  transition: all 0.2s ease;
+}
+
+.ov-bento-card.ov-stat-card:hover {
+  border-color: #d1d5db;
+  transform: translateY(-2px);
+}
+
+.ov-stat-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.ov-stat-icon-primary { background: #e0f2fe; color: #0284c7; }
+.ov-stat-icon-secondary { background: #e0e7ff; color: #4f46e5; }
+.ov-stat-icon-accent { background: #def7ec; color: #059669; }
+.ov-stat-icon-info { background: #fae8ff; color: #c026d3; }
+
+.ov-stat-content h3 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: #111827;
+  margin: 0 0 0.25rem 0;
+}
+
+.ov-stat-title {
+  color: #6b7280;
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0;
+}
+
+.ov-stat-subtitle {
+  color: #9ca3af;
+  font-size: 0.8rem;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Timeline/Footer Grid */
+.ov-dashboard-footer-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1.5rem;
+}
+
+.ov-text-btn {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+}
+
+.ov-text-btn:hover { text-decoration: underline; }
+
+.ov-timeline-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.ov-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.ov-timeline-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(18, 130, 162, 0.1);
+  color: #1282A2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
+}
+
+.ov-timeline-icon.ov-success {
+  background: rgba(18, 130, 162, 0.1);
+  color: #1282A2;
+}
+
+.ov-timeline-content p {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+.ov-timeline-content strong {
+  color: #111827;
+}
+
+.ov-timeline-content .ov-time {
+  font-size: 0.8rem;
+  color: #9ca3af;
+}
+
+.ov-empty-chart, .ov-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .ov-bento-grid, .ov-bento-grid.ov-bento-grid-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ov-bento-layout { padding: 1rem; }
+  .ov-dashboard-footer-grid { grid-template-columns: 1fr; }
+  .ov-bento-grid, .ov-bento-grid.ov-bento-grid-3 { grid-template-columns: 1fr; }
+  .ov-span-2 { grid-column: span 1; }
+}
+
+/* Marketplace Placeholder Page Classes */
+.mp-placeholder-container {
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+  text-align: center;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.mp-icon-wrapper {
+  width: 120px;
+  height: 120px;
+  background-color: rgba(18, 130, 162, 0.1);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+  color: #1282A2;
+  font-size: 3.5rem;
+}
+
+.mp-title {
+  color: #0A1128;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  font-size: 2.5rem;
+}
+
+.mp-status-text {
+  color: #64748b;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+/* Overview Layout Utilities (Moving remaining inline to CSS) */
+.ov-chart-container-centered {
+  width: 100%;
+  height: 220px;
+  display: flex;
+  justify-content: center;
+  min-height: 220px;
+}
+
+.ov-timeline-msgs-count {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #6b7280;
+}
+
+.ov-timeline-item-centered {
+  align-items: center;
+}
+
+.ov-marketplace-preview-item {
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.ov-marketplace-item-title {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.ov-flex-grow-1 {
+  flex-grow: 1;
+}
+
+.ov-mb-1 {
+  margin-bottom: 1rem;
+}
+
+/* Additional Overview Utilities */
+.ov-chart-container-fixed {
+    width: 100%;
+    height: 220px;
+    min-height: 220px;
 }
