@@ -207,7 +207,7 @@ class Community {
              FROM messages m
              LEFT JOIN users u ON m.sender_id = u.id
              WHERE m.community_id = $1
-               AND (m.status IS NULL OR m.status != 'pending_review')
+               AND (m.status IS NULL OR m.status = 'approved')
              ORDER BY m.created_at ASC
              LIMIT $2
         `;

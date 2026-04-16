@@ -61,8 +61,7 @@ const MessageLayout = ({
   const [typingUsers, setTypingUsers] = useState([]);
   const [blockedMessages, setBlockedMessages] = useState([]);
 
-  // System messages for join notifications
-  const [systemMessages, setSystemMessages] = useState([]);
+
 
   // Banned state
   const [isChatBanned, setIsChatBanned] = useState(() => {
@@ -140,10 +139,10 @@ const MessageLayout = ({
   }, [blockedMessages, selectedChatKey, activeMessages]);
 
   const renderedMessages = useMemo(() => {
-    const all = [...activeMessages, ...visibleBlockedMessages, ...systemMessages];
+    const all = [...activeMessages, ...visibleBlockedMessages];
     all.sort((a, b) => new Date(a.created_at || 0) - new Date(b.created_at || 0));
     return all;
-  }, [activeMessages, visibleBlockedMessages, systemMessages]);
+  }, [activeMessages, visibleBlockedMessages]);
 
   // --- Mutations ---
   const { 
@@ -157,22 +156,6 @@ const MessageLayout = ({
   useEffect(() => {
     if (!socketService || !socketService.socket) return;
 
-    // Handle user joining community — show system message
-    const handleUserJoined = (data) => {
-      console.log('[JOIN] user-joined-community received:', data, 'current community:', selectedItem?.id, 'mode:', mode);
-      if (mode !== 'community') return;
-      // Use loose comparison — communityId from backend may be integer, selectedItem.id may be string
-      if (selectedItem?.id && String(data.communityId) !== String(selectedItem.id)) return;
-
-      const sysMsg = {
-        id: `sys-join-${data.userId}-${Date.now()}`,
-        message_type: 'system_join',
-        content: `${data.userName} joined the community`,
-        created_at: data.joinedAt || new Date().toISOString(),
-        community_id: data.communityId
-      };
-      setSystemMessages(prev => [...prev, sysMsg]);
-    };
 
     const handleNewNotification = (data) => {
       console.log('[NOTIFICATION] new-notification received in Layout:', data);
@@ -331,7 +314,7 @@ const MessageLayout = ({
     socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
     socketService.socket.on('message-read', handleMessageRead); // Read receipts
     socketService.socket.on('message-blocked', handleMessageBlocked); // Moderation blocked (local only)
-    socketService.socket.on('user-joined-community', handleUserJoined); // Join notifications
+
     socketService.socket.on('chat-banned', handleChatBanned);
     socketService.socket.on('chat-unbanned', handleChatUnbanned);
     socketService.socket.on('new-notification', handleNewNotification);
@@ -344,7 +327,7 @@ const MessageLayout = ({
         socketService.socket.off('message-delivered', handleMessageDelivered);
         socketService.socket.off('message-read', handleMessageRead);
         socketService.socket.off('message-blocked', handleMessageBlocked);
-        socketService.socket.off('user-joined-community', handleUserJoined);
+
         socketService.socket.off('new-notification', handleNewNotification);
     };
   }, [socketService, queryClient, userId, selectedItem, mode, userName]);
@@ -393,7 +376,7 @@ const MessageLayout = ({
       setSelectedItem(item);
       setInputValue('');
       setTypingUsers([]);
-      setSystemMessages([]); // Clear join notifications when switching chats
+
       // Reset search/select modes
       setIsSearchMode(false);
       setIsSelectMode(false);

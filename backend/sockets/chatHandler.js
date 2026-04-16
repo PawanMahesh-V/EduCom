@@ -102,6 +102,9 @@ module.exports = (io, socket, connectedUsers) => {
                     
                     // Notify admins
                     io.emit('new-reported-message');
+                    if (typeof callback === 'function') {
+                        callback({ success: true, message: reportedMessage, blocked: true });
+                    }
                     return;
                 }
 
@@ -224,16 +227,21 @@ module.exports = (io, socket, connectedUsers) => {
             // Check if user is banned from chatting
             const userCheck = await pool.query('SELECT is_active FROM users WHERE id = $1', [senderId]);
             if (userCheck.rows.length > 0 && userCheck.rows[0].is_active === false) {
-                socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
-                socket.emit('message-blocked', { 
-                    client_message_id: clientMessageId,
-                    moderation_blocked: true,
-                    blocked_reason: 'chat_banned',
-                    content: message,
-                    error: 'You are banned from chatting and can only view messages.'
-                });
-                if (typeof callback === 'function') callback({ success: false, error: 'Banned' });
-                return;
+                const receiverRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
+                const isReceiverAdmin = receiverRoleCheck.rows.length > 0 && receiverRoleCheck.rows[0].role === 'Admin';
+                
+                if (!isReceiverAdmin) {
+                    socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
+                    socket.emit('message-blocked', { 
+                        client_message_id: clientMessageId,
+                        moderation_blocked: true,
+                        blocked_reason: 'chat_banned',
+                        content: message,
+                        error: 'You are banned from chatting and can only view messages.'
+                    });
+                    if (typeof callback === 'function') callback({ success: false, error: 'Banned' });
+                    return;
+                }
             }
 
             if (isAnonymous) {
@@ -291,7 +299,9 @@ module.exports = (io, socket, connectedUsers) => {
                 
                 // Notify admins
                 io.emit('new-reported-message');
-                if (typeof callback === 'function') callback({ success: false, error: 'Toxic' });
+                if (typeof callback === 'function') {
+                    callback({ success: true, message: reportedMessage, blocked: true });
+                }
                 return;
             }
 
