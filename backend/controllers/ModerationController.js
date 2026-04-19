@@ -4,19 +4,89 @@ class ModerationController {
     static async getReportedMessages(req, res, next) {
         try {
             const query = `
-                SELECT m.id, m.content, m.created_at, m.status, m.is_anonymous, m.sender_id, m.receiver_id,
-                       u.name AS sender_name, u.email as sender_email,
-                       ru.name AS receiver_name,
-                       c.id as community_id, c.name as community_name
+                SELECT
+                    m.id, m.content, m.created_at, m.status, m.is_anonymous, m.sender_id, m.receiver_id,
+                    u.name  AS sender_name,
+                    u.email AS sender_email,
+                    ru.name AS receiver_name,
+                    c.id    AS community_id,
+                    c.name  AS community_name,
+                    -- user report info (NULL if flagged by ML only)
+                    r.id         AS report_id,
+                    r.reason     AS report_reason,
+                    r.created_at AS reported_at,
+                    rep_user.name  AS reporter_name,
+                    rep_user.email AS reporter_email,
+                    CASE WHEN r.id IS NOT NULL THEN 'user' ELSE 'system' END AS report_source
                 FROM messages m
-                LEFT JOIN users u ON m.sender_id = u.id
-                LEFT JOIN users ru ON m.receiver_id = ru.id
-                LEFT JOIN communities c ON m.community_id = c.id
+                LEFT JOIN users u        ON m.sender_id   = u.id
+                LEFT JOIN users ru       ON m.receiver_id = ru.id
+                LEFT JOIN communities c  ON m.community_id = c.id
+                LEFT JOIN reports r      ON r.message_id   = m.id AND r.status = 'Pending'
+                LEFT JOIN users rep_user ON rep_user.id    = r.reporter_id
                 WHERE m.status = 'pending_review'
                 ORDER BY m.created_at DESC
             `;
             const result = await pool.query(query);
             res.json({ reported_messages: result.rows });
+        } catch (err) {
+            next(err);
+        }
+    }
+
+    static async reportMessage(req, res, next) {
+        try {
+            const { id } = req.params;
+            const { reporterId, reason } = req.body;
+
+            if (!reporterId) {
+                return res.status(400).json({ message: 'Reporter ID is required' });
+            }
+
+            // Verify message exists and is currently visible (approved)
+            const msgResult = await pool.query(
+                `SELECT id, sender_id, status FROM messages WHERE id = $1`,
+                [id]
+            );
+
+            if (msgResult.rows.length === 0) {
+                return res.status(404).json({ message: 'Message not found' });
+            }
+
+            const msg = msgResult.rows[0];
+
+            // Prevent users from reporting their own messages
+            if (String(msg.sender_id) === String(reporterId)) {
+                return res.status(400).json({ message: 'You cannot report your own message' });
+            }
+
+            // Prevent re-reporting an already-pending message by the same user
+            const dupCheck = await pool.query(
+                `SELECT id FROM reports WHERE message_id = $1 AND reporter_id = $2`,
+                [id, reporterId]
+            );
+            if (dupCheck.rows.length > 0) {
+                return res.status(400).json({ message: 'You have already reported this message' });
+            }
+
+            // Insert into reports table
+            await pool.query(
+                `INSERT INTO reports (message_id, reporter_id, reason, status)
+                 VALUES ($1, $2, $3, 'Pending')`,
+                [id, reporterId, reason || null]
+            );
+
+            // Mark the message as pending_review so it appears in the admin queue
+            await pool.query(
+                `UPDATE messages SET status = 'pending_review' WHERE id = $1`,
+                [id]
+            );
+
+            // Notify admins in real-time
+            const io = req.app.get('io');
+            io.emit('new-reported-message');
+
+            res.json({ message: 'Message reported successfully' });
         } catch (err) {
             next(err);
         }

@@ -68,6 +68,7 @@ export const API_ENDPOINTS = {
   },
   MODERATION: {
     REPORTED_MESSAGES: `${API_BASE_URL}/moderation/reported-messages`,
+    REPORT_MESSAGE: (id) => `${API_BASE_URL}/moderation/messages/${id}/report`,
     APPROVE: (id) => `${API_BASE_URL}/moderation/messages/${id}/approve`,
     REJECT: (id) => `${API_BASE_URL}/moderation/messages/${id}/reject`,
     BAN_USER: (userId, messageId) => `${API_BASE_URL}/moderation/users/${userId}/messages/${messageId}/ban`,

@@ -5,6 +5,8 @@ import { TEACHING_ROLES } from '../constants';
 import ChatSidebar from './Chat/ChatSidebar';
 import ChatWindow from './Chat/ChatWindow';
 import { useNotifications } from '../context/NotificationContext';
+import { moderationApi } from '../api';
+import { showSuccess, showError } from '../utils/alert';
 
 // Hooks
 import { 
@@ -426,6 +428,17 @@ const MessageLayout = ({
       }
   };
 
+  const handleReport = async (messageId, reason) => {
+      try {
+          await moderationApi.reportMessage(messageId, userId, reason);
+          showSuccess('Message reported to Admin for review.');
+      } catch (err) {
+          const msg = err?.response?.data?.message || err?.message || 'Failed to report message';
+          showError(msg);
+          throw err; // re-throw so MessageBubble can reset its state
+      }
+  };
+
   const handleDeleteSelected = async () => {
       if (selectedMessages.length === 0) return;
       
@@ -584,6 +597,9 @@ const MessageLayout = ({
             // Community specific
             onLeaveCommunity={onLeaveCommunity}
             onDisbandCommunity={onDisbandCommunity}
+
+            // Reporting
+            onReport={handleReport}
         />
       </div>
     </div>

@@ -6,6 +6,10 @@ class ModerationApi {
     return ApiClient.get(API_ENDPOINTS.MODERATION.REPORTED_MESSAGES);
   }
 
+  async reportMessage(messageId, reporterId, reason) {
+    return ApiClient.post(API_ENDPOINTS.MODERATION.REPORT_MESSAGE(messageId), { reporterId, reason });
+  }
+
   async approveMessage(id) {
     return ApiClient.put(API_ENDPOINTS.MODERATION.APPROVE(id));
   }

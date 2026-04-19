@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSignOutAlt, faGraduationCap, faBars, faChevronDown, faShoppingCart } from '@fortawesome/free-solid-svg-icons';
 
@@ -13,73 +13,12 @@ const DashboardLayout = ({
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
-  // Draggable logic for the marketplace button
-  const [position, setPosition] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0, moved: false });
-  const buttonRef = useRef(null);
-
-  const handleMouseDown = (e) => {
-    // Support both mouse and touch
-    const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
-    const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
-
-    setIsDragging(true);
-    dragRef.current = {
-        startX: clientX,
-        startY: clientY,
-        initialX: position.x,
-        initialY: position.y,
-        moved: false
-    };
-  };
-
-  useEffect(() => {
-    const handleMouseMove = (e) => {
-      if (!isDragging) return;
-      
-      const clientX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
-      const clientY = e.type === 'touchmove' ? e.touches[0].clientY : e.clientY;
-
-      const deltaX = clientX - dragRef.current.startX;
-      const deltaY = clientY - dragRef.current.startY;
-
-      // Check if actually moved (to differentiate from click)
-      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
-          dragRef.current.moved = true;
-      }
-
-      setPosition({
-        x: dragRef.current.initialX + deltaX,
-        y: dragRef.current.initialY + deltaY
-      });
-    };
-
-    const handleMouseUp = () => {
-      setIsDragging(false);
-    };
-
-    if (isDragging) {
-      window.addEventListener('mousemove', handleMouseMove);
-      window.addEventListener('mouseup', handleMouseUp);
-      window.addEventListener('touchmove', handleMouseMove, { passive: false });
-      window.addEventListener('touchend', handleMouseUp);
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleMouseMove);
-      window.removeEventListener('touchend', handleMouseUp);
-    };
-  }, [isDragging, position]);
-
+  const isAdmin = role?.toLowerCase() === 'admin';
+  const isCoursesTab = activeSection === 'courses';
+  const showMarketplaceBtn = isAdmin || isCoursesTab;
+  
   const handleButtonClick = (e) => {
-    // If we moved while dragging, don't trigger the click
-    if (dragRef.current.moved) {
-        e.preventDefault();
-        return;
-    }
+    e.preventDefault();
     onMenuClick('marketplace');
   };
 
@@ -170,24 +109,19 @@ const DashboardLayout = ({
         <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
-      {/* Floating Marketplace Button (Visible to all) */}
-      <button 
-        ref={buttonRef}
-        className={`floating-marketplace-btn ${isDragging ? 'dragging' : ''}`}
-        onClick={handleButtonClick}
-        onMouseDown={handleMouseDown}
-        onTouchStart={handleMouseDown}
-        style={{
-            transform: `translate(${position.x}px, ${position.y}px)`,
-            transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-            cursor: isDragging ? 'grabbing' : 'grab'
-        }}
-        title="Marketplace (Drag to move)"
-        aria-label="Open Marketplace"
-      >
-        <FontAwesomeIcon icon={faShoppingCart} />
-        <span className="cart-badge">!</span>
-      </button>
+      {/* Floating Marketplace Button */}
+      {showMarketplaceBtn && (
+        <button 
+          className="floating-marketplace-btn"
+          onClick={handleButtonClick}
+          title="Open Marketplace"
+          aria-label="Open Marketplace"
+          style={{ bottom: isAdmin ? '2.5rem' : undefined }}
+        >
+          <FontAwesomeIcon icon={faShoppingCart} />
+          <span className="cart-badge">!</span>
+        </button>
+      )}
 
       {/* Main Content */}
       <main className="dashboard-content">

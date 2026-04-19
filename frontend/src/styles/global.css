@@ -4630,13 +4630,172 @@ button {
   border: none;
 }
 
+/* ── Message Report Action ─────────────────────────────────── */
+
+/* Make the row position-relative so the popup stays in context */
+.chat-message.reportable {
+  position: relative;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+/* Container for the flag button + popup */
+.message-report-action {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* Show on row hover */
+.chat-message.reportable:hover .message-report-action {
+  opacity: 1;
+}
+
+/* The small flag icon button */
+.report-flag-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  transition: background 0.2s, transform 0.15s;
+  flex-shrink: 0;
+}
+
+.report-flag-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  transform: scale(1.1);
+}
+
+/* "Reported ✓" badge */
+.report-done-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  font-size: 0.65rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Inline reason popup */
+.report-reason-popup {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 220px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  padding: 10px;
+  z-index: 200;
+  animation: fadeInDown 0.18s ease;
+}
+
+/* Anchor popup to the left for received messages (default) */
+.chat-message.received .report-reason-popup {
+  left: 0;
+  transform: none;
+}
+
+.report-reason-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #374151;
+}
+
+.report-close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: color 0.15s;
+}
+
+.report-close-btn:hover {
+  color: #ef4444;
+}
+
+.report-reason-input {
+  width: 100%;
+  resize: none;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 0.78rem;
+  color: #374151;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.report-reason-input:focus {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.12);
+}
+
+.report-reason-input::placeholder {
+  color: #9ca3af;
+}
+
+.report-submit-btn {
+  width: 100%;
+  padding: 7px 10px;
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.report-submit-btn:hover:not(:disabled) {
+  background: #dc2626;
+  transform: translateY(-1px);
+}
+
+.report-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* ============================================
    FLOATING MARKETPLACE BUTTON (ADMIN)
    ============================================ */
 
 .floating-marketplace-btn {
   position: fixed;
-  bottom: 2.5rem;
+  bottom: calc(2.5rem + 60px + 16px);
   right: 2.5rem;
   width: 60px;
   height: 60px;
@@ -6435,32 +6594,32 @@ window.alert {
 /* Floating Join Button */
 .floating-join-btn {
   position: fixed;
-  bottom: 2rem;
-  right: 2rem;
+  bottom: 2.5rem;
+  right: 2.5rem;
   width: 60px;
   height: 60px;
   border-radius: 50%;
   background: var(--color-accent);
-  border: none;
+  border: 4px solid white;
   color: white;
   font-size: 24px;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
-  transition: all 0.3s ease;
-  z-index: 1000;
+  box-shadow: 0 10px 25px rgba(18, 130, 162, 0.4);
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .floating-join-btn:hover {
-  transform: translateY(-3px) scale(1.05);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.6);
+  transform: scale(1.1);
+  box-shadow: 0 15px 30px rgba(18, 130, 162, 0.6);
   background: var(--color-accent-dark);
 }
 
 .floating-join-btn:active {
-  transform: translateY(-1px) scale(0.98);
+  transform: scale(0.95);
 }
 
 .floating-join-btn i {

@@ -1,6 +1,13 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUserSecret, faCheck, faCircleExclamation } from '@fortawesome/free-solid-svg-icons';
+import {
+  faUserSecret,
+  faCheck,
+  faCircleExclamation,
+  faFlag,
+  faTimes,
+  faPaperPlane,
+} from '@fortawesome/free-solid-svg-icons';
 
 const MessageBubble = ({ 
   msg, 
@@ -8,7 +15,8 @@ const MessageBubble = ({
   isSelectionMode, 
   isSelected, 
   onToggleSelection, 
-  onContextMenu
+  onContextMenu,
+  onReport,        // (messageId, reason) => Promise<void>
 }) => {
   const senderId = msg.sender_id ?? msg.senderId;
   const isOwnMessage = Number(senderId) === Number(userId);
@@ -20,6 +28,26 @@ const MessageBubble = ({
   const time = msg.created_at 
     ? new Date(msg.created_at).toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'Asia/Karachi' }) 
     : msg.time;
+
+  // ------- Report state -------
+  const [showReportMenu, setShowReportMenu] = useState(false);
+  const [reportReason, setReportReason] = useState('');
+  const [reportState, setReportState] = useState('idle'); // 'idle' | 'submitting' | 'done'
+
+  const canReport = !isOwnMessage && !msg.moderation_blocked && !msg.message_type;
+
+  const handleReportSubmit = async () => {
+    if (reportState === 'submitting' || reportState === 'done') return;
+    setReportState('submitting');
+    try {
+      await onReport(msg.id, reportReason.trim() || undefined);
+      setReportState('done');
+      setShowReportMenu(false);
+      setReportReason('');
+    } catch (err) {
+      setReportState('idle');
+    }
+  };
 
   // Message status for tick marks (only for own messages and direct messages)
   const getMessageStatus = () => {
@@ -45,7 +73,7 @@ const MessageBubble = ({
   return (
     <div 
       id={`message-${msg.id}`}
-      className={`chat-message ${isOwnMessage ? 'sent' : 'received'} ${isSelected ? 'selected' : ''} ${isSelectionMode && isOwnMessage ? 'selectable' : ''}`}
+      className={`chat-message ${isOwnMessage ? 'sent' : 'received'} ${isSelected ? 'selected' : ''} ${isSelectionMode && isOwnMessage ? 'selectable' : ''} ${canReport ? 'reportable' : ''}`}
       onClick={isSelectionMode && isOwnMessage ? (e) => { e.stopPropagation(); onToggleSelection(msg.id); } : undefined}
       onContextMenu={(e) => onContextMenu && onContextMenu(e, msg)}
       style={isSelectionMode && isOwnMessage ? { cursor: 'pointer' } : {}}
@@ -108,6 +136,54 @@ const MessageBubble = ({
           )}
         </div>
       </div>
+
+      {/* ── Report button (hover-reveal, received messages only) ── */}
+      {canReport && !isSelectionMode && (
+        <div className="message-report-action">
+          {reportState === 'done' ? (
+            <span className="report-done-badge" title="You reported this message">
+              <FontAwesomeIcon icon={faFlag} /> Reported
+            </span>
+          ) : (
+            <button
+              className="report-flag-btn"
+              title="Report this message"
+              onClick={(e) => { e.stopPropagation(); setShowReportMenu(v => !v); }}
+            >
+              <FontAwesomeIcon icon={faFlag} />
+            </button>
+          )}
+
+          {/* Inline reason dialog */}
+          {showReportMenu && reportState !== 'done' && (
+            <div className="report-reason-popup" onClick={e => e.stopPropagation()}>
+              <div className="report-reason-header">
+                <span>Report Message</span>
+                <button className="report-close-btn" onClick={() => { setShowReportMenu(false); setReportReason(''); }}>
+                  <FontAwesomeIcon icon={faTimes} />
+                </button>
+              </div>
+              <textarea
+                className="report-reason-input"
+                placeholder="Reason (optional)..."
+                value={reportReason}
+                onChange={e => setReportReason(e.target.value)}
+                rows={2}
+                maxLength={300}
+              />
+              <button
+                className="report-submit-btn"
+                disabled={reportState === 'submitting'}
+                onClick={handleReportSubmit}
+              >
+                {reportState === 'submitting' ? 'Submitting…' : (
+                  <><FontAwesomeIcon icon={faPaperPlane} /> Submit Report</>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };

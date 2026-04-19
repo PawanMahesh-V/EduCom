@@ -76,6 +76,9 @@ const ChatWindow = ({
   // Community specific
   onLeaveCommunity,
   onDisbandCommunity,
+
+  // Reporting
+  onReport,
 }) => {
 
   if (!selectedItem) {
@@ -251,6 +254,7 @@ const ChatWindow = ({
                 isSelectionMode={isSelectMode}
                 isSelected={selectedMessages.includes(msg.id)}
                 onToggleSelection={toggleMessageSelection}
+                onReport={onReport}
               />
             );
           });

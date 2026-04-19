@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faBan, faTimes, faShieldHalved, faUnlock, faUsersSlash } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faBan, faTimes, faShieldHalved, faUnlock, faUsersSlash, faFlag, faRobot } from '@fortawesome/free-solid-svg-icons';
 import { moderationApi } from '../../api';
 import { useSocket } from '../../context/SocketContext';
 import { showSuccess, showError } from '../../utils/alert';
@@ -185,6 +185,7 @@ const Moderation = () => {
                                             <th>Date Sent</th>
                                             <th>Sender</th>
                                             <th>Where</th>
+                                            <th>Source</th>
                                             <th>Message Content</th>
                                             <th>Actions</th>
                                         </tr>
@@ -202,6 +203,42 @@ const Moderation = () => {
                                                 </td>
                                                 <td data-label="Where">
                                                     {msg.community_id ? `Community: ${msg.community_name}` : `Direct Message: ${msg.receiver_name || 'Unknown User'}`}
+                                                </td>
+                                                <td data-label="Source">
+                                                    {msg.report_source === 'user' ? (
+                                                        <div>
+                                                            <span style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                                padding: '3px 8px', borderRadius: '12px',
+                                                                backgroundColor: '#fef3c7', color: '#92400e',
+                                                                fontSize: '0.8em', fontWeight: '600'
+                                                            }}>
+                                                                <FontAwesomeIcon icon={faFlag} /> User Reported
+                                                            </span>
+                                                            {msg.reporter_name && (
+                                                                <div style={{ fontSize: '0.8em', color: '#666', marginTop: '4px' }}>
+                                                                    by {msg.reporter_name}
+                                                                </div>
+                                                            )}
+                                                            {msg.report_reason && (
+                                                                <div style={{
+                                                                    marginTop: '4px', fontSize: '0.8em',
+                                                                    color: '#374151', fontStyle: 'italic'
+                                                                }}>
+                                                                    "{msg.report_reason}"
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{
+                                                            display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                            padding: '3px 8px', borderRadius: '12px',
+                                                            backgroundColor: '#ede9fe', color: '#5b21b6',
+                                                            fontSize: '0.8em', fontWeight: '600'
+                                                        }}>
+                                                            <FontAwesomeIcon icon={faRobot} /> ML Auto-Detected
+                                                        </span>
+                                                    )}
                                                 </td>
                                                 <td data-label="Message Content">
                                                     <div style={{ 
@@ -267,6 +304,34 @@ const Moderation = () => {
                                                 <div className="user-card-row">
                                                     <div className="user-card-label">Where</div>
                                                     <div className="user-card-value">{msg.community_id ? `Community: ${msg.community_name}` : `Direct Message: ${msg.receiver_name || 'Unknown User'}`}</div>
+                                                </div>
+                                                <div className="user-card-row">
+                                                    <div className="user-card-label">Source</div>
+                                                    <div className="user-card-value">
+                                                        {msg.report_source === 'user' ? (
+                                                            <div>
+                                                                <span style={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                                    padding: '3px 8px', borderRadius: '12px',
+                                                                    backgroundColor: '#fef3c7', color: '#92400e',
+                                                                    fontSize: '0.8em', fontWeight: '600'
+                                                                }}>
+                                                                    <FontAwesomeIcon icon={faFlag} /> User Reported
+                                                                </span>
+                                                                {msg.reporter_name && <div style={{ fontSize: '0.8em', color: '#555', marginTop: '3px' }}>by {msg.reporter_name}</div>}
+                                                                {msg.report_reason && <div style={{ fontSize: '0.8em', fontStyle: 'italic', marginTop: '3px' }}>Reason: "{msg.report_reason}"</div>}
+                                                            </div>
+                                                        ) : (
+                                                            <span style={{
+                                                                display: 'inline-flex', alignItems: 'center', gap: '5px',
+                                                                padding: '3px 8px', borderRadius: '12px',
+                                                                backgroundColor: '#ede9fe', color: '#5b21b6',
+                                                                fontSize: '0.8em', fontWeight: '600'
+                                                            }}>
+                                                                <FontAwesomeIcon icon={faRobot} /> ML Auto-Detected
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <div className="user-card-row" style={{ flexDirection: 'column', alignItems: 'flex-start' }}>
                                                     <div className="user-card-label" style={{ marginBottom: '8px' }}>Message Content</div>

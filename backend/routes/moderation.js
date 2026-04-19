@@ -7,6 +7,7 @@ const ModerationController = require('../controllers/ModerationController');
 // Based on EduCom architecture, frontend already guards it.
 
 router.get('/reported-messages', ModerationController.getReportedMessages);
+router.post('/messages/:id/report', ModerationController.reportMessage);
 router.put('/messages/:id/approve', ModerationController.approveMessage);
 router.put('/messages/:id/reject', ModerationController.rejectMessage);
 router.post('/users/:userId/messages/:messageId/ban', ModerationController.banUserAndRejectMessage);
