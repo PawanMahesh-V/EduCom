@@ -70,7 +70,7 @@ const HomePage = () => {
     <div className="homepage">
       {/* Navbar */}
       <nav className="nav">
-        <div className="nav-brand" onClick={() => navigate("/")}>
+        <div className="nav-brand">
           <FontAwesomeIcon icon={faGraduationCap} />
           <span>
             Edu<span className="accent">Com</span>
