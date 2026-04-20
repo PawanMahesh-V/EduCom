@@ -516,6 +516,46 @@ const MessageLayout = ({
   const canSendAnonymously = mode === 'direct' && userRole === 'Student' && 
                              TEACHING_ROLES.includes(selectedItem?.user_role);
 
+  const scrollToMessage = (msgId) => {
+    if (!msgId) return;
+    setTimeout(() => {
+      const el = document.getElementById(`message-${msgId}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+        el.style.transition = 'background-color 0.5s';
+        setTimeout(() => {
+          if (el) el.style.backgroundColor = '';
+        }, 2000);
+      }
+    }, 100);
+  };
+
+  const handleSearch = () => {
+    if (!messageSearchQuery.trim()) {
+      setSearchResults([]);
+      return;
+    }
+    const query = messageSearchQuery.toLowerCase();
+    const results = renderedMessages
+      .map((msg, index) => ((msg.content || msg.text || '').toLowerCase().includes(query) ? index : -1))
+      .filter((index) => index !== -1);
+    
+    setSearchResults(results);
+    if (results.length > 0) {
+      setCurrentSearchIndex(0);
+      scrollToMessage(renderedMessages[results[0]]?.id);
+    }
+  };
+
+  const navigateSearchResult = (direction) => {
+    if (searchResults.length === 0) return;
+    let newIndex = currentSearchIndex + direction;
+    if (newIndex < 0) newIndex = searchResults.length - 1;
+    if (newIndex >= searchResults.length) newIndex = 0;
+    setCurrentSearchIndex(newIndex);
+    scrollToMessage(renderedMessages[searchResults[newIndex]]?.id);
+  };
 
   return (
     <div className="chat-container">
@@ -555,12 +595,15 @@ const MessageLayout = ({
             isSearchMode={isSearchMode}
             messageSearchQuery={messageSearchQuery}
             setMessageSearchQuery={setMessageSearchQuery}
-            // handleSearch implementation omitted for brevity in this step, can add later
-            handleSearch={() => {}} 
+            handleSearch={handleSearch} 
             searchResults={searchResults}
             currentSearchIndex={currentSearchIndex}
-            navigateSearchResult={() => {}}
-            closeSearch={() => { setIsSearchMode(false); }}
+            navigateSearchResult={navigateSearchResult}
+            closeSearch={() => { 
+                setIsSearchMode(false); 
+                setMessageSearchQuery('');
+                setSearchResults([]);
+            }}
             setIsSearchMode={setIsSearchMode}
             
             // Selection / Delete
@@ -579,6 +622,7 @@ const MessageLayout = ({
             handleOptionClick={(action) => {
                setShowOptions(false);
                if (action === 'delete' || action === 'select') setIsSelectMode(true);
+               if (action === 'search') setIsSearchMode(true);
             }}
 
             // Direct specific

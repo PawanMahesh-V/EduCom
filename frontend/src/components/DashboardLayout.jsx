@@ -14,8 +14,7 @@ const DashboardLayout = ({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
   const isAdmin = role?.toLowerCase() === 'admin';
-  const isCoursesTab = activeSection === 'courses';
-  const showMarketplaceBtn = isAdmin || isCoursesTab;
+  const showMarketplaceBtn = isAdmin ? activeSection === 'overview' : activeSection === 'courses';
   
   const handleButtonClick = (e) => {
     e.preventDefault();
