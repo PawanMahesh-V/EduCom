@@ -64,7 +64,7 @@ class Message {
             if (hasAnonymous.rows[0].has_messages) {
                 const anonymousData = await pool.query(
                     `SELECT 
-                        COUNT(*)::integer as unread_count,
+                        COUNT(CASE WHEN is_read = false THEN 1 END)::integer as unread_count,
                         MAX(created_at) as last_message_time,
                         (SELECT content FROM messages 
                          WHERE community_id IS NULL 
@@ -74,13 +74,12 @@ class Message {
                     FROM messages
                     WHERE community_id IS NULL
                       AND receiver_id = $1
-                      AND is_anonymous = true
-                      AND is_read = false`,
+                      AND is_anonymous = true`,
                     [userId]
                 );
                 const data = anonymousData.rows[0];
 
-                allConversations.unshift({
+                allConversations.push({
                     user_id: 'anonymous',
                     user_name: 'Anonymous Students',
                     user_email: null,
@@ -90,6 +89,9 @@ class Message {
                     last_message: data.last_message || 'Anonymous stats',
                     is_anonymous: true
                 });
+                
+                // Sort by last_message_time DESC
+                allConversations.sort((a, b) => new Date(b.last_message_time) - new Date(a.last_message_time));
             }
         }
         return allConversations;

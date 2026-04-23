@@ -3,7 +3,7 @@ const pool = require('../config/database');
 class User {
     static async findByIdentifier(identifier) {
         const query = `
-            SELECT id, reg_id, email, name, role, department, semester, program_year, section, password 
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, password, is_active 
             FROM users 
             WHERE LOWER(email) = LOWER($1) OR LOWER(reg_id) = LOWER($1)
         `;
@@ -12,7 +12,7 @@ class User {
     }
     static async findById(userId) {
         const query = `
-            SELECT id, reg_id, email, name, role, department, semester, program_year, section, created_at, updated_at
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, is_active, created_at, updated_at
             FROM users 
             WHERE id = $1
         `;
@@ -21,7 +21,7 @@ class User {
     }
     static async findAll(filters = {}) {
         let query = `
-            SELECT id, reg_id, email, name, role, department, semester, program_year, section, created_at, updated_at
+            SELECT id, reg_id, email, name, role, department, semester, program_year, section, is_active, created_at, updated_at
             FROM users
         `;
         const params = [];
@@ -51,7 +51,7 @@ class User {
         const query = `
             INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, section)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, created_at
+            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, is_active, created_at
         `;
         const result = await pool.query(query, [reg_id, name, email, password, role, department, semester || null, program_year || null, section || null]);
         return result.rows[0];
@@ -62,7 +62,7 @@ class User {
             UPDATE users 
             SET name = $1, email = $2, role = $3, department = $4, semester = $5, program_year = $6, section = $7, updated_at = CURRENT_TIMESTAMP
             WHERE id = $8
-            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, updated_at
+            RETURNING id, reg_id, email, name, role, department, semester, program_year, section, is_active, updated_at
         `;
         const result = await pool.query(query, [name, email, role, department, semester || null, program_year || null, section || null, userId]);
         return result.rows[0];

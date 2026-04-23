@@ -311,6 +311,7 @@ const MessageLayout = ({
     // Listen to correct socket events based on backend implementation
     socketService.socket.on('new-message', handleNewMessage); // Community messages
     socketService.socket.on('new-direct-message', handleNewDirectMessage); // Direct messages
+    socketService.socket.on('direct-message-sent', handleNewDirectMessage); // Sent direct messages
     socketService.socket.on('user-typing', handleTyping); // Community typing
     socketService.socket.on('dm-user-typing', handleDMTyping); // DM typing
     socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
@@ -324,6 +325,7 @@ const MessageLayout = ({
     return () => {
         socketService.socket.off('new-message', handleNewMessage);
         socketService.socket.off('new-direct-message', handleNewDirectMessage);
+        socketService.socket.off('direct-message-sent', handleNewDirectMessage);
         socketService.socket.off('user-typing', handleTyping);
         socketService.socket.off('dm-user-typing', handleDMTyping);
         socketService.socket.off('message-delivered', handleMessageDelivered);

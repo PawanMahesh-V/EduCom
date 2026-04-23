@@ -1,0 +1,9 @@
+Your ML service uses a Logistic Regression algorithm for classification.
+
+Specifically, looking at the train_model.py file, it uses LogisticRegression from the scikit-learn library.
+
+Before the text is fed into the Logistic Regression model, it goes through a feature extraction process using TF-IDF (Term Frequency-Inverse Document Frequency) vectorizers. It combines two types of features to understand the text better:
+
+Word-level n-grams (combinations of 1-2 words).
+Character-level n-grams (combinations of 3-5 characters).
+This is a very solid, standard approach for text classification tasks like moderation or sentiment analysis!
