@@ -108,20 +108,6 @@ const DashboardLayout = ({
         <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)} />
       )}
 
-      {/* Floating Marketplace Button */}
-      {showMarketplaceBtn && (
-        <button 
-          className="floating-marketplace-btn"
-          onClick={handleButtonClick}
-          title="Open Marketplace"
-          aria-label="Open Marketplace"
-          style={{ bottom: isAdmin ? '2.5rem' : undefined }}
-        >
-          <FontAwesomeIcon icon={faShoppingCart} />
-          <span className="cart-badge">!</span>
-        </button>
-      )}
-
       {/* Main Content */}
       <main className="dashboard-content">
         {children}

@@ -24,9 +24,10 @@ const MessageLayout = ({
   userName,
   mode = 'direct', // 'direct' or 'community'
   // Optional initial selection overrides or callbacks
-  initialChatId = null, 
+  initialChatId = null,
+  initialUserObject = null, // { id, name } — opens a new DM if no existing conversation
   onChatSelected,
-  onLeaveCommunity, // kept as prop or move to hook? Kept as specific logic often resides in parent
+  onLeaveCommunity,
   onDisbandCommunity
 }) => {
   const queryClient = useQueryClient();
@@ -364,15 +365,39 @@ const MessageLayout = ({
     }
   }, [mode, selectedItem, userId, queryClient]);
 
-  // Initial Selection
+  // Initial Selection — by ID (existing conversation)
   useEffect(() => {
-      // If initialChatId provided (e.g. from nav), select it
       if (initialChatId && activeList.length > 0 && !selectedItem) {
           const found = activeList.find(i => (i.id === initialChatId || i.user_id === initialChatId));
           if (found) setSelectedItem(found);
       }
   }, [initialChatId, activeList]);
 
+  // Initial Selection — by User Object (open/create DM with seller even if no conversation exists)
+  useEffect(() => {
+    if (!initialUserObject) return;
+    if (mode !== 'direct') return;
+
+    // Wait until conversations have been fetched
+    if (conversations === undefined) return;
+
+    const existing = (conversations || []).find(c => c.user_id === initialUserObject.id);
+    if (existing) {
+      handleSelect(existing);
+    } else {
+      // Create a synthetic conversation object so the chat window opens immediately
+      const newConv = {
+        user_id: initialUserObject.id,
+        user_name: initialUserObject.name,
+        user_email: initialUserObject.email || '',
+        user_role: initialUserObject.role || '',
+        last_message: null,
+      };
+      handleSelect(newConv);
+    }
+  // Only run once when initialUserObject first arrives and conversations are loaded
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUserObject, conversations]);
 
   // --- Handlers ---
 

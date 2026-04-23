@@ -19,7 +19,7 @@ import UserManagement from './Admin/UserManagement';
 import CourseManagement from './Admin/CourseManagement';
 import AdminMessages from './Admin/Messages';
 import AdminModeration from './Admin/Moderation';
-import AdminMarketplace from './Admin/Marketplace';
+import AdminMarketplace from './Marketplace';
 
 // Student components
 import StudentMessages from './Student/Messages';
@@ -44,6 +44,7 @@ const Dashboard = () => {
   const [activeSection, setActiveSection] = useState(role === 'admin' ? 'overview' : 'courses');
   const [courseInitialTab, setCourseInitialTab] = useState('courses');
   const [initialChat, setInitialChat] = useState(null);
+  const [initialMessageUser, setInitialMessageUser] = useState(null);
 
   // Use React Query hook for admin profile
   const { data: adminProfile } = useDashboardData(role);
@@ -70,6 +71,12 @@ const Dashboard = () => {
     setActiveSection('community');
   };
 
+  const handleMessageSeller = (seller) => {
+    // seller: { id, name } from marketplace item
+    setInitialMessageUser(seller);
+    setActiveSection('messages');
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('userToken');
     localStorage.removeItem('user');
@@ -94,6 +101,7 @@ const Dashboard = () => {
       case 'admin':
         return [
           { id: 'overview', name: 'Overview', icon: faTachometerAlt },
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'users', name: 'User Management', icon: faUsers },
           { id: 'courses', name: 'Course Management', icon: faBook },
           { id: 'messages', name: 'Messages', icon: faComments },
@@ -101,6 +109,7 @@ const Dashboard = () => {
         ];
       case 'student':
         return [
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
           { id: 'messages', name: 'Messages', icon: faComments },
@@ -110,6 +119,7 @@ const Dashboard = () => {
       case 'hod':
       case 'pm':
         return [
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
           { id: 'messages', name: 'Messages', icon: faComments },
@@ -145,11 +155,11 @@ const Dashboard = () => {
       case 'courses':
         return <CourseManagement initialTab={courseInitialTab} />;
       case 'messages':
-        return <AdminMessages />;
+        return <AdminMessages initialMessageUser={initialMessageUser} />;
       case 'moderation':
         return <AdminModeration />;
       case 'marketplace':
-        return <AdminMarketplace />;
+        return <AdminMarketplace onMessageSeller={handleMessageSeller} />;
       default:
         return <AdminOverview />;
     }
@@ -162,11 +172,11 @@ const Dashboard = () => {
       case 'community':
         return <StudentCommunities initialChat={initialChat} />;
       case 'messages':
-        return <StudentMessages />;
+        return <StudentMessages initialMessageUser={initialMessageUser} />;
       case 'notifications':
         return <StudentNotifications />;
       case 'marketplace':
-        return <AdminMarketplace />;
+        return <AdminMarketplace onMessageSeller={handleMessageSeller} />;
       default:
         return <StudentMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
     }
@@ -179,11 +189,11 @@ const Dashboard = () => {
       case 'community':
         return <TeacherCommunities initialChat={initialChat} />;
       case 'messages':
-        return <TeacherMessages />;
+        return <TeacherMessages initialMessageUser={initialMessageUser} />;
       case 'notifications':
         return <TeacherNotifications />;
       case 'marketplace':
-        return <AdminMarketplace />;
+        return <AdminMarketplace onMessageSeller={handleMessageSeller} />;
       default:
         return <TeacherMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
     }

@@ -1,0 +1,573 @@
+/* ============================================
+   MarketplaceModals.css
+   Matches the global EduCom Admin .modal pattern exactly
+   ============================================ */
+
+/* ============================================
+   Overlay — same as global .modal
+   ============================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(39, 35, 67, 0.85);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-6);
+  animation: mp-fade-in var(--transition-base);
+}
+
+/* ============================================
+   Base modal content — same as global .modal-content
+   ============================================ */
+.modal-content {
+  background: var(--color-white);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-xl);
+  animation: mp-scale-in var(--transition-slow);
+  position: relative;
+}
+
+/* ============================================
+   Post/Edit Item Modal — wide horizontal layout
+   ============================================ */
+.post-item-modal {
+  max-width: 880px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.modal-header {
+  padding: var(--space-8) var(--space-8) var(--space-6) var(--space-8);
+  border-bottom: 1px solid var(--color-medium-light);
+}
+
+.modal-header h2 {
+  font-size: var(--font-2xl);
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+}
+
+/* Close button */
+.close-btn {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  color: var(--color-gray-400);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  z-index: 10;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: var(--color-dark);
+}
+
+/* Error banner */
+.modal-error {
+  margin: 0 var(--space-8) var(--space-4) var(--space-8);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-danger-light, #FEE2E2);
+  color: var(--color-danger, #EF4444);
+  border-radius: var(--radius-md);
+  font-size: var(--font-sm);
+}
+
+/* ============================================
+   Horizontal layout: image left | form right
+   ============================================ */
+.post-item-layout {
+  display: flex;
+  min-height: 480px;
+}
+
+.post-item-image-side {
+  flex: 1;
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border-right: 1px solid var(--color-medium-light);
+  background: var(--color-white);
+}
+
+.post-item-details-side {
+  flex: 1.4;
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  background: var(--color-white);
+  overflow-y: auto;
+}
+
+/* Image upload zone */
+.image-upload-zone {
+  border: 2px dashed var(--color-medium-light);
+  border-radius: var(--radius-md);
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+  cursor: pointer;
+  background: var(--color-light);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 320px;
+  transition: border-color var(--transition-base), background var(--transition-base);
+}
+
+.image-upload-zone:hover {
+  border-color: var(--bg-accent);
+  background: var(--color-white);
+}
+
+.upload-icon {
+  font-size: 2rem;
+  color: var(--color-gray-400);
+}
+
+.upload-title {
+  display: block;
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-dark);
+}
+
+.upload-hint {
+  display: block;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+}
+
+.upload-preview-img {
+  max-width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.upload-change-hint {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--bg-accent);
+  margin-top: var(--space-2);
+}
+
+/* ============================================
+   Form elements — inherit global .form-group
+   ============================================ */
+.post-item-form {
+  display: flex;
+  flex-direction: column;
+}
+
+/* The .form-group, label, input, select, textarea styles come from global.css */
+/* Only override what's specific to the post form */
+
+.form-row {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.form-row .form-group {
+  flex: 1;
+}
+
+/* Checkbox options */
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-sm);
+  font-weight: 400;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+/* Footer with action buttons */
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-medium-light);
+  margin-top: auto;
+}
+
+/* Button styles — match global .button */
+.btn-primary {
+  padding: 0.75rem 1.5rem;
+  font-size: var(--font-base);
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--bg-accent);
+  color: var(--color-white);
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover:not(:disabled) {
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-secondary {
+  padding: 0.75rem 1.5rem;
+  font-size: var(--font-base);
+  font-weight: 600;
+  border: 1px solid var(--color-medium-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-white);
+  color: var(--color-dark);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: var(--color-light);
+}
+
+.btn-secondary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   Item Details Modal
+   ============================================ */
+.item-details-modal {
+  max-width: 900px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.item-details-layout {
+  display: flex;
+  min-height: 500px;
+}
+
+/* Left image panel */
+.item-image-section {
+  flex: 1;
+  background: var(--color-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  border-right: 1px solid var(--color-medium-light);
+}
+
+.main-image-container {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-main-image {
+  max-width: 100%;
+  max-height: 380px;
+  object-fit: contain;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.out-of-stock-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--color-white);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-xl);
+  font-weight: 700;
+  border-radius: var(--radius-md);
+}
+
+/* Right info panel */
+.item-info-section {
+  flex: 1.2;
+  padding: var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  overflow-y: auto;
+}
+
+.item-category-tag {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bg-accent);
+}
+
+.item-title {
+  font-size: var(--font-2xl);
+  font-weight: 700;
+  color: var(--color-dark);
+  margin: 0;
+  line-height: 1.25;
+}
+
+.item-price {
+  font-size: var(--font-3xl);
+  font-weight: 800;
+  color: var(--color-dark);
+}
+
+/* Seller card — matches the card style in global */
+.item-seller-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--color-light);
+  border: 1px solid var(--color-medium-light);
+  border-radius: var(--radius-md);
+}
+
+.seller-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--color-medium-light);
+}
+
+.seller-details {
+  flex-grow: 1;
+}
+
+.seller-name {
+  font-weight: 600;
+  color: var(--color-dark);
+  display: block;
+  font-size: var(--font-sm);
+}
+
+.seller-rating {
+  font-size: var(--font-xs);
+  color: var(--text-secondary);
+  margin-top: 2px;
+}
+
+.message-seller-btn {
+  background: var(--color-light);
+  color: var(--text-secondary);
+  border: 1px solid var(--color-medium-light);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  font-size: var(--font-sm);
+}
+
+.message-seller-btn:hover {
+  background: var(--bg-accent);
+  color: var(--color-white);
+  border-color: var(--bg-accent);
+}
+
+/* Core data rows */
+.item-core-data {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--color-medium-light);
+  border-bottom: 1px solid var(--color-medium-light);
+}
+
+.data-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.data-label {
+  width: 90px;
+  flex-shrink: 0;
+  font-size: var(--font-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.status-tag {
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+  font-weight: 700;
+}
+
+.status-tag.available {
+  background: var(--color-success-light, #D1FAE5);
+  color: var(--color-success, #10B981);
+}
+
+.status-tag.out_of_stock {
+  background: var(--color-danger-light, #FEE2E2);
+  color: var(--color-danger, #EF4444);
+}
+
+.status-tag.sold {
+  background: var(--color-light);
+  color: var(--text-secondary);
+}
+
+/* Tags */
+.tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+.tag-pill {
+  background: var(--color-light);
+  border: 1px solid var(--color-medium-light);
+  color: var(--text-secondary);
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--font-xs);
+}
+
+/* Description */
+.item-description h3 {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-dark);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.item-description p {
+  color: var(--text-secondary);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
+  font-size: var(--font-sm);
+}
+
+/* Action row */
+.item-actions {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: auto;
+}
+
+.quantity-selector {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-medium-light);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.quantity-selector button {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-white);
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--color-dark);
+  transition: background var(--transition-fast);
+}
+
+.quantity-selector button:hover {
+  background: var(--color-light);
+}
+
+.quantity-selector span {
+  padding: 0 var(--space-4);
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+  font-size: var(--font-sm);
+}
+
+.flex-grow {
+  flex-grow: 1;
+}
+
+.item-secondary-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-secondary);
+  font-size: var(--font-sm);
+  justify-content: center;
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes mp-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes mp-scale-in {
+  from { opacity: 0; transform: scale(0.97) translateY(10px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+  .post-item-layout,
+  .item-details-layout {
+    flex-direction: column;
+  }
+
+  .post-item-image-side,
+  .item-image-section {
+    border-right: none;
+    border-bottom: 1px solid var(--color-medium-light);
+    min-height: auto;
+  }
+
+  .image-upload-zone {
+    min-height: 200px;
+  }
+
+  .post-item-modal,
+  .item-details-modal {
+    max-width: 100%;
+  }
+}

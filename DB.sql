@@ -344,3 +344,27 @@ CREATE INDEX idx_login_verification_expires ON public.login_verification_codes (
 
 CREATE INDEX idx_reset_code_email   ON public.password_reset_codes (email);
 CREATE INDEX idx_reset_code_expires ON public.password_reset_codes (expires_at);
+
+
+
+-- 1. Add Category column for filtering (e.g., 'Textbook', 'Hardware', 'Notes')
+ALTER TABLE public.marketplace_items 
+ADD COLUMN category VARCHAR(50);
+
+-- 2. Add Quantity column to track stock
+ALTER TABLE public.marketplace_items 
+ADD COLUMN quantity INTEGER DEFAULT 1;
+
+-- 3. Add index for faster filtering by category
+CREATE INDEX idx_marketplace_category ON public.marketplace_items (category);
+
+-- 4. (Optional) Add a 'tags' column for better searchability
+ALTER TABLE public.marketplace_items 
+ADD COLUMN tags TEXT[];
+
+ALTER TABLE public.marketplace_items 
+DROP CONSTRAINT IF EXISTS marketplace_status_check;
+
+ALTER TABLE public.marketplace_items 
+ADD CONSTRAINT marketplace_status_check 
+CHECK (status = ANY (ARRAY['pending', 'available', 'out_of_stock', 'sold']));

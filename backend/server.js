@@ -33,12 +33,15 @@ const communityRoutes = require('./routes/communities');
 const notificationRoutes = require('./routes/notifications');
 const directMessageRoutes = require('./routes/directMessages');
 const moderationRoutes = require('./routes/moderation');
+const marketplaceRoutes = require('./routes/marketplaceRoutes');
 
-// Middleware
 const helmet = require('helmet');
 const compression = require('compression');
+const path = require('path');
 
-app.use(helmet());
+app.use(helmet({
+    crossOriginResourcePolicy: false, // Allow loading images from different origins
+}));
 app.use(compression());
 
 app.use(cors({
@@ -46,6 +49,9 @@ app.use(cors({
     credentials: true
 }));
 app.use(express.json());
+
+// Serve static uploads
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // Use routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
@@ -55,6 +61,7 @@ app.use('/api/communities', communityRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/direct-messages', directMessageRoutes);
 app.use('/api/moderation', moderationRoutes);
+app.use('/api/marketplace', marketplaceRoutes);
 
 // Error Handling Middleware (Must be last)
 const errorHandler = require('./middleware/errorHandler');
