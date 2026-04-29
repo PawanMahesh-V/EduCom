@@ -28,7 +28,8 @@ const MessageLayout = ({
   initialUserObject = null, // { id, name } — opens a new DM if no existing conversation
   onChatSelected,
   onLeaveCommunity,
-  onDisbandCommunity
+  onDisbandCommunity,
+  onToggleChat
 }) => {
   const queryClient = useQueryClient();
   const { socketService } = useSocket();
@@ -63,6 +64,12 @@ const MessageLayout = ({
 
   const [typingUsers, setTypingUsers] = useState([]);
   const [blockedMessages, setBlockedMessages] = useState([]);
+
+  useEffect(() => {
+    if (onToggleChat) {
+      onToggleChat(!!selectedItem);
+    }
+  }, [selectedItem, onToggleChat]);
 
 
 

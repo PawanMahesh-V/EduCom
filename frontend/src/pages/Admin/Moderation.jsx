@@ -12,6 +12,7 @@ const Moderation = () => {
     const [bannedUsers, setBannedUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [bannedLoading, setBannedLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
     
     const { socketService, isConnected } = useSocket();
     const [confirmState, setConfirmState] = useState({
@@ -141,38 +142,55 @@ const Moderation = () => {
         });
     };
 
+    const filteredMessages = messages.filter(msg => 
+        msg.sender_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        msg.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        msg.sender_email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const filteredBannedUsers = bannedUsers.filter(user =>
+        user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
     return (
-        <div className="user-management-wrapper">
-            <div className="tabs-container">
-                <button
-                    className={`tab-button ${activeTab === 'queue' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('queue')}
-                >
-                    Reported Messages
-                </button>
-                <button
-                    className={`tab-button ${activeTab === 'banned' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('banned')}
-                >
-                     Banned Users
-                </button>
+        <div className="moderation-management-wrapper">
+            <div className="dashboard-sub-nav">
+                <div className="dashboard-sub-nav-tabs">
+                    <div
+                        className={`sub-nav-item ${activeTab === 'queue' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('queue')}
+                    >
+                        Reported Messages
+                    </div>
+                    <div
+                        className={`sub-nav-item ${activeTab === 'banned' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('banned')}
+                    >
+                        Banned Users
+                    </div>
+                </div>
             </div>
 
-            <div className="tab-content container">
+            <div className="tab-content">
                 {activeTab === 'queue' ? (
-                    <>
-                        <div className="header-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
-                                Pending Reports
-                            </h2>
-                            </div>
+                    <div className="moderation-queue-tab">
+                        <div className="dashboard-toolbar">
+                            <input
+                                className="dashboard-search-input"
+                                type="text"
+                                placeholder="Search reported messages..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
 
                         {loading ? (
                             <div className="loading-container">
                                 <div className="spinner"></div>
                                 <p>Loading reported messages...</p>
                             </div>
-                        ) : messages.length === 0 ? (
+                        ) : filteredMessages.length === 0 ? (
                             <div className="empty-state">
                                 <h3>No Pending Reports</h3>
                                 <p>There are currently no messages waiting for admin review.</p>
@@ -187,11 +205,11 @@ const Moderation = () => {
                                             <th>Where</th>
                                             <th>Source</th>
                                             <th>Message Content</th>
-                                            <th>Actions</th>
+                                            <th className="text-center">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {messages.map((msg) => (
+                                        {filteredMessages.map((msg) => (
                                             <tr key={msg.id}>
                                                 <td data-label="Date Sent">{new Date(msg.created_at).toLocaleString()}</td>
                                                 <td data-label="Sender">
@@ -251,29 +269,29 @@ const Moderation = () => {
                                                     </div>
                                                 </td>
                                                 <td data-label="Actions">
-                                                    <button
-                                                        className="btn-reject"
-                                                        title="Chat Ban User"
-                                                        onClick={() => handleBanUser(msg.sender_id, msg.id, msg.sender_name)}
-                                                        style={{ marginRight: '8px', backgroundColor: '#dc2626' }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faBan} />
-                                                    </button>
-                                                    <button
-                                                        className="btn-approve"
-                                                        title="Approve Message"
-                                                        onClick={() => handleApprove(msg.id)}
-                                                        style={{ marginRight: '8px' }}
-                                                    >
-                                                        <FontAwesomeIcon icon={faCheck} />
-                                                    </button>
-                                                    <button
-                                                        className="btn-reject"
-                                                        title="Reject Message Only"
-                                                        onClick={() => handleReject(msg.id)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faTimes} />
-                                                    </button>
+                                                    <div className="action-buttons justify-center">
+                                                        <button
+                                                            className="button delete icon-button"
+                                                            title="Chat Ban User"
+                                                            onClick={() => handleBanUser(msg.sender_id, msg.id, msg.sender_name)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faBan} />
+                                                        </button>
+                                                        <button
+                                                            className="button success icon-button"
+                                                            title="Approve Message"
+                                                            onClick={() => handleApprove(msg.id)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faCheck} />
+                                                        </button>
+                                                        <button
+                                                            className="button delete icon-button"
+                                                            title="Reject Message Only"
+                                                            onClick={() => handleReject(msg.id)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faTimes} />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -282,7 +300,7 @@ const Moderation = () => {
 
                                 {/* Mobile Card View */}
                                 <div className="mobile-cards-view">
-                                    {messages.map((msg) => (
+                                    {filteredMessages.map((msg) => (
                                         <div key={msg.id} className="user-card">
                                             <div className="user-card-header">
                                                 <div className="user-card-info">
@@ -340,9 +358,9 @@ const Moderation = () => {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="user-card-actions" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                            <div className="user-card-actions">
                                                 <button className="button delete" onClick={() => handleBanUser(msg.sender_id, msg.id, msg.sender_name)} style={{ flex: '1' }}>
-                                                    <FontAwesomeIcon icon={faBan} /> Ban User
+                                                    <FontAwesomeIcon icon={faBan} /> Ban
                                                 </button>
                                                 <button className="button success" onClick={() => handleApprove(msg.id)} style={{ flex: '1' }}>
                                                     <FontAwesomeIcon icon={faCheck} /> Approve
@@ -356,21 +374,25 @@ const Moderation = () => {
                                 </div>
                             </div>
                         )}
-                    </>
+                    </div>
                 ) : (
-                    <>
-                        <div className="header-actions" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-                            <h2 style={{ fontSize: '1.5rem', fontWeight: 'bold', margin: 0 }}>
-                                Chat Banned Users
-                            </h2>
-                           </div>
+                    <div className="banned-users-tab">
+                        <div className="dashboard-toolbar">
+                            <input
+                                className="dashboard-search-input"
+                                type="text"
+                                placeholder="Search banned users..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
 
                         {bannedLoading ? (
                             <div className="loading-container">
                                 <div className="spinner"></div>
                                 <p>Loading banned users...</p>
                             </div>
-                        ) : bannedUsers.length === 0 ? (
+                        ) : filteredBannedUsers.length === 0 ? (
                             <div className="empty-state">
                                 <h3>No Banned Users</h3>
                                 <p>There are no users currently blocked from chatting.</p>
@@ -388,20 +410,22 @@ const Moderation = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {bannedUsers.map((user) => (
+                                        {filteredBannedUsers.map((user) => (
                                             <tr key={user.id}>
                                                 <td data-label="User Name"><strong>{user.name}</strong></td>
                                                 <td data-label="Email">{user.email}</td>
                                                 <td data-label="Role">{user.role}</td>
                                                 <td data-label="Department">{user.department || '-'}</td>
-                                                <td data-label="Actions">
-                                                    <button
-                                                        className="button primary icon-button"
-                                                        title="Unban User"
-                                                        onClick={() => handleUnbanUser(user.id, user.name)}
-                                                    >
-                                                        <FontAwesomeIcon icon={faUnlock} /> Unban
-                                                    </button>
+                                                 <td data-label="Actions">
+                                                    <div className="action-buttons justify-center">
+                                                        <button
+                                                            className="button primary icon-button"
+                                                            title="Unban User"
+                                                            onClick={() => handleUnbanUser(user.id, user.name)}
+                                                        >
+                                                            <FontAwesomeIcon icon={faUnlock} />
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -410,7 +434,7 @@ const Moderation = () => {
 
                                 {/* Mobile Card View */}
                                 <div className="mobile-cards-view">
-                                    {bannedUsers.map((user) => (
+                                    {filteredBannedUsers.map((user) => (
                                         <div key={user.id} className="user-card">
                                             <div className="user-card-header">
                                                 <div className="user-card-info">
@@ -446,7 +470,7 @@ const Moderation = () => {
                                 </div>
                             </div>
                         )}
-                    </>
+                    </div>
                 )}
             </div>
 

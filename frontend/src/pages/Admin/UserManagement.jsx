@@ -10,6 +10,7 @@ import {
 import { showSuccess, showError } from '../../utils/alert';
 import { authApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import CustomSelect from '../../components/Common/CustomSelect';
 import { useSocket } from '../../context/SocketContext';
 
 const UserManagement = () => {
@@ -279,89 +280,68 @@ const UserManagement = () => {
 
   return (
     <div className="user-management-wrapper">
-      <div className="tabs-container">
-        <button
-          className={`tab-button ${userTab === 'users' ? 'active' : ''}`}
-          onClick={() => setUserTab('users')}
-        >
-          Add New User
-        </button>
-        <button
-          className={`tab-button ${userTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setUserTab('requests')}
-        >
-          Approve Requests
-        </button>
+      <div className="dashboard-sub-nav">
+        <div className="dashboard-sub-nav-tabs">
+          <div
+            className={`sub-nav-item ${userTab === 'users' ? 'active' : ''}`}
+            onClick={() => setUserTab('users')}
+          >
+            Manage Users
+          </div>
+          <div
+            className={`sub-nav-item ${userTab === 'requests' ? 'active' : ''}`}
+            onClick={() => setUserTab('requests')}
+          >
+            Registration Requests
+          </div>
+        </div>
       </div>
 
       <div className="tab-content">
         {userTab === 'users' ? (
-          <div className="container">
-            <div className="header-actions">
-              <div className="search-container">
-                <input
-                  className="search-input"
-                  type="text"
-                  placeholder="Search users by name, email, role..."
-                  value={userSearchTerm}
-                  onChange={(e) => setUserSearchTerm(e.target.value)}
-                />
-              </div>
+          <div className="user-management-tab-content">
+            <div className="dashboard-toolbar">
+              <input
+                className="dashboard-search-input"
+                type="text"
+                placeholder="Search users..."
+                value={userSearchTerm}
+                onChange={(e) => setUserSearchTerm(e.target.value)}
+              />
+              
+              <CustomSelect
+                options={[
+                  { value: 'All', label: 'All Roles' },
+                  { value: 'Student', label: 'Student' },
+                  { value: 'Teacher', label: 'Teacher' },
+                  { value: 'Admin', label: 'Admin' },
+                  { value: 'HOD', label: 'HOD' },
+                  { value: 'PM', label: 'PM' }
+                ]}
+                value={userRoleFilter}
+                onChange={(val) => setUserRoleFilter(val)}
+              />
+
+              <CustomSelect
+                options={[
+                  { value: 'All', label: 'All Departments' },
+                  { value: 'Computer Science', label: 'Computer Science' },
+                  { value: 'Management Sciences', label: 'Management Sciences' },
+                  { value: 'Social Sciences', label: 'Social Sciences' },
+                  { value: 'Media Sciences', label: 'Media Sciences' },
+                  { value: 'Mechatronics Engineering', label: 'Mechatronics Engineering' }
+                ]}
+                value={userDepartmentFilter}
+                onChange={(val) => setUserDepartmentFilter(val)}
+              />
+
               <button
-                className="button primary icon-button"
+                className="button primary dashboard-action-btn"
                 onClick={() => setIsUserModalOpen(true)}
-                data-tooltip="Add New User"
-                aria-label="Add New User"
               >
                 <FontAwesomeIcon icon={faUserPlus} />
+                Add User
               </button>
-            </div>
-
-            <div className="filters-container">
-              <div className="filter-group">
-                <label className="filter-label">Role</label>
-                <select
-                  className="input filter-select-min"
-                  value={userRoleFilter}
-                  onChange={(e) => setUserRoleFilter(e.target.value)}
-                >
-                  <option value="All">All Roles</option>
-                  <option value="Student">Student</option>
-                  <option value="Teacher">Teacher</option>
-                  <option value="Admin">Admin</option>
-                  <option value="HOD">HOD</option>
-                  <option value="PM">PM</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label className="filter-label">Department</label>
-                <select
-                  className="input filter-select-min"
-                  value={userDepartmentFilter}
-                  onChange={(e) => setUserDepartmentFilter(e.target.value)}
-                >
-                  <option value="All">All Departments</option>
-                  <option value="CS">CS</option>
-                  <option value="BBA">BBA</option>
-                  {/* <option value="IT">IT</option> */}
-                </select>
-              </div>
-
-              {(userRoleFilter !== 'All' || userDepartmentFilter !== 'All' || userSearchTerm) && (
-                <div className="filter-actions">
-                  <button
-                    className="btn secondary filter-button-nowrap"
-                    onClick={() => {
-                      setUserRoleFilter('All');
-                      setUserDepartmentFilter('All');
-                      setUserSearchTerm('');
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
             </div>
 
             {usersLoading ? (
@@ -529,64 +509,62 @@ const UserManagement = () => {
                       </div>
                       <div className="form-group">
                         <label>Role:</label>
-                        <select
-                          name="role"
+                        <CustomSelect
+                          options={[
+                            { value: 'Student', label: 'Student' },
+                            { value: 'Teacher', label: 'Teacher' },
+                            { value: 'Admin', label: 'Admin' },
+                            { value: 'HOD', label: 'HOD' },
+                            { value: 'PM', label: 'PM (Program Manager)' }
+                          ]}
                           value={userFormData.role}
-                          onChange={handleUserInputChange}
-                        >
-                          <option value="Student">Student</option>
-                          <option value="Teacher">Teacher</option>
-                          <option value="Admin">Admin</option>
-                          <option value="HOD">HOD</option>
-                          <option value="PM">PM (Program Manager)</option>
-                        </select>
+                          onChange={(val) => setUserFormData({ ...userFormData, role: val })}
+                        />
                       </div>
                       <div className="form-group">
                         <label>Department:</label>
-                        <select
-                          name="department"
+                        <CustomSelect
+                          options={[
+                            { value: 'CS', label: 'CS' },
+                            { value: 'BBA', label: 'BBA' },
+                            { value: 'IT', label: 'IT' }
+                          ]}
                           value={userFormData.department}
-                          onChange={handleUserInputChange}
-                        >
-                          <option value="CS">CS</option>
-                          <option value="BBA">BBA</option>
-                          <option value="IT">IT</option>
-                        </select>
+                          onChange={(val) => setUserFormData({ ...userFormData, department: val })}
+                        />
                       </div>
                       {userFormData.role === 'Student' && (
                         <div className="form-group">
                           <label>Semester:</label>
-                          <select
-                            name="semester"
+                          <CustomSelect
+                            options={[
+                              { value: '1', label: '1' },
+                              { value: '2', label: '2' },
+                              { value: '3', label: '3' },
+                              { value: '4', label: '4' },
+                              { value: '5', label: '5' },
+                              { value: '6', label: '6' },
+                              { value: '7', label: '7' },
+                              { value: '8', label: '8' }
+                            ]}
                             value={userFormData.semester}
-                            onChange={handleUserInputChange}
-                            required
-                          >
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                            <option value="5">5</option>
-                            <option value="6">6</option>
-                            <option value="7">7</option>
-                            <option value="8">8</option>
-                          </select>
+                            onChange={(val) => setUserFormData({ ...userFormData, semester: val })}
+                          />
                         </div>
                       )}
                       {userFormData.role === 'PM' && (
                         <div className="form-group">
                           <label>Program Year:</label>
-                          <select
-                            name="program_year"
+                          <CustomSelect
+                            options={[
+                              { value: '1', label: '1' },
+                              { value: '2', label: '2' },
+                              { value: '3', label: '3' },
+                              { value: '4', label: '4' }
+                            ]}
                             value={userFormData.program_year}
-                            onChange={handleUserInputChange}
-                            required
-                          >
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                            <option value="3">3</option>
-                            <option value="4">4</option>
-                          </select>
+                            onChange={(val) => setUserFormData({ ...userFormData, program_year: val })}
+                          />
                         </div>
                       )}
                     </div>
@@ -613,17 +591,15 @@ const UserManagement = () => {
             />
           </div>
         ) : (
-          <div className="container">
-            <div className="header-actions">
-              <div className="search-container">
-                <input
-                  className="search-input"
-                  type="text"
-                  placeholder="Search requests by name, email, ID..."
-                  value={requestSearchTerm}
-                  onChange={(e) => setRequestSearchTerm(e.target.value)}
-                />
-              </div>
+          <div className="registration-requests-tab-content">
+            <div className="dashboard-toolbar">
+              <input
+                className="dashboard-search-input"
+                type="text"
+                placeholder="Search requests..."
+                value={requestSearchTerm}
+                onChange={(e) => setRequestSearchTerm(e.target.value)}
+              />
             </div>
 
             {requestsLoading ? (

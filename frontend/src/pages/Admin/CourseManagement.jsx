@@ -11,6 +11,7 @@ import {
 import { showSuccess, showError, showWarning } from '../../utils/alert';
 import { courseApi, communityApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import CustomSelect from '../../components/Common/CustomSelect';
 import { useSocket } from '../../context/SocketContext';
 
 const CourseManagement = ({ initialTab }) => {
@@ -369,98 +370,77 @@ const CourseManagement = ({ initialTab }) => {
 
   return (
     <div className="course-management-wrapper">
-      <div className="tabs-container">
-        <button
-          className={`tab-button ${courseTab === 'courses' ? 'active' : ''}`}
-          onClick={() => setCourseTab('courses')}
-        >
-          Courses
-        </button>
-        <button
-          className={`tab-button ${courseTab === 'communities' ? 'active' : ''}`}
-          onClick={() => setCourseTab('communities')}
-        >
-          Communities
-        </button>
-        <button
-          className={`tab-button ${courseTab === 'requests' ? 'active' : ''}`}
-          onClick={() => setCourseTab('requests')}
-        >
-          Approve Courses
-        </button>
+      <div className="dashboard-sub-nav">
+        <div className="dashboard-sub-nav-tabs">
+          <div
+            className={`sub-nav-item ${courseTab === 'courses' ? 'active' : ''}`}
+            onClick={() => setCourseTab('courses')}
+          >
+            Manage Courses
+          </div>
+          <div
+            className={`sub-nav-item ${courseTab === 'communities' ? 'active' : ''}`}
+            onClick={() => setCourseTab('communities')}
+          >
+            Communities
+          </div>
+          <div
+            className={`sub-nav-item ${courseTab === 'requests' ? 'active' : ''}`}
+            onClick={() => setCourseTab('requests')}
+          >
+            Course Requests
+          </div>
+        </div>
       </div>
 
       <div className="tab-content">
         {courseTab === 'courses' ? (
-          <div className="container">
-            <div className="header-actions">
-              <div className="search-container">
-                <input
-                  type="text"
-                  className="search-input"
-                  placeholder="Search courses by code, name, department..."
-                  value={courseSearchTerm}
-                  onChange={(e) => setCourseSearchTerm(e.target.value)}
-                />
-              </div>
+          <div className="courses-tab-content">
+            <div className="dashboard-toolbar">
+              <input
+                type="text"
+                className="dashboard-search-input"
+                placeholder="Search courses..."
+                value={courseSearchTerm}
+                onChange={(e) => setCourseSearchTerm(e.target.value)}
+              />
+              
+              <CustomSelect
+                options={[
+                  { value: 'All', label: 'All Departments' },
+                  { value: 'CS', label: 'CS' },
+                  { value: 'BBA', label: 'BBA' },
+                  { value: 'IT', label: 'IT' }
+                ]}
+                value={courseDepartmentFilter}
+                onChange={(val) => setCourseDepartmentFilter(val)}
+              />
+
+              <CustomSelect
+                options={[
+                  { value: 'All', label: 'All Semesters' },
+                  { value: '1', label: 'Semester 1' },
+                  { value: '2', label: 'Semester 2' },
+                  { value: '3', label: 'Semester 3' },
+                  { value: '4', label: 'Semester 4' },
+                  { value: '5', label: 'Semester 5' },
+                  { value: '6', label: 'Semester 6' },
+                  { value: '7', label: 'Semester 7' },
+                  { value: '8', label: 'Semester 8' }
+                ]}
+                value={courseSemesterFilter}
+                onChange={(val) => setCourseSemesterFilter(val)}
+              />
+
               <button
-                className="button primary icon-button"
+                className="button primary dashboard-action-btn"
                 onClick={() => setIsCourseModalOpen(true)}
-                data-tooltip="Add New Course"
               >
                 <FontAwesomeIcon icon={faBook} />
+                Add Course
               </button>
             </div>
 
-            <div className="filters-container">
-              <div className="filter-group">
-                <label className="filter-label">Department</label>
-                <select
-                  className="input filter-select-min"
-                  value={courseDepartmentFilter}
-                  onChange={(e) => setCourseDepartmentFilter(e.target.value)}
-                >
-                  <option value="All">All Departments</option>
-                  <option value="CS">CS</option>
-                  <option value="BBA">BBA</option>
-                  <option value="IT">IT</option>
-                </select>
-              </div>
-
-              <div className="filter-group">
-                <label className="filter-label">Semester</label>
-                <select
-                  className="input filter-select-min"
-                  value={courseSemesterFilter}
-                  onChange={(e) => setCourseSemesterFilter(e.target.value)}
-                >
-                  <option value="All">All Semesters</option>
-                  <option value="1">Semester 1</option>
-                  <option value="2">Semester 2</option>
-                  <option value="3">Semester 3</option>
-                  <option value="4">Semester 4</option>
-                  <option value="5">Semester 5</option>
-                  <option value="6">Semester 6</option>
-                  <option value="7">Semester 7</option>
-                  <option value="8">Semester 8</option>
-                </select>
-              </div>
-
-              {(courseDepartmentFilter !== 'All' || courseSemesterFilter !== 'All' || courseSearchTerm) && (
-                <div className="filter-actions">
-                  <button
-                    className="btn secondary filter-button-nowrap"
-                    onClick={() => {
-                      setCourseDepartmentFilter('All');
-                      setCourseSemesterFilter('All');
-                      setCourseSearchTerm('');
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
-            </div>
 
             {coursesLoading ? (
               <div className="loading-error">Loading...</div>
@@ -599,50 +579,45 @@ const CourseManagement = ({ initialTab }) => {
                       </div>
                       <div className="form-group">
                         <label>Department:</label>
-                        <select
-                          name="department"
+                        <CustomSelect
+                          options={[
+                            { value: 'CS', label: 'CS' },
+                            { value: 'BBA', label: 'BBA' },
+                            { value: 'IT', label: 'IT' }
+                          ]}
                           value={courseFormData.department}
-                          onChange={handleCourseInputChange}
-                        >
-                          <option value="CS">CS</option>
-                          <option value="BBA">BBA</option>
-                          <option value="IT">IT</option>
-                        </select>
+                          onChange={(val) => setCourseFormData({ ...courseFormData, department: val })}
+                        />
                       </div>
                       <div className="form-group">
                         <label>Semester:</label>
-                        <select
-                          name="semester"
+                        <CustomSelect
+                          options={[
+                            { value: '1', label: 'Semester 1' },
+                            { value: '2', label: 'Semester 2' },
+                            { value: '3', label: 'Semester 3' },
+                            { value: '4', label: 'Semester 4' },
+                            { value: '5', label: 'Semester 5' },
+                            { value: '6', label: 'Semester 6' },
+                            { value: '7', label: 'Semester 7' },
+                            { value: '8', label: 'Semester 8' }
+                          ]}
                           value={courseFormData.semester}
-                          onChange={handleCourseInputChange}
-                          required
-                        >
-                          <option value="">Select Semester</option>
-                          <option value="1">Semester 1</option>
-                          <option value="2">Semester 2</option>
-                          <option value="3">Semester 3</option>
-                          <option value="4">Semester 4</option>
-                          <option value="5">Semester 5</option>
-                          <option value="6">Semester 6</option>
-                          <option value="7">Semester 7</option>
-                          <option value="8">Semester 8</option>
-                        </select>
+                          onChange={(val) => setCourseFormData({ ...courseFormData, semester: val })}
+                          placeholder="Select Semester"
+                        />
                       </div>
                       <div className="form-group form-group-full">
                         <label>Teacher:</label>
-                        <select
-                          name="teacher_id"
+                        <CustomSelect
+                          options={teachers.map(t => ({ 
+                            value: t.id, 
+                            label: `${t.name} ${t.role ? `(${t.role})` : ''}` 
+                          }))}
                           value={courseFormData.teacher_id}
-                          onChange={handleCourseInputChange}
-                          required
-                        >
-                          <option value="">Select Teacher</option>
-                          {teachers.map(teacher => (
-                            <option key={teacher.id} value={teacher.id}>
-                              {teacher.name} {teacher.role ? `(${teacher.role})` : ''}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={(val) => setCourseFormData({ ...courseFormData, teacher_id: val })}
+                          placeholder="Select Teacher"
+                        />
                       </div>
                     </div>
                     <div className="modal-actions">
@@ -675,45 +650,25 @@ const CourseManagement = ({ initialTab }) => {
             />
           </div>
         ) : courseTab === 'communities' ? (
-          <div className="container">
-            <div className="filters-container">
-              <div className="filter-group">
-                <label className="filter-label">Search</label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Search communities by name, code..."
-                  value={communitySearchTerm}
-                  onChange={(e) => setCommunitySearchTerm(e.target.value)}
-                />
-              </div>
-
-              <div className="filter-group">
-                <label className="filter-label">Status</label>
-                <select
-                  className="input filter-select-min"
-                  value={communityStatusFilter}
-                  onChange={(e) => setCommunityStatusFilter(e.target.value)}
-                >
-                  <option value="All">All Status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
-              </div>
-
-              {(communityStatusFilter !== 'All' || communitySearchTerm) && (
-                <div className="filter-actions">
-                  <button
-                    className="btn secondary filter-button-nowrap"
-                    onClick={() => {
-                      setCommunityStatusFilter('All');
-                      setCommunitySearchTerm('');
-                    }}
-                  >
-                    Clear Filters
-                  </button>
-                </div>
-              )}
+          <div className="communities-tab-content">
+            <div className="dashboard-toolbar">
+              <input
+                type="text"
+                className="dashboard-search-input"
+                placeholder="Search communities..."
+                value={communitySearchTerm}
+                onChange={(e) => setCommunitySearchTerm(e.target.value)}
+              />
+              
+              <CustomSelect
+                options={[
+                  { value: 'All', label: 'All Status' },
+                  { value: 'active', label: 'Active' },
+                  { value: 'inactive', label: 'Inactive' }
+                ]}
+                value={communityStatusFilter}
+                onChange={(val) => setCommunityStatusFilter(val)}
+              />
             </div>
 
             <div className="table-container">
@@ -869,16 +824,15 @@ const CourseManagement = ({ initialTab }) => {
 
                     <div className="form-group">
                       <label htmlFor="community-status">Status</label>
-                      <select
+                      <CustomSelect
                         id="community-status"
-                        name="status"
-                        className="input"
+                        options={[
+                          { value: 'active', label: 'Active' },
+                          { value: 'inactive', label: 'Inactive' }
+                        ]}
                         value={communityFormData.status}
-                        onChange={handleCommunityInputChange}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
+                        onChange={(val) => setCommunityFormData({ ...communityFormData, status: val })}
+                      />
                     </div>
                     <div className="modal-actions">
                       <button

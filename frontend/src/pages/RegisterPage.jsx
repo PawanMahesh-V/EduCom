@@ -158,6 +158,7 @@ const RegisterPage = () => {
                 register={register}
                 errors={errors}
                 watch={watch}
+                setValue={setValue}
                 onSubmit={handleSubmit(onFinalSubmit)}
                 loading={loading}
                 error={error}

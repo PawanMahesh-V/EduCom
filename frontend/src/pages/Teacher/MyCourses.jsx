@@ -13,6 +13,7 @@ import { courseApi, communityApi } from '../../api';
 import socketService from '../../services/socket';
 import { showAlert } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
+import CustomSelect from '../../components/Common/CustomSelect';
 
 import { useAuth } from '../../context/AuthContext';
 
@@ -318,35 +319,32 @@ const MyCourses = ({ onNavigateToCommunity }) => {
                 </div>
                 <div className="form-group">
                   <label>Department:</label>
-                  <select
-                    name="department"
+                  <CustomSelect
+                    options={[
+                      { value: 'CS', label: 'CS' },
+                      { value: 'BBA', label: 'BBA' }
+                    ]}
                     value={courseRequestData.department}
-                    onChange={handleCourseRequestInputChange}
-                    required
-                  >
-                    <option value="CS">CS</option>
-                    <option value="BBA">BBA</option>
-                    {/* <option value="IT">IT</option> */}
-                  </select>
+                    onChange={(val) => setCourseRequestData({ ...courseRequestData, department: val })}
+                  />
                 </div>
                 <div className="form-group">
                   <label>Semester:</label>
-                  <select
-                    name="semester"
+                  <CustomSelect
+                    options={[
+                      { value: '1', label: 'Semester 1' },
+                      { value: '2', label: 'Semester 2' },
+                      { value: '3', label: 'Semester 3' },
+                      { value: '4', label: 'Semester 4' },
+                      { value: '5', label: 'Semester 5' },
+                      { value: '6', label: 'Semester 6' },
+                      { value: '7', label: 'Semester 7' },
+                      { value: '8', label: 'Semester 8' }
+                    ]}
                     value={courseRequestData.semester}
-                    onChange={handleCourseRequestInputChange}
-                    required
-                  >
-                    <option value="">Select Semester</option>
-                    <option value="1">Semester 1</option>
-                    <option value="2">Semester 2</option>
-                    <option value="3">Semester 3</option>
-                    <option value="4">Semester 4</option>
-                    <option value="5">Semester 5</option>
-                    <option value="6">Semester 6</option>
-                    <option value="7">Semester 7</option>
-                    <option value="8">Semester 8</option>
-                  </select>
+                    onChange={(val) => setCourseRequestData({ ...courseRequestData, semester: val })}
+                    placeholder="Select Semester"
+                  />
                 </div>
                 <div className="form-group form-group-full">
                   <label>Teacher:</label>

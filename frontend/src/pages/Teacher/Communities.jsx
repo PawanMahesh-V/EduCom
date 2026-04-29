@@ -6,7 +6,7 @@ import { courseApi, communityApi } from '../../api';
 import { showAlert, showConfirm } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
 
-const Communities = ({ initialChat }) => {
+const Communities = ({ initialChat, onToggleChat }) => {
   const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
   const user = raw ? JSON.parse(raw) : null;
   const userId = user?.id || user?.userId;
@@ -352,6 +352,7 @@ const Communities = ({ initialChat }) => {
         userRole={user?.role}
         userName={user?.name}
         onDisbandCommunity={handleDisbandCommunity}
+        onToggleChat={onToggleChat}
       />
       <ConfirmDialog
         open={confirmDialog.open}

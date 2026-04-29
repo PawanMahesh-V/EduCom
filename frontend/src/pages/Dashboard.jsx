@@ -45,6 +45,7 @@ const Dashboard = () => {
   const [courseInitialTab, setCourseInitialTab] = useState('courses');
   const [initialChat, setInitialChat] = useState(null);
   const [initialMessageUser, setInitialMessageUser] = useState(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
 
   // Use React Query hook for admin profile
   const { data: adminProfile } = useDashboardData(role);
@@ -101,28 +102,28 @@ const Dashboard = () => {
       case 'admin':
         return [
           { id: 'overview', name: 'Overview', icon: faTachometerAlt },
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'users', name: 'User Management', icon: faUsers },
           { id: 'courses', name: 'Course Management', icon: faBook },
           { id: 'messages', name: 'Messages', icon: faComments },
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'moderation', name: 'Content Moderation', icon: faShieldHalved },
         ];
       case 'student':
         return [
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
           { id: 'messages', name: 'Messages', icon: faComments },
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'notifications', name: 'Notifications', icon: faBell },
         ];
       case 'teacher':
       case 'hod':
       case 'pm':
         return [
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'courses', name: 'My Courses', icon: faBook },
           { id: 'community', name: 'Community Chat', icon: faUsers },
           { id: 'messages', name: 'Messages', icon: faComments },
+          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
           { id: 'notifications', name: 'Notifications', icon: faBell },
         ];
       default:
@@ -155,7 +156,7 @@ const Dashboard = () => {
       case 'courses':
         return <CourseManagement initialTab={courseInitialTab} />;
       case 'messages':
-        return <AdminMessages initialMessageUser={initialMessageUser} />;
+        return <AdminMessages initialMessageUser={initialMessageUser} onToggleChat={setIsChatOpen} />;
       case 'moderation':
         return <AdminModeration />;
       case 'marketplace':
@@ -170,9 +171,9 @@ const Dashboard = () => {
       case 'courses':
         return <StudentMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
       case 'community':
-        return <StudentCommunities initialChat={initialChat} />;
+        return <StudentCommunities initialChat={initialChat} onToggleChat={setIsChatOpen} />;
       case 'messages':
-        return <StudentMessages initialMessageUser={initialMessageUser} />;
+        return <StudentMessages initialMessageUser={initialMessageUser} onToggleChat={setIsChatOpen} />;
       case 'notifications':
         return <StudentNotifications />;
       case 'marketplace':
@@ -187,9 +188,9 @@ const Dashboard = () => {
       case 'courses':
         return <TeacherMyCourses onNavigateToCommunity={handleNavigateToCommunity} />;
       case 'community':
-        return <TeacherCommunities initialChat={initialChat} />;
+        return <TeacherCommunities initialChat={initialChat} onToggleChat={setIsChatOpen} />;
       case 'messages':
-        return <TeacherMessages initialMessageUser={initialMessageUser} />;
+        return <TeacherMessages initialMessageUser={initialMessageUser} onToggleChat={setIsChatOpen} />;
       case 'notifications':
         return <TeacherNotifications />;
       case 'marketplace':
@@ -210,6 +211,7 @@ const Dashboard = () => {
       activeSection={activeSection}
       onMenuClick={handleMenuClick}
       onLogout={handleLogout}
+      hideBottomNav={isChatOpen}
     >
       {renderContent()}
     </DashboardLayout>

@@ -1,8 +1,8 @@
 import React from 'react';
 import UnifiedMessages from '../../components/UnifiedMessages';
 
-const Messages = ({ initialMessageUser }) => {
-  return <UnifiedMessages defaultRole="Teacher" allowAnonymous={false} initialMessageUser={initialMessageUser} />;
+const Messages = ({ initialMessageUser, onToggleChat }) => {
+  return <UnifiedMessages defaultRole="Teacher" allowAnonymous={true} initialMessageUser={initialMessageUser} onToggleChat={onToggleChat} />;
 };
 
 export default Messages;

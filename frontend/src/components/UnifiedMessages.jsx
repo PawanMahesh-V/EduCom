@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import MessageLayout from './MessageLayout';
 import { useAuth } from '../context/AuthContext';
 
-const UnifiedMessages = ({ defaultRole, initialMessageUser }) => {
+const UnifiedMessages = ({ defaultRole, initialMessageUser, onToggleChat }) => {
   const { user } = useAuth();
   const userId = user?.id || user?.userId;
 
@@ -17,6 +17,7 @@ const UnifiedMessages = ({ defaultRole, initialMessageUser }) => {
       userName={user?.name}
       initialChatId={initialChatId}
       initialUserObject={initialMessageUser}
+      onToggleChat={onToggleChat}
     />
   );
 };

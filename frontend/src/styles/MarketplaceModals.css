@@ -40,12 +40,19 @@
 .post-item-modal {
   max-width: 880px;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .modal-header {
   padding: var(--space-8) var(--space-8) var(--space-6) var(--space-8);
   border-bottom: 1px solid var(--color-medium-light);
+}
+
+.checkout-item-price {
+  font-size: var(--font-base);
+  font-weight: 700;
+  color: var(--bg-accent);
+  flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -271,7 +278,7 @@
 .item-details-modal {
   max-width: 900px;
   padding: 0;
-  overflow: hidden;
+  overflow-y: auto;
 }
 
 .item-details-layout {
@@ -348,7 +355,7 @@
 .item-price {
   font-size: var(--font-3xl);
   font-weight: 800;
-  color: var(--color-dark);
+  color: var(--bg-accent);
 }
 
 /* Seller card — matches the card style in global */

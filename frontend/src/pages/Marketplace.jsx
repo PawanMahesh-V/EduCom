@@ -10,6 +10,7 @@ import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api/client';
 import API_BASE_URL from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import CustomSelect from '../components/Common/CustomSelect';
 
 const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
@@ -196,8 +197,8 @@ const Marketplace = ({ onMessageSeller }) => {
     <div className="marketplace-container">
 
       {/* Sub Navigation */}
-      <div className="marketplace-sub-nav">
-        <div className="marketplace-sub-nav-tabs">
+      <div className="dashboard-sub-nav">
+        <div className="dashboard-sub-nav-tabs">
           <div
             className={`sub-nav-item ${activeTab === 'items' ? 'active' : ''}`}
             onClick={() => setActiveTab('items')}
@@ -231,27 +232,27 @@ const Marketplace = ({ onMessageSeller }) => {
 
       {/* Search + Filter toolbar — only visible on Items tab */}
       {activeTab === 'items' && (
-        <div className="marketplace-toolbar">
+        <div className="dashboard-toolbar">
           <input
-            className="marketplace-search-input"
+            className="dashboard-search-input"
             type="text"
             placeholder="Search items..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <select
-            className="marketplace-category-select"
+          <CustomSelect
+            options={[
+              { value: 'All Category', label: 'All Categories' },
+              { value: 'Textbooks', label: 'Textbooks' },
+              { value: 'Equipment', label: 'Equipment' },
+              { value: 'Notes', label: 'Notes' },
+              { value: 'Tutoring', label: 'Tutoring' }
+            ]}
             value={categoryFilter}
-            onChange={(e) => setCategoryFilter(e.target.value)}
-          >
-            <option value="All Category">All Categories</option>
-            <option value="Textbooks">Textbooks</option>
-            <option value="Equipment">Equipment</option>
-            <option value="Notes">Notes</option>
-            <option value="Tutoring">Tutoring</option>
-          </select>
+            onChange={(val) => setCategoryFilter(val)}
+          />
           <button
-            className="button primary post-item-btn"
+            className="button primary dashboard-action-btn"
             onClick={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
             style={{ marginLeft: 'auto' }}
           >
@@ -441,15 +442,15 @@ const Marketplace = ({ onMessageSeller }) => {
                           {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : order.status}
                         </span>
                       ) : (
-                        <select 
-                          className={`status-select ${order.status}`}
+                        <CustomSelect
+                          options={[
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'delivered', label: 'Delivered' },
+                            { value: 'cancelled', label: 'Cancelled' }
+                          ]}
                           value={order.status}
-                          onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="delivered">Delivered</option>
-                          <option value="cancelled">Cancelled</option>
-                        </select>
+                          onChange={(val) => handleUpdateStatus(order.id, val)}
+                        />
                       )}
                     </div>
                   </div>

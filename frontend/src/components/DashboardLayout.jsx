@@ -9,6 +9,7 @@ const DashboardLayout = ({
   activeSection, 
   onMenuClick, 
   onLogout, 
+  hideBottomNav,
   children 
 }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -38,9 +39,9 @@ const DashboardLayout = ({
   };
 
   return (
-    <div className="dashboard-layout-topnav">
+    <div className={`dashboard-layout-topnav ${hideBottomNav ? 'chat-active-layout' : ''}`}>
       {/* Top Navigation Bar */}
-      <nav className="topnav">
+      <nav className={`topnav ${hideBottomNav ? 'mobile-hidden' : ''}`}>
         <div className="topnav-container">
           {/* Logo */}
           <div className="topnav-brand" role="banner">
@@ -48,8 +49,8 @@ const DashboardLayout = ({
             <span className="brand-text">EduCom</span>
           </div>
 
-          {/* Desktop Navigation Menu */}
-          <div className={`topnav-menu ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+          {/* Desktop Navigation Menu (Hidden on mobile via CSS) */}
+          <div className="topnav-menu desktop-menu">
             {menuItems.map((item) => (
               <button
                 key={item.id}
@@ -69,47 +70,48 @@ const DashboardLayout = ({
               <button 
                 className="profile-trigger"
                 aria-label="User Profile Menu"
-                aria-haspopup="true"
-                aria-expanded="false"
               >
                 <div className="profile-avatar">
                   {getInitials(user?.full_name || user?.name)}
                 </div>
-                <div className="profile-info">
+                <div className="profile-info desktop-only">
                   <span className="profile-name">{user?.full_name || user?.name || 'User'}</span>
                   <span className="profile-role">{role || user?.role || 'User'}</span>
                 </div>
-                <FontAwesomeIcon icon={faChevronDown} className="dropdown-icon" />
+                <FontAwesomeIcon icon={faChevronDown} className="dropdown-icon desktop-only" />
               </button>
               
               <div className="profile-dropdown-menu">
-                <button className="dropdown-item logout-item" onClick={onLogout} aria-label="Sign Out">
-                  <FontAwesomeIcon icon={faSignOutAlt} aria-hidden="true" />
+                <button className="dropdown-item logout-item" onClick={onLogout}>
+                  <FontAwesomeIcon icon={faSignOutAlt} />
                   <span>Logout</span>
                 </button>
               </div>
             </div>
-
-            {/* Mobile Menu Toggle */}
-            <button 
-              className="mobile-menu-toggle" 
-              onClick={toggleMobileMenu}
-              aria-label="Toggle Mobile Menu"
-              aria-expanded={isMobileMenuOpen}
-            >
-              <FontAwesomeIcon icon={faBars} />
-            </button>
           </div>
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
-      {isMobileMenuOpen && (
-        <div className="mobile-menu-overlay" onClick={() => setIsMobileMenuOpen(false)} />
+      {/* Bottom Navigation Bar for Mobile */}
+      {!hideBottomNav && (
+        <nav className="bottom-nav-bar">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              className={`bottom-nav-item ${activeSection === item.id ? 'active' : ''}`}
+              onClick={() => handleMenuClick(item.id)}
+            >
+              <div className="nav-icon-wrapper">
+                <FontAwesomeIcon icon={item.icon} />
+              </div>
+              <span className="nav-label">{item.name}</span>
+            </button>
+          ))}
+        </nav>
       )}
 
       {/* Main Content */}
-      <main className="dashboard-content">
+      <main className={`dashboard-content ${hideBottomNav ? 'no-bottom-nav' : ''}`}>
         {children}
       </main>
     </div>

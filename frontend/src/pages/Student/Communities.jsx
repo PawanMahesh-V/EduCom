@@ -6,7 +6,7 @@ import ConfirmDialog from '../../components/ConfirmDialog';
 
 import { useAuth } from '../../context/AuthContext';
 
-const Communities = ({ initialChat, onChatSelected }) => {
+const Communities = ({ initialChat, onChatSelected, onToggleChat }) => {
   const { user } = useAuth();
   const userId = user?.id || user?.userId;
 
@@ -56,6 +56,7 @@ const Communities = ({ initialChat, onChatSelected }) => {
         initialChatId={initialChat?.id}
         onChatSelected={onChatSelected}
         onLeaveCommunity={handleLeaveCommunity}
+        onToggleChat={onToggleChat}
       />
       <ConfirmDialog
         open={confirmDialog.open}

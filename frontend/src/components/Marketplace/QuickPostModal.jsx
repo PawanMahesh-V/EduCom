@@ -4,6 +4,7 @@ import { faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
 import '../../styles/MarketplaceModals.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
+import CustomSelect from '../Common/CustomSelect';
 
 const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
     const [formData, setFormData] = useState({
@@ -220,12 +221,16 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                             <div className="form-row">
                                 <div className="form-group">
                                     <label>Category *</label>
-                                    <select name="category" value={formData.category} onChange={handleChange}>
-                                        <option value="Textbooks">Textbook</option>
-                                        <option value="Equipment">Equipment</option>
-                                        <option value="Notes">Notes</option>
-                                        <option value="Tutoring">Tutoring</option>
-                                    </select>
+                                    <CustomSelect
+                                        options={[
+                                            { value: 'Textbooks', label: 'Textbook' },
+                                            { value: 'Equipment', label: 'Equipment' },
+                                            { value: 'Notes', label: 'Notes' },
+                                            { value: 'Tutoring', label: 'Tutoring' }
+                                        ]}
+                                        value={formData.category}
+                                        onChange={(val) => setFormData({ ...formData, category: val })}
+                                    />
                                 </div>
                                 <div className="form-group">
                                     <label>Price (Rs.) *</label>

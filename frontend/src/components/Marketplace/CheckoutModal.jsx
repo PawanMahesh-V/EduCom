@@ -8,6 +8,7 @@ import {
 import '../../styles/CheckoutModal.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
+import CustomSelect from '../Common/CustomSelect';
 
 const PAYMENT_METHODS = [
   { id: 'cod', label: 'Cash on Delivery', icon: faMoneyBillWave, desc: 'Pay when you receive' },
@@ -177,12 +178,16 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                 </div>
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faMapMarkerAlt} /> Pickup Campus</label>
-                  <select name="campus" value={form.campus} onChange={handleChange}>
-                    <option>SZABIST Campus</option>
-                    <option>Main Library</option>
-                    <option>Student Center</option>
-                    <option>Cafeteria Area</option>
-                  </select>
+                  <CustomSelect
+                    options={[
+                      { value: 'SZABIST Campus', label: 'SZABIST Campus' },
+                      { value: 'Main Library', label: 'Main Library' },
+                      { value: 'Student Center', label: 'Student Center' },
+                      { value: 'Cafeteria Area', label: 'Cafeteria Area' }
+                    ]}
+                    value={form.campus}
+                    onChange={(val) => setForm({ ...form, campus: val })}
+                  />
                 </div>
                 <div className="checkout-field">
                   <label>Pickup Note (Optional)</label>

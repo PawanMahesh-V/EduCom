@@ -249,7 +249,7 @@
 .checkout-item-price {
   font-size: var(--font-base);
   font-weight: 700;
-  color: var(--color-dark);
+  color: var(--bg-accent);
   flex-shrink: 0;
 }
 

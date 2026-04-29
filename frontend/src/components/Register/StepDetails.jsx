@@ -5,6 +5,7 @@ import {
   faUserGraduate, faBuilding, faGraduationCap, faCheckCircle 
 } from '@fortawesome/free-solid-svg-icons';
 import { ROLES, DEPARTMENTS } from '../../constants';
+import CustomSelect from '../Common/CustomSelect';
 
 const StepDetails = ({ 
     register,
@@ -12,7 +13,8 @@ const StepDetails = ({
     watch,
     loading, 
     error, 
-    onSubmit 
+    onSubmit,
+    setValue
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -146,18 +148,15 @@ const StepDetails = ({
               <div className="register-input-icon">
                 <FontAwesomeIcon icon={faUserGraduate} />
               </div>
-              <select
-                className="register-input register-select"
-                id="role"
-                disabled={loading}
-                {...register('role')}
-              >
-                {ROLES.filter(r => r !== 'Admin').map(r => (
-                  <option key={r} value={r}>
-                    {r === 'PM' ? 'PM (Program Manager)' : r}
-                  </option>
-                ))}
-              </select>
+              <CustomSelect
+                options={ROLES.filter(r => r !== 'Admin').map(r => ({
+                  value: r,
+                  label: r === 'PM' ? 'PM (Program Manager)' : r
+                }))}
+                value={currentRole}
+                onChange={(val) => setValue('role', val, { shouldValidate: true })}
+                className="register-select"
+              />
             </div>
           </div>
 
@@ -169,16 +168,12 @@ const StepDetails = ({
               <div className="register-input-icon">
                 <FontAwesomeIcon icon={faBuilding} />
               </div>
-              <select
-                className="register-input register-select"
-                id="department"
-                disabled={loading}
-                {...register('department')}
-              >
-                {DEPARTMENTS.map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
+              <CustomSelect
+                options={DEPARTMENTS.map(d => ({ value: d, label: d }))}
+                value={watch('department')}
+                onChange={(val) => setValue('department', val, { shouldValidate: true })}
+                className="register-select"
+              />
             </div>
           </div>
 
@@ -191,21 +186,21 @@ const StepDetails = ({
                 <div className="register-input-icon">
                   <FontAwesomeIcon icon={faGraduationCap} />
                 </div>
-                <select
-                  className={`register-input register-select ${errors.semester ? 'register-input--error' : ''}`}
-                  id="semester"
-                  disabled={loading}
-                  {...register('semester')}
-                >
-                  <option value="1">Semester 1</option>
-                  <option value="2">Semester 2</option>
-                  <option value="3">Semester 3</option>
-                  <option value="4">Semester 4</option>
-                  <option value="5">Semester 5</option>
-                  <option value="6">Semester 6</option>
-                  <option value="7">Semester 7</option>
-                  <option value="8">Semester 8</option>
-                </select>
+                <CustomSelect
+                  options={[
+                    { value: '1', label: 'Semester 1' },
+                    { value: '2', label: 'Semester 2' },
+                    { value: '3', label: 'Semester 3' },
+                    { value: '4', label: 'Semester 4' },
+                    { value: '5', label: 'Semester 5' },
+                    { value: '6', label: 'Semester 6' },
+                    { value: '7', label: 'Semester 7' },
+                    { value: '8', label: 'Semester 8' }
+                  ]}
+                  value={watch('semester')}
+                  onChange={(val) => setValue('semester', val, { shouldValidate: true })}
+                  className="register-select"
+                />
               </div>
               {renderFieldError('semester')}
             </div>
@@ -220,17 +215,17 @@ const StepDetails = ({
                 <div className="register-input-icon">
                   <FontAwesomeIcon icon={faGraduationCap} />
                 </div>
-                <select
-                  className={`register-input register-select ${errors.program_year ? 'register-input--error' : ''}`}
-                  id="program_year"
-                  disabled={loading}
-                  {...register('program_year')}
-                >
-                  <option value="1">Year 1</option>
-                  <option value="2">Year 2</option>
-                  <option value="3">Year 3</option>
-                  <option value="4">Year 4</option>
-                </select>
+                <CustomSelect
+                  options={[
+                    { value: '1', label: 'Year 1' },
+                    { value: '2', label: 'Year 2' },
+                    { value: '3', label: 'Year 3' },
+                    { value: '4', label: 'Year 4' }
+                  ]}
+                  value={watch('program_year')}
+                  onChange={(val) => setValue('program_year', val, { shouldValidate: true })}
+                  className="register-select"
+                />
               </div>
               {renderFieldError('program_year')}
             </div>
