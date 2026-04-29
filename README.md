@@ -149,6 +149,16 @@ Health check:
 curl http://127.0.0.1:8001/health
 ```
 
+## 5) Unified Startup (Recommended)
+
+To start the entire project (Backend, Frontend, and ML Service) with a single command, use the provided Python script in the root directory:
+
+```bash
+python start_project.py
+```
+
+This will launch all services in the background and show their status. Press **Ctrl+C** to stop all services at once.
+
 ## Startup Order
 
 1. Start PostgreSQL
