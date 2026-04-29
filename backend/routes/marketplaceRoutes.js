@@ -28,4 +28,11 @@ router.put('/:id', upload.single('image'), marketplaceController.updateItem);
 // Delete item
 router.delete('/:id', marketplaceController.deleteItem);
 
+// Order routes
+router.get('/orders/me', marketplaceController.getMyOrders);
+router.get('/orders/received', marketplaceController.getReceivedOrders);
+router.post('/orders', marketplaceController.placeOrder);
+router.put('/orders/:id/status', marketplaceController.updateOrderStatus);
+router.put('/orders/:id/cancel', marketplaceController.cancelOrder);
+
 module.exports = router;

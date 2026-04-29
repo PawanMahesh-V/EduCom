@@ -6,6 +6,8 @@ import {
   faUser, faPhone, faEnvelope, faUniversity
 } from '@fortawesome/free-solid-svg-icons';
 import '../../styles/CheckoutModal.css';
+import api from '../../api/client';
+import API_BASE_URL from '../../config/api';
 
 const PAYMENT_METHODS = [
   { id: 'cod', label: 'Cash on Delivery', icon: faMoneyBillWave, desc: 'Pay when you receive' },
@@ -39,19 +41,42 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
   const handlePlaceOrder = async () => {
-    setPlacing(true);
-    // Simulate order placement
-    await new Promise(r => setTimeout(r, 1500));
-    setPlacing(false);
-    setPlaced(true);
-    setTimeout(() => {
-      setPlaced(false);
-      setStep(0);
-      setForm({ fullName: '', email: '', phone: '', campus: 'SZABIST Campus', pickupNote: '' });
-      setPaymentMethod('cod');
-      if (onOrderPlaced) onOrderPlaced();
-      onClose();
-    }, 2500);
+    try {
+      setPlacing(true);
+      const orderData = {
+        full_name: form.fullName,
+        email: form.email,
+        phone: form.phone,
+        campus: form.campus,
+        pickup_note: form.pickupNote,
+        payment_method: paymentMethod,
+        total_amount: cartTotal,
+        items: cartItems.map(item => ({
+          id: item.id,
+          title: item.title,
+          price: item.price,
+          qty: item.qty || 1
+        }))
+      };
+
+      await api.post(`${API_BASE_URL}/marketplace/orders`, orderData);
+      
+      setPlacing(false);
+      setPlaced(true);
+      
+      setTimeout(() => {
+        setPlaced(false);
+        setStep(0);
+        setForm({ fullName: currentUser?.name || '', email: currentUser?.email || '', phone: '', campus: 'SZABIST Campus', pickupNote: '' });
+        setPaymentMethod('cod');
+        if (onOrderPlaced) onOrderPlaced();
+        onClose();
+      }, 2500);
+    } catch (error) {
+      console.error('Failed to place order:', error);
+      alert('Failed to place order. Please try again.');
+      setPlacing(false);
+    }
   };
 
   const canProceedStep1 = form.fullName.trim() && form.email.trim() && form.phone.trim();

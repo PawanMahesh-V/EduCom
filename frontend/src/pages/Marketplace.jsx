@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine } from '@fortawesome/free-solid-svg-icons';
 import '../styles/Marketplace.css';
 import QuickPostModal from '../components/Marketplace/QuickPostModal';
 import ItemDetailsModal from '../components/Marketplace/ItemDetailsModal';
 import CheckoutModal from '../components/Marketplace/CheckoutModal';
+import OTPModal from '../components/Marketplace/OTPModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import api from '../api/client';
 import API_BASE_URL from '../config/api';
@@ -14,11 +15,14 @@ const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
   const currentUserId = user?.id || user?.userId;
 
-  const [activeTab, setActiveTab] = useState('items'); // 'items' | 'myItems' | 'cart'
+  const [activeTab, setActiveTab] = useState('items'); // 'items' | 'orders' | 'sales' | 'cart'
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Category');
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState([]);
+  const [receivedOrders, setReceivedOrders] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState({ items: false, orders: false, sales: false });
 
   // Cart — persisted in localStorage so it survives navigation
   const [cartItems, setCartItems] = useState(() => {
@@ -40,6 +44,8 @@ const Marketplace = ({ onMessageSeller }) => {
   const [selectedItem, setSelectedItem] = useState(null);
   const [itemToEdit, setItemToEdit] = useState(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
+  const [otpOrderId, setOtpOrderId] = useState(null);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -48,36 +54,64 @@ const Marketplace = ({ onMessageSeller }) => {
     onConfirm: null,
   });
 
-  const fetchItems = async () => {
-    if (activeTab === 'cart') return; // Cart is local state, no fetch needed
+  const fetchItems = async (isBackground = false) => {
+    if (activeTab === 'cart') return;
     try {
-      setLoading(true);
-      const endpoint = activeTab === 'myItems' ? '/marketplace/my-items' : '/marketplace';
-      const params = new URLSearchParams();
+      if (!isBackground) setLoading(true);
+      if (activeTab === 'orders') {
+        const response = await api.get(`${API_BASE_URL}/marketplace/orders/me`);
+        setOrders(response || []);
+        setHasLoaded(prev => ({ ...prev, orders: true }));
+      } else if (activeTab === 'sales') {
+        const response = await api.get(`${API_BASE_URL}/marketplace/orders/received`);
+        setReceivedOrders(response || []);
+        setHasLoaded(prev => ({ ...prev, sales: true }));
+      } else {
+        const endpoint = '/marketplace';
+        const params = new URLSearchParams();
 
-      if (activeTab === 'items') {
-        if (searchQuery) params.append('search', searchQuery);
-        if (categoryFilter !== 'All Category') params.append('category', categoryFilter);
+        if (activeTab === 'items') {
+          if (searchQuery) params.append('search', searchQuery);
+          if (categoryFilter !== 'All Category') params.append('category', categoryFilter);
+        }
+
+        const response = await api.get(`${API_BASE_URL}${endpoint}${params.toString() ? '?' + params.toString() : ''}`);
+        setItems(response || []);
+        setHasLoaded(prev => ({ ...prev, items: true }));
       }
-
-      const response = await api.get(`${API_BASE_URL}${endpoint}${params.toString() ? '?' + params.toString() : ''}`);
-      setItems(response || []);
     } catch (error) {
-      console.error('Failed to fetch marketplace items:', error);
-      setItems([]);
+      console.error('Failed to fetch marketplace data:', error);
+      if (activeTab === 'orders') setOrders([]);
+      else if (activeTab === 'sales') setReceivedOrders([]);
+      else setItems([]);
     } finally {
       setLoading(false);
     }
   };
 
+  // Immediate fetch on tab change if not loaded, or background refresh if already loaded
   useEffect(() => {
+    if (activeTab === 'cart') return;
+    
+    const needsLoading = !hasLoaded[activeTab];
+    fetchItems(!needsLoading);
+  }, [activeTab]);
+
+  // Debounced fetch for search and filters
+  useEffect(() => {
+    if (activeTab !== 'items') return;
+    
     const delayDebounceFn = setTimeout(() => {
-      fetchItems();
+      // Show loading UI when searching/filtering
+      if (hasLoaded.items) {
+        fetchItems(false);
+      }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, categoryFilter, activeTab]);
+  }, [searchQuery, categoryFilter]);
 
   const handlePostSuccess = () => {
+    setHasLoaded(prev => ({ ...prev, items: false }));
     fetchItems();
     setItemToEdit(null);
   };
@@ -127,6 +161,37 @@ const Marketplace = ({ onMessageSeller }) => {
 
   const cartTotal = cartItems.reduce((sum, c) => sum + parseFloat(c.price || 0) * c.qty, 0);
 
+  const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
+    try {
+      await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/status`, { status: newStatus, otp });
+      setHasLoaded(prev => ({ ...prev, orders: false, sales: false })); // Invalidate both order-related tabs
+      fetchItems();
+    } catch (error) {
+      console.error('Failed to update order status:', error);
+      throw error;
+    }
+  };
+
+  const handleCancelOrder = (orderId) => {
+    setConfirmState({
+      open: true,
+      title: 'Cancel Order',
+      message: 'Are you sure you want to cancel this order? The items will be returned to the marketplace inventory.',
+      confirmText: 'Yes, Cancel Order',
+      onConfirm: async () => {
+        setConfirmState(prev => ({ ...prev, open: false }));
+        try {
+          await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/cancel`);
+          setHasLoaded({ items: false, orders: false, sales: false }); // Invalidate all on cancellation
+          fetchItems();
+        } catch (error) {
+          console.error('Failed to cancel order:', error);
+          alert(error.response?.data?.message || 'Failed to cancel order');
+        }
+      }
+    });
+  };
+
   return (
     <div className="marketplace-container">
 
@@ -140,10 +205,16 @@ const Marketplace = ({ onMessageSeller }) => {
             Items
           </div>
           <div
-            className={`sub-nav-item ${activeTab === 'myItems' ? 'active' : ''}`}
-            onClick={() => setActiveTab('myItems')}
+            className={`sub-nav-item ${activeTab === 'orders' ? 'active' : ''}`}
+            onClick={() => setActiveTab('orders')}
           >
-            My Items
+            My Orders
+          </div>
+          <div
+            className={`sub-nav-item ${activeTab === 'sales' ? 'active' : ''}`}
+            onClick={() => setActiveTab('sales')}
+          >
+            My Sales
           </div>
           <div
             className={`sub-nav-item ${activeTab === 'cart' ? 'active' : ''}`}
@@ -157,19 +228,6 @@ const Marketplace = ({ onMessageSeller }) => {
           </div>
         </div>
       </div>
-
-      {/* Post an Item button — below sub-nav, only on My Items tab */}
-      {activeTab === 'myItems' && (
-        <div className="marketplace-toolbar">
-          <button
-            className="button primary"
-            onClick={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
-          >
-            <FontAwesomeIcon icon={faPlus} />
-            Post an Item
-          </button>
-        </div>
-      )}
 
       {/* Search + Filter toolbar — only visible on Items tab */}
       {activeTab === 'items' && (
@@ -192,24 +250,33 @@ const Marketplace = ({ onMessageSeller }) => {
             <option value="Notes">Notes</option>
             <option value="Tutoring">Tutoring</option>
           </select>
+          <button
+            className="button primary post-item-btn"
+            onClick={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
+            style={{ marginLeft: 'auto' }}
+          >
+            <FontAwesomeIcon icon={faPlus} />
+            Post an Item
+          </button>
         </div>
       )}
 
       {/* =================== ITEMS TAB =================== */}
       {activeTab === 'items' && (
         <div className="marketplace-items-grid">
-          {loading ? (
-            <div className="marketplace-loading">Loading...</div>
+          {loading && items.length === 0 ? (
+            <div className="marketplace-loading">Loading items...</div>
           ) : items.length === 0 ? (
             <div className="marketplace-empty">No items found. Be the first to post!</div>
           ) : (
             items.map(item => {
               const parsedPrice = parseFloat(item.price);
               const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
+              const isOwner = item.seller_id === currentUserId;
               return (
                 <div
                   key={item.id}
-                  className="marketplace-card"
+                  className={`marketplace-card ${isOwner ? 'manageable' : ''}`}
                   onClick={() => handleItemClick(item)}
                 >
                   <div className="card-image-wrapper">
@@ -224,6 +291,16 @@ const Marketplace = ({ onMessageSeller }) => {
                       <div className="card-img-container">
                         <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="card-image" />
                         {isOutOfStock && <div className="out-of-stock-banner">Out of Stock</div>}
+                      </div>
+                    )}
+                    {isOwner && (
+                      <div className="item-management-overlay">
+                        <button className="mgmt-btn edit" onClick={(e) => { e.stopPropagation(); handleEdit(item); }}>
+                          Edit Post
+                        </button>
+                        <button className="mgmt-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}>
+                          Delete Post
+                        </button>
                       </div>
                     )}
                   </div>
@@ -269,68 +346,134 @@ const Marketplace = ({ onMessageSeller }) => {
         </div>
       )}
 
-      {/* =================== MY ITEMS TAB =================== */}
-      {activeTab === 'myItems' && (
-        <div className="marketplace-items-grid">
-          {loading ? (
-            <div className="marketplace-loading">Loading...</div>
-          ) : items.length === 0 ? (
+
+      {/* =================== ORDERS TAB =================== */}
+      {activeTab === 'orders' && (
+        <div className="orders-container">
+          {loading && orders.length === 0 ? (
+            <div className="marketplace-loading">Loading orders...</div>
+          ) : orders.length === 0 ? (
             <div className="marketplace-empty">
-              <FontAwesomeIcon icon={faBoxOpen} style={{ fontSize: '2rem', marginBottom: '12px', display: 'block' }} />
-              You haven't posted any items yet.
+              <FontAwesomeIcon icon={faBox} style={{ fontSize: '2.5rem', marginBottom: '12px', display: 'block', color: 'var(--color-gray-300)' }} />
+              You haven't placed any orders yet.
             </div>
           ) : (
-            items.map(item => {
-              const parsedPrice = parseFloat(item.price);
-              const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
-              return (
-                <div key={item.id} className="marketplace-card manageable">
-                  <div className="card-image-wrapper">
-                    {item.category === 'Tutoring' ? (
-                      <div className="avatar-placeholder-bg">
-                        <img src={item.image_url || '/assets/marketplace/tutor.png'} alt={item.title} className="avatar-img" />
-                        <div className="star-badge"><FontAwesomeIcon icon={faStar} /></div>
-                        <div className="avatar-title">{item.seller_name || 'Tutor'}</div>
-                        <div className="avatar-subtitle">{item.quantity} slots available</div>
-                      </div>
-                    ) : (
-                      <div className="card-img-container">
-                        <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="card-image" />
-                        {isOutOfStock && <div className="out-of-stock-banner">Out of Stock</div>}
-                      </div>
-                    )}
-                    <div className="item-management-overlay">
-                      <button className="mgmt-btn edit" onClick={(e) => { e.stopPropagation(); handleEdit(item); }}>
-                        Edit Post
-                      </button>
-                      <button className="mgmt-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}>
-                        Delete Post
-                      </button>
+            <div className="orders-list">
+              {orders.map(order => (
+                <div key={order.id} className="order-card">
+                  <div className="order-header">
+                    <div className="order-id">Order #{order.id}</div>
+                    <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
+                    <div className={`order-status ${order.status}`}>
+                      {order.status === 'cancelled_by_buyer' ? 'Cancelled by You' : order.status}
                     </div>
                   </div>
-                  <div className="card-content">
-                    <h3 className="card-title">{item.title}</h3>
-                    <div className="card-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}</div>
-                    {item.category !== 'Tutoring' && (
-                      <div className="seller-info">
-                        <img src="/assets/marketplace/tutor.png" alt="Seller" className="seller-avatar-small" />
-                        <span className="seller-name">{item.seller_name || 'User'}</span>
+                  <div className="order-items">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="order-item">
+                        <span className="order-item-title">{item.title}</span>
+                        <span className="order-item-qty">x{item.quantity}</span>
+                        <span className="order-item-price">Rs. {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
                       </div>
-                    )}
-                    <div className="card-rating-row">
-                      <div className="seller-type">
-                        <FontAwesomeIcon icon={faUserGraduate} className="seller-type-icon" />
-                        {item.category}
+                    ))}
+                  </div>
+                  <div className="order-footer">
+                    <div className="order-pickup">
+                      <strong>Pickup:</strong> {order.campus}
+                    </div>
+                    <div className="order-footer-actions">
+                      <div className="order-total">
+                        Total: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
                       </div>
-                      <div className="rating-score">
-                        <FontAwesomeIcon icon={faStar} className="star-icon" />
-                        4.8
-                      </div>
+                      {order.status === 'pending' && (
+                        <button 
+                          className="button delete small cancel-order-btn"
+                          onClick={() => handleCancelOrder(order.id)}
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+                      {order.status === 'delivered' && (
+                        <button 
+                          className="button primary small"
+                          style={{ fontSize: 'var(--font-xs)', padding: '4px 12px' }}
+                          onClick={() => {
+                            setOtpOrderId(order.id);
+                            setIsOTPModalOpen(true);
+                          }}
+                        >
+                          Mark as Received
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
-              );
-            })
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {/* =================== SALES TAB =================== */}
+      {activeTab === 'sales' && (
+        <div className="orders-container">
+          {loading && receivedOrders.length === 0 ? (
+            <div className="marketplace-loading">Loading sales...</div>
+          ) : receivedOrders.length === 0 ? (
+            <div className="marketplace-empty">
+              <FontAwesomeIcon icon={faChartLine} style={{ fontSize: '2.5rem', marginBottom: '12px', display: 'block', color: 'var(--color-gray-300)' }} />
+              No orders received yet for your items.
+            </div>
+          ) : (
+            <div className="orders-list">
+              {receivedOrders.map(order => (
+                <div key={order.id} className="order-card sales-card">
+                  <div className="order-header">
+                    <div className="order-id">Order #{order.id}</div>
+                    <div className="order-date">Buyer: <strong>{order.buyer_name || order.full_name}</strong></div>
+                    {order.delivery_otp && (
+                      <div className="order-otp-display">
+                        Delivery OTP: <strong>{order.delivery_otp}</strong>
+                      </div>
+                    )}
+                    <div className="order-status-actions">
+                      {['completed', 'cancelled', 'cancelled_by_buyer'].includes(order.status) ? (
+                        <span className={`order-status ${order.status}`}>
+                          {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : order.status}
+                        </span>
+                      ) : (
+                        <select 
+                          className={`status-select ${order.status}`}
+                          value={order.status}
+                          onChange={(e) => handleUpdateStatus(order.id, e.target.value)}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="delivered">Delivered</option>
+                          <option value="cancelled">Cancelled</option>
+                        </select>
+                      )}
+                    </div>
+                  </div>
+                  <div className="order-items">
+                    {order.items.map((item, idx) => (
+                      <div key={idx} className="order-item">
+                        <span className="order-item-title">{item.title}</span>
+                        <span className="order-item-qty">x{item.quantity}</span>
+                        <span className="order-item-price">Rs. {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="order-footer">
+                    <div className="order-contact">
+                      <div className="contact-line"><strong>Phone:</strong> {order.phone}</div>
+                      <div className="contact-line"><strong>Campus:</strong> {order.campus}</div>
+                    </div>
+                    <div className="order-total">
+                      Subtotal: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -414,8 +557,16 @@ const Marketplace = ({ onMessageSeller }) => {
         onOrderPlaced={() => {
           setCartItems([]);
           localStorage.removeItem('educom_cart');
-          setActiveTab('items');
+          setHasLoaded(prev => ({ ...prev, items: false, orders: false }));
+          setActiveTab('orders');
         }}
+      />
+
+      <OTPModal 
+        isOpen={isOTPModalOpen}
+        onClose={() => setIsOTPModalOpen(false)}
+        onVerify={(id, otp) => handleUpdateStatus(id, 'completed', otp)}
+        orderId={otpOrderId}
       />
 
       <ConfirmDialog

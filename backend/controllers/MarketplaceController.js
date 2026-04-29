@@ -1,4 +1,5 @@
 const MarketplaceItem = require('../models/MarketplaceItem');
+const Order = require('../models/Order');
 
 const marketplaceController = {
     // Get all items
@@ -174,6 +175,93 @@ const marketplaceController = {
         } catch (error) {
             console.error('Error deleting marketplace item:', error);
             res.status(500).json({ message: 'Server error deleting item' });
+        }
+    },
+
+    // Place an order
+    placeOrder: async (req, res) => {
+        try {
+            const buyer_id = req.user.userId;
+            const orderData = {
+                buyer_id,
+                ...req.body
+            };
+
+            const orderId = await Order.create(orderData);
+            res.status(201).json({ message: 'Order placed successfully', orderId });
+        } catch (error) {
+            console.error('Error placing order:', error);
+            res.status(500).json({ message: 'Server error placing order' });
+        }
+    },
+
+    // Get current user's placed orders
+    getMyOrders: async (req, res) => {
+        try {
+            const buyer_id = req.user.userId;
+            const orders = await Order.findByBuyerId(buyer_id);
+            res.status(200).json(orders);
+        } catch (error) {
+            console.error('Error fetching user orders:', error);
+            res.status(500).json({ message: 'Server error fetching your orders' });
+        }
+    },
+
+    // Get orders received by the seller (or all orders for Admins)
+    getReceivedOrders: async (req, res) => {
+        try {
+            const userId = req.user.userId;
+            const userRole = req.user.role;
+
+            let orders;
+            if (userRole === 'Admin') {
+                orders = await Order.findAll();
+            } else {
+                orders = await Order.findBySellerId(userId);
+            }
+            res.status(200).json(orders);
+        } catch (error) {
+            console.error('Error fetching received orders:', error);
+            res.status(500).json({ message: 'Server error fetching received orders' });
+        }
+    },
+
+    // Update order status
+    updateOrderStatus: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { status, otp } = req.body;
+
+            // If marking as completed, verify OTP
+            if (status === 'completed') {
+                if (!otp) {
+                    return res.status(400).json({ message: 'Delivery OTP is required to complete the order' });
+                }
+                const isValid = await Order.verifyOTP(id, otp);
+                if (!isValid) {
+                    return res.status(400).json({ message: 'Invalid delivery OTP' });
+                }
+            }
+
+            const updatedOrder = await Order.updateStatus(id, status);
+            res.status(200).json(updatedOrder);
+        } catch (error) {
+            console.error('Error updating order status:', error);
+            res.status(500).json({ message: 'Server error updating order' });
+        }
+    },
+
+    // Cancel order (by buyer)
+    cancelOrder: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const buyer_id = req.user.userId;
+
+            await Order.cancel(id, buyer_id);
+            res.status(200).json({ message: 'Order cancelled and items restocked' });
+        } catch (error) {
+            console.error('Error cancelling order:', error);
+            res.status(400).json({ message: error.message || 'Failed to cancel order' });
         }
     }
 };
