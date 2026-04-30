@@ -1,16 +1,23 @@
 const MarketplaceItem = require('../models/MarketplaceItem');
 const Order = require('../models/Order');
+const Cart = require('../models/Cart');
 
 const marketplaceController = {
     // Get all items
     getAllItems: async (req, res) => {
         try {
+            const page = parseInt(req.query.page) || 1;
+            const limit = parseInt(req.query.limit) || 20;
+            const offset = (page - 1) * limit;
+
             const filters = {
                 category: req.query.category,
-                search: req.query.search
+                search: req.query.search,
+                limit,
+                offset
             };
-            const items = await MarketplaceItem.findAll(filters);
-            res.status(200).json(items);
+            const result = await MarketplaceItem.findAll(filters);
+            res.status(200).json(result); // result is { items, total }
         } catch (error) {
             console.error('Error fetching marketplace items:', error);
             res.status(500).json({ message: 'Server error fetching items' });
@@ -188,6 +195,13 @@ const marketplaceController = {
             };
 
             const orderId = await Order.create(orderData);
+            
+            // Emit real-time inventory update
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('inventory_updated');
+            }
+
             res.status(201).json({ message: 'Order placed successfully', orderId });
         } catch (error) {
             console.error('Error placing order:', error);
@@ -258,10 +272,100 @@ const marketplaceController = {
             const buyer_id = req.user.userId;
 
             await Order.cancel(id, buyer_id);
+            
+            // Emit real-time inventory update
+            const io = req.app.get('io');
+            if (io) {
+                io.emit('inventory_updated');
+            }
+
             res.status(200).json({ message: 'Order cancelled and items restocked' });
         } catch (error) {
             console.error('Error cancelling order:', error);
             res.status(400).json({ message: error.message || 'Failed to cancel order' });
+        }
+    },
+
+    // ================= CART =================
+    getCart: async (req, res) => {
+        try {
+            const cartItems = await Cart.getCart(req.user.userId);
+            res.status(200).json(cartItems);
+        } catch (error) {
+            console.error('Error fetching cart:', error);
+            res.status(500).json({ message: 'Server error fetching cart' });
+        }
+    },
+
+    addToCart: async (req, res) => {
+        try {
+            const { item_id, quantity } = req.body;
+            const item = await Cart.addItem(req.user.userId, item_id, quantity);
+            res.status(200).json(item);
+        } catch (error) {
+            console.error('Error adding to cart:', error);
+            res.status(500).json({ message: 'Server error adding to cart' });
+        }
+    },
+
+    removeFromCart: async (req, res) => {
+        try {
+            const { itemId } = req.params;
+            await Cart.removeItem(req.user.userId, itemId);
+            res.status(200).json({ message: 'Item removed from cart' });
+        } catch (error) {
+            console.error('Error removing from cart:', error);
+            res.status(500).json({ message: 'Server error removing from cart' });
+        }
+    },
+
+    updateCartQuantity: async (req, res) => {
+        try {
+            const { itemId } = req.params;
+            const { quantity } = req.body;
+            
+            if (quantity === undefined) {
+                return res.status(400).json({ message: 'Quantity is required' });
+            }
+
+            const updatedItem = await Cart.updateQuantity(req.user.userId, itemId, parseInt(quantity, 10));
+            res.status(200).json(updatedItem || { message: 'Item removed from cart' });
+        } catch (error) {
+            console.error('Error updating cart quantity:', error);
+            res.status(500).json({ message: 'Server error updating cart quantity' });
+        }
+    },
+
+    clearCart: async (req, res) => {
+        try {
+            await Cart.clearCart(req.user.userId);
+            res.status(200).json({ message: 'Cart cleared' });
+        } catch (error) {
+            console.error('Error clearing cart:', error);
+            res.status(500).json({ message: 'Server error clearing cart' });
+        }
+    },
+
+
+
+    // ================= SELLER PROFILE =================
+    getSellerProfile: async (req, res) => {
+        try {
+            const { id } = req.params;
+            const items = await MarketplaceItem.findBySellerId(id);
+            
+            let sellerInfo = null;
+            if (items.length > 0) {
+                sellerInfo = {
+                    id: id,
+                    name: items[0].seller_name
+                };
+            }
+            
+            res.status(200).json({ seller: sellerInfo, items });
+        } catch (error) {
+            console.error('Error fetching seller profile:', error);
+            res.status(500).json({ message: 'Server error fetching seller profile' });
         }
     }
 };

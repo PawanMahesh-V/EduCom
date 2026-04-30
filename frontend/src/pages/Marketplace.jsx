@@ -7,10 +7,13 @@ import ItemDetailsModal from '../components/Marketplace/ItemDetailsModal';
 import CheckoutModal from '../components/Marketplace/CheckoutModal';
 import OTPModal from '../components/Marketplace/OTPModal';
 import ConfirmDialog from '../components/ConfirmDialog';
+import SellerProfileModal from '../components/Marketplace/SellerProfileModal';
 import api from '../api/client';
 import API_BASE_URL from '../config/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import CustomSelect from '../components/Common/CustomSelect';
+import { showSuccess, showError } from '../utils/alert';
 
 const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
@@ -20,25 +23,29 @@ const Marketplace = ({ onMessageSeller }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Category');
   const [items, setItems] = useState([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  
   const [orders, setOrders] = useState([]);
   const [receivedOrders, setReceivedOrders] = useState([]);
+  const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState({ items: false, orders: false, sales: false });
+  const [hasLoaded, setHasLoaded] = useState({ items: false, orders: false, sales: false, cart: false });
 
-  // Cart — persisted in localStorage so it survives navigation
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const saved = localStorage.getItem('educom_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const { socket } = useSocket();
 
-  // Sync cart to localStorage whenever it changes
+  // Listen for inventory updates
   useEffect(() => {
-    localStorage.setItem('educom_cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+      if (!socket) return;
+      const handleInventoryUpdate = () => {
+          // Silently refresh items
+          fetchItems(true, page);
+      };
+      socket.on('inventory_updated', handleInventoryUpdate);
+      return () => {
+          socket.off('inventory_updated', handleInventoryUpdate);
+      };
+  }, [socket, activeTab, page, searchQuery, categoryFilter]);
 
   // Modals state
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -55,8 +62,20 @@ const Marketplace = ({ onMessageSeller }) => {
     onConfirm: null,
   });
 
-  const fetchItems = async (isBackground = false) => {
-    if (activeTab === 'cart') return;
+  const [selectedSeller, setSelectedSeller] = useState(null);
+
+  const fetchCart = async () => {
+    try {
+      const response = await api.get(`${API_BASE_URL}/marketplace/cart`);
+      setCartItems(response || []);
+      setHasLoaded(prev => ({ ...prev, cart: true }));
+    } catch (error) {
+      console.error('Failed to fetch cart:', error);
+      setCartItems([]);
+    }
+  };
+
+  const fetchItems = async (isBackground = false, currentPage = 1) => {
     try {
       if (!isBackground) setLoading(true);
       if (activeTab === 'orders') {
@@ -67,6 +86,10 @@ const Marketplace = ({ onMessageSeller }) => {
         const response = await api.get(`${API_BASE_URL}/marketplace/orders/received`);
         setReceivedOrders(response || []);
         setHasLoaded(prev => ({ ...prev, sales: true }));
+      } else if (activeTab === 'cart') {
+        const response = await api.get(`${API_BASE_URL}/marketplace/cart`);
+        setCartItems(response || []);
+        setHasLoaded(prev => ({ ...prev, cart: true }));
       } else {
         const endpoint = '/marketplace';
         const params = new URLSearchParams();
@@ -74,28 +97,46 @@ const Marketplace = ({ onMessageSeller }) => {
         if (activeTab === 'items') {
           if (searchQuery) params.append('search', searchQuery);
           if (categoryFilter !== 'All Category') params.append('category', categoryFilter);
+          params.append('page', currentPage);
+          params.append('limit', 20);
         }
 
         const response = await api.get(`${API_BASE_URL}${endpoint}${params.toString() ? '?' + params.toString() : ''}`);
-        setItems(response || []);
+        
+        if (currentPage === 1) {
+            setItems(response?.items || []);
+        } else {
+            setItems(prev => [...prev, ...(response?.items || [])]);
+        }
+        
+        setHasMore(response?.items?.length === 20);
         setHasLoaded(prev => ({ ...prev, items: true }));
       }
     } catch (error) {
       console.error('Failed to fetch marketplace data:', error);
       if (activeTab === 'orders') setOrders([]);
       else if (activeTab === 'sales') setReceivedOrders([]);
+      else if (activeTab === 'cart') setCartItems([]);
       else setItems([]);
     } finally {
-      setLoading(false);
+      if (!isBackground) setLoading(false);
     }
   };
 
+  // Fetch cart globally on mount so grid items can show cart state
+  useEffect(() => {
+    if (!hasLoaded.cart) fetchCart();
+  }, []);
+
   // Immediate fetch on tab change if not loaded, or background refresh if already loaded
   useEffect(() => {
-    if (activeTab === 'cart') return;
-    
     const needsLoading = !hasLoaded[activeTab];
-    fetchItems(!needsLoading);
+    if (activeTab === 'items') {
+      fetchItems(!needsLoading, 1);
+      setPage(1);
+    } else {
+      fetchItems(!needsLoading);
+    }
   }, [activeTab]);
 
   // Debounced fetch for search and filters
@@ -103,13 +144,20 @@ const Marketplace = ({ onMessageSeller }) => {
     if (activeTab !== 'items') return;
     
     const delayDebounceFn = setTimeout(() => {
-      // Show loading UI when searching/filtering
+      // Always reset to page 1 on search/filter
+      setPage(1);
       if (hasLoaded.items) {
-        fetchItems(false);
+        fetchItems(false, 1);
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, categoryFilter]);
+
+  const loadMore = () => {
+    const nextPage = page + 1;
+    setPage(nextPage);
+    fetchItems(false, nextPage);
+  };
 
   const handlePostSuccess = () => {
     setHasLoaded(prev => ({ ...prev, items: false }));
@@ -141,26 +189,53 @@ const Marketplace = ({ onMessageSeller }) => {
           fetchItems();
         } catch (error) {
           console.error('Failed to delete item:', error);
-          alert('Failed to delete item');
+          showError('Failed to delete item');
         }
       }
     });
   };
 
-  const handleAddToCart = (e, item) => {
-    e.stopPropagation();
-    setCartItems(prev => {
-      const exists = prev.find(c => c.id === item.id);
-      if (exists) return prev;
-      return [...prev, { ...item, qty: 1 }];
-    });
+  const handleAddToCart = async (e, item) => {
+    if (e) e.stopPropagation();
+    try {
+      await api.post(`${API_BASE_URL}/marketplace/cart`, { item_id: item.id, quantity: 1 });
+      await fetchCart(); // Always refresh cart state
+      showSuccess(`${item.title} added to cart!`);
+    } catch (error) {
+      console.error('Failed to add to cart:', error);
+      showError('Failed to add to cart');
+    }
   };
 
-  const handleRemoveFromCart = (id) => {
-    setCartItems(prev => prev.filter(c => c.id !== id));
+  const handleUpdateCartQuantity = async (e, item, delta) => {
+    if (e) e.stopPropagation();
+    try {
+      const cartItem = cartItems.find(c => c.id === item.id);
+      const newQuantity = (cartItem ? cartItem.qty : 0) + delta;
+      
+      if (newQuantity <= 0) {
+        await api.delete(`${API_BASE_URL}/marketplace/cart/${item.id}`);
+      } else {
+        await api.put(`${API_BASE_URL}/marketplace/cart/${item.id}`, { quantity: newQuantity });
+      }
+      await fetchCart();
+    } catch (error) {
+      console.error('Failed to update cart quantity:', error);
+      showError('Failed to update quantity');
+    }
   };
 
-  const cartTotal = cartItems.reduce((sum, c) => sum + parseFloat(c.price || 0) * c.qty, 0);
+  const handleRemoveFromCart = async (id) => {
+    try {
+      await api.delete(`${API_BASE_URL}/marketplace/cart/${id}`);
+      await fetchCart(); // refresh cart
+    } catch (error) {
+      console.error('Failed to remove from cart:', error);
+      showError('Failed to remove item');
+    }
+  };
+
+  const cartTotal = cartItems.reduce((sum, c) => sum + parseFloat(c.price || 0) * (c.qty || 1), 0);
 
   const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
     try {
@@ -187,7 +262,7 @@ const Marketplace = ({ onMessageSeller }) => {
           fetchItems();
         } catch (error) {
           console.error('Failed to cancel order:', error);
-          alert(error.response?.data?.message || 'Failed to cancel order');
+          showError(error.response?.data?.message || 'Failed to cancel order');
         }
       }
     });
@@ -274,6 +349,7 @@ const Marketplace = ({ onMessageSeller }) => {
               const parsedPrice = parseFloat(item.price);
               const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
               const isOwner = item.seller_id === currentUserId;
+              const cartItem = cartItems.find(c => c.id === item.id);
               return (
                 <div
                   key={item.id}
@@ -309,7 +385,7 @@ const Marketplace = ({ onMessageSeller }) => {
                     <h3 className="card-title">{item.title}</h3>
                     <div className="card-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}</div>
                     {item.category !== 'Tutoring' && (
-                      <div className="seller-info">
+                      <div className="seller-info" onClick={(e) => { e.stopPropagation(); setSelectedSeller(item.seller_id); }} style={{ cursor: 'pointer' }}>
                         <img src="/assets/marketplace/tutor.png" alt="Seller" className="seller-avatar-small" />
                         <span className="seller-name">{item.seller_name || 'User'}</span>
                       </div>
@@ -324,29 +400,42 @@ const Marketplace = ({ onMessageSeller }) => {
                         4.8
                       </div>
                     </div>
-                    <button
-                      className={`card-action-btn ${isOutOfStock ? 'buy' : (item.seller_id === currentUserId ? 'view' : 'buy')}`}
-                      disabled={isOutOfStock}
-                      onClick={(e) => {
-                        if (item.seller_id === currentUserId) {
+                    {cartItem && !isOwner && !isOutOfStock ? (
+                      <div className="grid-quantity-selector" onClick={(e) => e.stopPropagation()}>
+                        <button className="grid-qty-btn" onClick={(e) => handleUpdateCartQuantity(e, item, -1)}>-</button>
+                        <span className="grid-qty-display">{cartItem.qty}</span>
+                        <button className="grid-qty-btn" onClick={(e) => handleUpdateCartQuantity(e, item, 1)} disabled={cartItem.qty >= item.quantity}>+</button>
+                      </div>
+                    ) : (
+                      <button
+                        className={`card-action-btn ${isOutOfStock ? 'buy' : (isOwner ? 'view' : 'buy')}`}
+                        disabled={isOutOfStock}
+                        onClick={(e) => {
                           e.stopPropagation();
-                          handleItemClick(item);
-                        } else {
-                          e.stopPropagation();
-                          handleAddToCart(e, item);
-                        }
-                      }}
-                    >
-                      {isOutOfStock ? 'Sold Out' : (item.seller_id === currentUserId ? 'View Product' : 'Add to Cart')}
-                    </button>
+                          if (isOwner) {
+                            handleItemClick(item);
+                          } else {
+                            handleAddToCart(e, item);
+                          }
+                        }}
+                      >
+                        {isOutOfStock ? 'Sold Out' : (isOwner ? 'View Product' : 'Add to Cart')}
+                      </button>
+                    )}
                   </div>
                 </div>
               );
             })
           )}
+          {hasMore && items.length > 0 && (
+            <div className="load-more-container" style={{ gridColumn: '1 / -1', textAlign: 'center', marginTop: '20px' }}>
+              <button className="button secondary" onClick={loadMore} disabled={loading}>
+                {loading ? 'Loading...' : 'Load More'}
+              </button>
+            </div>
+          )}
         </div>
       )}
-
 
       {/* =================== ORDERS TAB =================== */}
       {activeTab === 'orders' && (
@@ -363,10 +452,14 @@ const Marketplace = ({ onMessageSeller }) => {
               {orders.map(order => (
                 <div key={order.id} className="order-card">
                   <div className="order-header">
-                    <div className="order-id">Order #{order.id}</div>
-                    <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
-                    <div className={`order-status ${order.status}`}>
-                      {order.status === 'cancelled_by_buyer' ? 'Cancelled by You' : order.status}
+                    <div className="order-header-left">
+                      <div className="order-id">Order #{order.id}</div>
+                      <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
+                    </div>
+                    <div className="order-header-right">
+                      <div className={`order-status ${order.status}`}>
+                        {order.status === 'cancelled_by_buyer' ? 'Cancelled by You' : order.status}
+                      </div>
                     </div>
                   </div>
                   <div className="order-items">
@@ -388,7 +481,7 @@ const Marketplace = ({ onMessageSeller }) => {
                       </div>
                       {order.status === 'pending' && (
                         <button 
-                          className="button delete small cancel-order-btn"
+                          className="cancel-order-btn"
                           onClick={() => handleCancelOrder(order.id)}
                         >
                           Cancel Order
@@ -396,8 +489,7 @@ const Marketplace = ({ onMessageSeller }) => {
                       )}
                       {order.status === 'delivered' && (
                         <button 
-                          className="button primary small"
-                          style={{ fontSize: 'var(--font-xs)', padding: '4px 12px' }}
+                          className="receive-order-btn"
                           onClick={() => {
                             setOtpOrderId(order.id);
                             setIsOTPModalOpen(true);
@@ -429,29 +521,32 @@ const Marketplace = ({ onMessageSeller }) => {
               {receivedOrders.map(order => (
                 <div key={order.id} className="order-card sales-card">
                   <div className="order-header">
-                    <div className="order-id">Order #{order.id}</div>
-                    <div className="order-date">Buyer: <strong>{order.buyer_name || order.full_name}</strong></div>
-                    {order.delivery_otp && (
-                      <div className="order-otp-display">
-                        Delivery OTP: <strong>{order.delivery_otp}</strong>
-                      </div>
-                    )}
-                    <div className="order-status-actions">
-                      {['completed', 'cancelled', 'cancelled_by_buyer'].includes(order.status) ? (
-                        <span className={`order-status ${order.status}`}>
-                          {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : order.status}
-                        </span>
-                      ) : (
-                        <CustomSelect
-                          options={[
-                            { value: 'pending', label: 'Pending' },
-                            { value: 'delivered', label: 'Delivered' },
-                            { value: 'cancelled', label: 'Cancelled' }
-                          ]}
-                          value={order.status}
-                          onChange={(val) => handleUpdateStatus(order.id, val)}
-                        />
+                    <div className="order-header-left">
+                      <div className="order-id">Order #{order.id}</div>
+                    </div>
+                    <div className="order-header-right">
+                      {order.delivery_otp && (
+                        <div className="order-otp-display">
+                          Delivery OTP: <strong>{order.delivery_otp}</strong>
+                        </div>
                       )}
+                      <div className="order-status-actions">
+                        {['completed', 'cancelled', 'cancelled_by_buyer'].includes(order.status) ? (
+                          <span className={`order-status ${order.status}`}>
+                            {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : order.status}
+                          </span>
+                        ) : (
+                          <CustomSelect
+                            options={[
+                              { value: 'pending', label: 'Pending' },
+                              { value: 'delivered', label: 'Delivered' },
+                              { value: 'cancelled', label: 'Cancelled' }
+                            ]}
+                            value={order.status}
+                            onChange={(val) => handleUpdateStatus(order.id, val)}
+                          />
+                        )}
+                      </div>
                     </div>
                   </div>
                   <div className="order-items">
@@ -465,7 +560,8 @@ const Marketplace = ({ onMessageSeller }) => {
                   </div>
                   <div className="order-footer">
                     <div className="order-contact">
-                      <div className="contact-line"><strong>Phone:</strong> {order.phone}</div>
+                      <div className="order-date">Buyer: <strong>{order.buyer_name || order.full_name}</strong></div>
+                      <div className="contact-line"><strong>Buyer Phone:</strong> {order.phone}</div>
                       <div className="contact-line"><strong>Campus:</strong> {order.campus}</div>
                     </div>
                     <div className="order-total">
@@ -503,6 +599,7 @@ const Marketplace = ({ onMessageSeller }) => {
                         <div className="cart-item-title">{item.title}</div>
                         <div className="cart-item-category">{item.category}</div>
                         <div className="cart-item-seller">Seller: {item.seller_name || 'User'}</div>
+                        <div className="cart-item-seller"> Quantity: {item.qty}</div>
                       </div>
                       <div className="cart-item-price">
                         Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}
@@ -555,10 +652,14 @@ const Marketplace = ({ onMessageSeller }) => {
         cartItems={cartItems}
         cartTotal={cartTotal}
         currentUser={user}
-        onOrderPlaced={() => {
+        onOrderPlaced={async () => {
+          try {
+            await api.delete(`${API_BASE_URL}/marketplace/cart`);
+          } catch (e) {
+            console.error('Failed to clear backend cart', e);
+          }
           setCartItems([]);
-          localStorage.removeItem('educom_cart');
-          setHasLoaded(prev => ({ ...prev, items: false, orders: false }));
+          setHasLoaded(prev => ({ ...prev, items: false, orders: false, cart: false }));
           setActiveTab('orders');
         }}
       />
@@ -578,6 +679,14 @@ const Marketplace = ({ onMessageSeller }) => {
         onCancel={() => setConfirmState(prev => ({ ...prev, open: false }))}
         onConfirm={confirmState.onConfirm}
         variant="danger"
+      />
+
+      <SellerProfileModal
+        sellerId={selectedSeller}
+        isOpen={!!selectedSeller}
+        onClose={() => setSelectedSeller(null)}
+        onAddToCart={(item) => { handleAddToCart(null, item); }}
+        currentUserId={currentUserId}
       />
     </div>
   );

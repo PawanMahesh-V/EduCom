@@ -9,6 +9,7 @@ import '../../styles/CheckoutModal.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
 import CustomSelect from '../Common/CustomSelect';
+import { showError } from '../../utils/alert';
 
 const PAYMENT_METHODS = [
   { id: 'cod', label: 'Cash on Delivery', icon: faMoneyBillWave, desc: 'Pay when you receive' },
@@ -75,7 +76,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
       }, 2500);
     } catch (error) {
       console.error('Failed to place order:', error);
-      alert('Failed to place order. Please try again.');
+      showError('Failed to place order. Please try again.');
       setPlacing(false);
     }
   };

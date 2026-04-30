@@ -13,6 +13,23 @@ router.get('/', marketplaceController.getAllItems);
 // Get current user's items
 router.get('/my-items', marketplaceController.getMyItems);
 
+// Cart routes
+router.get('/cart', marketplaceController.getCart);
+router.post('/cart', marketplaceController.addToCart);
+router.put('/cart/:itemId', marketplaceController.updateCartQuantity);
+router.delete('/cart/:itemId', marketplaceController.removeFromCart);
+router.delete('/cart', marketplaceController.clearCart);
+
+// Order routes
+router.get('/orders/me', marketplaceController.getMyOrders);
+router.get('/orders/received', marketplaceController.getReceivedOrders);
+router.post('/orders', marketplaceController.placeOrder);
+router.put('/orders/:id/status', marketplaceController.updateOrderStatus);
+router.put('/orders/:id/cancel', marketplaceController.cancelOrder);
+
+// Seller Profile route
+router.get('/seller/:id', marketplaceController.getSellerProfile);
+
 // Get single item
 router.get('/:id', marketplaceController.getItemById);
 
@@ -27,12 +44,5 @@ router.put('/:id', upload.single('image'), marketplaceController.updateItem);
 
 // Delete item
 router.delete('/:id', marketplaceController.deleteItem);
-
-// Order routes
-router.get('/orders/me', marketplaceController.getMyOrders);
-router.get('/orders/received', marketplaceController.getReceivedOrders);
-router.post('/orders', marketplaceController.placeOrder);
-router.put('/orders/:id/status', marketplaceController.updateOrderStatus);
-router.put('/orders/:id/cancel', marketplaceController.cancelOrder);
 
 module.exports = router;

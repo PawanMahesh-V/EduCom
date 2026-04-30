@@ -30,26 +30,49 @@ class MarketplaceItem {
             LEFT JOIN users u ON m.seller_id = u.id
             WHERE m.status != 'hidden'
         `;
+        let countQuery = `
+            SELECT COUNT(*)
+            FROM marketplace_items m
+            WHERE m.status != 'hidden'
+        `;
         const values = [];
         let paramCount = 1;
 
         if (filters.category && filters.category !== 'All Category') {
-            query += ` AND m.category = $${paramCount}`;
+            const catClause = ` AND m.category = $${paramCount}`;
+            query += catClause;
+            countQuery += catClause;
             values.push(filters.category);
             paramCount++;
         }
 
         if (filters.search) {
-            query += ` AND (m.title ILIKE $${paramCount} OR m.description ILIKE $${paramCount})`;
+            const searchClause = ` AND (m.title ILIKE $${paramCount} OR m.description ILIKE $${paramCount})`;
+            query += searchClause;
+            countQuery += searchClause;
             values.push(`%${filters.search}%`);
             paramCount++;
         }
 
         query += ` ORDER BY m.created_at DESC`;
 
+        if (filters.limit) {
+            query += ` LIMIT $${paramCount}`;
+            values.push(filters.limit);
+            paramCount++;
+        }
+        
+        if (filters.offset) {
+            query += ` OFFSET $${paramCount}`;
+            values.push(filters.offset);
+            paramCount++;
+        }
+
         try {
+            const countResult = await pool.query(countQuery, values.slice(0, filters.limit ? values.length - (filters.offset ? 2 : 1) : values.length));
+            const total = parseInt(countResult.rows[0].count, 10);
             const { rows } = await pool.query(query, values);
-            return rows;
+            return { items: rows, total };
         } catch (error) {
             console.error('Error fetching marketplace items:', error);
             throw error;

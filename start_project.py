@@ -17,7 +17,7 @@ class ProjectRunner:
     def __init__(self):
         self.processes = []
         self.root_dir = os.path.dirname(os.path.abspath(__file__))
-
+ 
     def log(self, service, message, color=Fore.CYAN):
         print(f"{color}[{service}]{Style.RESET_ALL} {message}")
 

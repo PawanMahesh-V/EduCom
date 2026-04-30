@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
+import imageCompression from 'browser-image-compression';
 import '../../styles/MarketplaceModals.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
@@ -63,21 +64,34 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleFileChange = (e) => {
+    const handleFileChange = async (e) => {
         const file = e.target.files[0];
         if (file) {
             if (!file.type.startsWith('image/')) {
                 setError('Please select an image file');
                 return;
             }
-            setImageFile(file);
-            
-            // Create preview URL
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setImagePreview(reader.result);
-            };
-            reader.readAsDataURL(file);
+
+            try {
+                // Compress image
+                const options = {
+                    maxSizeMB: 1,
+                    maxWidthOrHeight: 1024,
+                    useWebWorker: true
+                };
+                const compressedFile = await imageCompression(file, options);
+                setImageFile(compressedFile);
+                
+                // Create preview URL
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreview(reader.result);
+                };
+                reader.readAsDataURL(compressedFile);
+            } catch (error) {
+                console.error("Error compressing image:", error);
+                setError("Failed to process image. Please try another one.");
+            }
         }
     };
 
