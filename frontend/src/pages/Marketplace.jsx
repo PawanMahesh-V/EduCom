@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine } from '@fortawesome/free-solid-svg-icons';
+import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine, faWallet } from '@fortawesome/free-solid-svg-icons';
 import '../styles/Marketplace.css';
 import QuickPostModal from '../components/Marketplace/QuickPostModal';
 import ItemDetailsModal from '../components/Marketplace/ItemDetailsModal';
 import CheckoutModal from '../components/Marketplace/CheckoutModal';
 import OTPModal from '../components/Marketplace/OTPModal';
+import TransactionHistoryModal from '../components/Marketplace/TransactionHistoryModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import SellerProfileModal from '../components/Marketplace/SellerProfileModal';
 import api from '../api/client';
@@ -21,7 +22,7 @@ const Marketplace = ({ onMessageSeller }) => {
 
   const [activeTab, setActiveTab] = useState('items'); // 'items' | 'orders' | 'sales' | 'cart'
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All Category');
+  const [roleFilter, setRoleFilter] = useState('All Roles');
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -45,7 +46,7 @@ const Marketplace = ({ onMessageSeller }) => {
       return () => {
           socket.off('inventory_updated', handleInventoryUpdate);
       };
-  }, [socket, activeTab, page, searchQuery, categoryFilter]);
+  }, [socket, activeTab, page, searchQuery, roleFilter]);
 
   // Modals state
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -53,6 +54,7 @@ const Marketplace = ({ onMessageSeller }) => {
   const [itemToEdit, setItemToEdit] = useState(null);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isOTPModalOpen, setIsOTPModalOpen] = useState(false);
+  const [isTransactionHistoryOpen, setIsTransactionHistoryOpen] = useState(false);
   const [otpOrderId, setOtpOrderId] = useState(null);
   const [confirmState, setConfirmState] = useState({
     open: false,
@@ -72,6 +74,17 @@ const Marketplace = ({ onMessageSeller }) => {
     } catch (error) {
       console.error('Failed to fetch cart:', error);
       setCartItems([]);
+    }
+  };
+
+  const fetchSales = async () => {
+    try {
+      const response = await api.get(`${API_BASE_URL}/marketplace/orders/received`);
+      setReceivedOrders(response || []);
+      setHasLoaded(prev => ({ ...prev, sales: true }));
+    } catch (error) {
+      console.error('Failed to fetch sales:', error);
+      setReceivedOrders([]);
     }
   };
 
@@ -96,7 +109,7 @@ const Marketplace = ({ onMessageSeller }) => {
 
         if (activeTab === 'items') {
           if (searchQuery) params.append('search', searchQuery);
-          if (categoryFilter !== 'All Category') params.append('category', categoryFilter);
+          if (roleFilter !== 'All Roles') params.append('role', roleFilter);
           params.append('page', currentPage);
           params.append('limit', 20);
         }
@@ -126,6 +139,7 @@ const Marketplace = ({ onMessageSeller }) => {
   // Fetch cart globally on mount so grid items can show cart state
   useEffect(() => {
     if (!hasLoaded.cart) fetchCart();
+    if (!hasLoaded.sales) fetchSales();
   }, []);
 
   // Immediate fetch on tab change if not loaded, or background refresh if already loaded
@@ -151,7 +165,7 @@ const Marketplace = ({ onMessageSeller }) => {
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, categoryFilter]);
+  }, [searchQuery, roleFilter]);
 
   const loadMore = () => {
     const nextPage = page + 1;
@@ -237,6 +251,14 @@ const Marketplace = ({ onMessageSeller }) => {
 
   const cartTotal = cartItems.reduce((sum, c) => sum + parseFloat(c.price || 0) * (c.qty || 1), 0);
 
+  const totalEarnings = receivedOrders.reduce((total, order) => {
+    if (order.status !== 'cancelled' && order.status !== 'cancelled_by_buyer' && order.status !== 'refunded') {
+      const orderEarned = order.items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
+      return total + orderEarned;
+    }
+    return total;
+  }, 0);
+
   const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
     try {
       await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/status`, { status: newStatus, otp });
@@ -317,14 +339,15 @@ const Marketplace = ({ onMessageSeller }) => {
           />
           <CustomSelect
             options={[
-              { value: 'All Category', label: 'All Categories' },
-              { value: 'Textbooks', label: 'Textbooks' },
-              { value: 'Equipment', label: 'Equipment' },
-              { value: 'Notes', label: 'Notes' },
-              { value: 'Tutoring', label: 'Tutoring' }
+              { value: 'All Roles', label: 'All Roles' },
+              { value: 'Student', label: 'Student' },
+              { value: 'Teacher', label: 'Teacher' },
+              { value: 'Admin', label: 'Admin' },
+              { value: 'HOD', label: 'HOD' },
+              { value: 'PM', label: 'PM' }
             ]}
-            value={categoryFilter}
-            onChange={(val) => setCategoryFilter(val)}
+            value={roleFilter}
+            onChange={(val) => setRoleFilter(val)}
           />
           <button
             className="button primary dashboard-action-btn"
@@ -386,18 +409,13 @@ const Marketplace = ({ onMessageSeller }) => {
                     <div className="card-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}</div>
                     {item.category !== 'Tutoring' && (
                       <div className="seller-info" onClick={(e) => { e.stopPropagation(); setSelectedSeller(item.seller_id); }} style={{ cursor: 'pointer' }}>
-                        <img src="/assets/marketplace/tutor.png" alt="Seller" className="seller-avatar-small" />
                         <span className="seller-name">{item.seller_name || 'User'}</span>
                       </div>
                     )}
                     <div className="card-rating-row">
                       <div className="seller-type">
                         <FontAwesomeIcon icon={faUserGraduate} className="seller-type-icon" />
-                        {item.category}
-                      </div>
-                      <div className="rating-score">
-                        <FontAwesomeIcon icon={faStar} className="star-icon" />
-                        4.8
+                        {item.seller_role || 'User'}
                       </div>
                     </div>
                     {cartItem && !isOwner && !isOutOfStock ? (
@@ -477,6 +495,9 @@ const Marketplace = ({ onMessageSeller }) => {
                     </div>
                     <div className="order-footer-actions">
                       <div className="order-total">
+                        <div style={{ fontSize: '0.85rem', color: 'var(--color-dark)', marginBottom: '4px' }}>
+                          Payment: <strong>{order.payment_method === 'payfast' ? 'Paid via PayFast' : (order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method)}</strong>
+                        </div>
                         Total: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
                       </div>
                       {order.status === 'pending' && (
@@ -509,6 +530,35 @@ const Marketplace = ({ onMessageSeller }) => {
       {/* =================== SALES TAB =================== */}
       {activeTab === 'sales' && (
         <div className="orders-container">
+          <div className="sales-overview-card">
+            <div>
+              <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: '1.25rem' }}>Sales Overview</h2>
+              <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Track your earnings from all orders</p>
+            </div>
+            <div 
+              className="total-earnings-badge"
+              onClick={() => setIsTransactionHistoryOpen(true)}
+              title="Click to view Transaction History"
+            >
+              <div style={{ 
+                backgroundColor: 'var(--color-primary)', 
+                color: 'white', 
+                width: '36px', 
+                height: '36px', 
+                borderRadius: '50%', 
+                display: 'flex', 
+                alignItems: 'center', 
+                justifyContent: 'center',
+                fontSize: '1rem'
+              }}>
+                <FontAwesomeIcon icon={faWallet} />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1 }}>Total Earnings</span>
+                <span style={{ fontSize: '1.3rem', color: 'var(--color-dark)', lineHeight: 1.2 }}>Rs. {totalEarnings.toFixed(2)}</span>
+              </div>
+            </div>
+          </div>
           {loading && receivedOrders.length === 0 ? (
             <div className="marketplace-loading">Loading sales...</div>
           ) : receivedOrders.length === 0 ? (
@@ -531,9 +581,29 @@ const Marketplace = ({ onMessageSeller }) => {
                         </div>
                       )}
                       <div className="order-status-actions">
-                        {['completed', 'cancelled', 'cancelled_by_buyer'].includes(order.status) ? (
+                        {order.payment_method === 'payfast' && !['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) && (
+                          <button 
+                            className="button danger" 
+                            style={{ padding: '6px 12px', fontSize: '0.8rem', marginRight: '8px' }}
+                            onClick={() => {
+                                setConfirmState({
+                                    open: true,
+                                    title: 'Issue Refund',
+                                    message: 'Are you sure you want to refund this PayFast order? This will update the status to Refunded and remove the amount from your earnings.',
+                                    confirmText: 'Issue Refund',
+                                    onConfirm: () => {
+                                        handleUpdateStatus(order.id, 'refunded');
+                                        setConfirmState(prev => ({ ...prev, open: false }));
+                                    }
+                                });
+                            }}
+                          >
+                            Issue Refund
+                          </button>
+                        )}
+                        {['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) ? (
                           <span className={`order-status ${order.status}`}>
-                            {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : order.status}
+                            {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : (order.status === 'refunded' ? 'Refunded' : order.status)}
                           </span>
                         ) : (
                           <CustomSelect
@@ -565,7 +635,7 @@ const Marketplace = ({ onMessageSeller }) => {
                       <div className="contact-line"><strong>Campus:</strong> {order.campus}</div>
                     </div>
                     <div className="order-total">
-                      Subtotal: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
+                      Payment: <strong>{order.payment_method === 'payfast' ? 'Paid via PayFast' : (order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method)}</strong>
                     </div>
                   </div>
                 </div>
@@ -669,6 +739,12 @@ const Marketplace = ({ onMessageSeller }) => {
         onClose={() => setIsOTPModalOpen(false)}
         onVerify={(id, otp) => handleUpdateStatus(id, 'completed', otp)}
         orderId={otpOrderId}
+      />
+
+      <TransactionHistoryModal
+        isOpen={isTransactionHistoryOpen}
+        onClose={() => setIsTransactionHistoryOpen(false)}
+        orders={receivedOrders}
       />
 
       <ConfirmDialog

@@ -6637,7 +6637,7 @@ window.alert {
     overflow-x: auto;
     scrollbar-width: none;
   }
-  
+
   .dashboard-sub-nav::-webkit-scrollbar {
     display: none;
   }
@@ -8217,11 +8217,13 @@ option {
 }
 
 .ov-text-warning {
-  color: #f97316; /* Vibrant Orange */
+  color: #f97316;
+  /* Vibrant Orange */
 }
 
 .ov-text-danger {
-  color: #ef4444; /* Vibrant Red */
+  color: #ef4444;
+  /* Vibrant Red */
 }
 
 .ov-text-success {

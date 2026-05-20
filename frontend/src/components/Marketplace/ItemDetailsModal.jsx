@@ -49,12 +49,8 @@ const ItemDetailsModal = ({ item, isOpen, onClose, onMessageSeller, onAddToCart,
                         </div>
 
                         <div className="item-seller-card">
-                            <img src="/assets/marketplace/tutor.png" alt="Seller" className="seller-avatar" />
                             <div className="seller-details">
                                 <span className="seller-name">{item.seller_name || 'User'}</span>
-                                <div className="seller-rating">
-                                    <FontAwesomeIcon icon={faStar} className="star-icon" /> 4.8 Rating
-                                </div>
                             </div>
                             {!isOwnListing && (
                                 <button
@@ -87,19 +83,6 @@ const ItemDetailsModal = ({ item, isOpen, onClose, onMessageSeller, onAddToCart,
                                 <span className="data-label">Stock</span>
                                 <span>{item.quantity} available</span>
                             </div>
-                            {item.tags && (Array.isArray(item.tags) ? item.tags.length > 0 : item.tags.length > 0) && (
-                                <div className="data-row">
-                                    <span className="data-label">Tags</span>
-                                    <div className="tags-list">
-                                        {Array.isArray(item.tags) 
-                                            ? item.tags.map((tag, i) => <span key={i} className="tag-pill">{tag}</span>)
-                                            : typeof item.tags === 'string' 
-                                                ? item.tags.replace(/^{|}$/g, '').split(',').map((tag, i) => tag.trim() ? <span key={i} className="tag-pill">{tag.trim().replace(/^"|"$/g, '')}</span> : null)
-                                                : null
-                                        }
-                                    </div>
-                                </div>
-                            )}
                         </div>
 
                         <div className="item-description">

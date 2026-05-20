@@ -4,6 +4,9 @@ const marketplaceController = require('../controllers/MarketplaceController');
 const auth = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
+// Webhooks MUST be public (unprotected by JWT) so external payment gateways can ping them
+router.post('/orders/payfast/webhook', marketplaceController.payFastWebhook);
+
 // Public routes (or protected depending on requirements, assuming protected for platform users)
 router.use(auth); // All marketplace actions require login
 
@@ -24,6 +27,10 @@ router.delete('/cart', marketplaceController.clearCart);
 router.get('/orders/me', marketplaceController.getMyOrders);
 router.get('/orders/received', marketplaceController.getReceivedOrders);
 router.post('/orders', marketplaceController.placeOrder);
+
+// PayFast Integration routes
+router.post('/orders/payfast/initiate', marketplaceController.initiatePayFastPayment);
+
 router.put('/orders/:id/status', marketplaceController.updateOrderStatus);
 router.put('/orders/:id/cancel', marketplaceController.cancelOrder);
 

@@ -12,6 +12,7 @@ import CustomSelect from '../Common/CustomSelect';
 import { showError } from '../../utils/alert';
 
 const PAYMENT_METHODS = [
+  { id: 'payfast', label: 'PayFast (Debit/Credit Card)', icon: faCreditCard, desc: 'Automated secure card payment' },
   { id: 'cod', label: 'Cash on Delivery', icon: faMoneyBillWave, desc: 'Pay when you receive' },
   { id: 'easypaisa', label: 'Easypaisa', icon: faMobileAlt, desc: 'Mobile wallet payment' },
   { id: 'jazzcash', label: 'JazzCash', icon: faMobileAlt, desc: 'Mobile wallet payment' },
@@ -33,11 +34,18 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
   const [placing, setPlacing] = useState(false);
   const [placed, setPlaced] = useState(false);
 
+
   if (!isOpen) return null;
 
   const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    let value = e.target.value;
+    if (e.target.name === 'phone') {
+      value = value.replace(/\D/g, '').slice(0, 11);
+    }
+    setForm(prev => ({ ...prev, [e.target.name]: value }));
   };
+
+
 
   const handleNext = () => setStep(s => Math.min(s + 1, STEPS.length - 1));
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
@@ -61,6 +69,36 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
         }))
       };
 
+      if (paymentMethod === 'payfast') {
+        // Use the specialized initiation endpoint
+        const response = await api.post(`${API_BASE_URL}/marketplace/orders/payfast/initiate`, orderData);
+        
+        if (response.success && response.paymentUrl) {
+          if (response.payload) {
+            // Dynamically create a form to POST the PayFast payload to the gateway
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = response.paymentUrl;
+            
+            Object.keys(response.payload).forEach(key => {
+              const hiddenField = document.createElement('input');
+              hiddenField.type = 'hidden';
+              hiddenField.name = key;
+              hiddenField.value = response.payload[key];
+              form.appendChild(hiddenField);
+            });
+            
+            document.body.appendChild(form);
+            form.submit();
+          } else {
+            // For simulated flow where only URL is provided
+            window.location.href = response.paymentUrl;
+          }
+          return; // Stop execution as we are redirecting
+        }
+      }
+
+      // Default COD/Manual flow
       await api.post(`${API_BASE_URL}/marketplace/orders`, orderData);
       
       setPlacing(false);
@@ -81,7 +119,8 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
     }
   };
 
-  const canProceedStep1 = form.fullName.trim() && form.email.trim() && form.phone.trim();
+  const isPhoneValid = /^03\d{9}$/.test(form.phone.trim());
+  const canProceedStep1 = form.fullName.trim() && form.email.trim() && isPhoneValid;
 
   return (
     <div className="checkout-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
@@ -176,15 +215,25 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faPhone} /> Phone Number</label>
                   <input name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="03xx-xxxxxxx" />
+                  {form.phone.length > 0 && !isPhoneValid && (
+                    <span style={{ color: '#e74c3c', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                      {form.phone.length !== 11 
+                        ? 'Phone number must be exactly 11 digits.' 
+                        : 'Phone number is invalid'}
+                    </span>
+                  )}
                 </div>
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faMapMarkerAlt} /> Pickup Campus</label>
                   <CustomSelect
                     options={[
-                      { value: 'SZABIST Campus', label: 'SZABIST Campus' },
-                      { value: 'Main Library', label: 'Main Library' },
-                      { value: 'Student Center', label: 'Student Center' },
-                      { value: 'Cafeteria Area', label: 'Cafeteria Area' }
+                      { value: '79 Campus', label: '79 Campus' },
+                      { value: '98 Campus', label: '98 Campus' },
+                      { value: '99 Campus', label: '99 Campus' },
+                      { value: '100 Campus', label: '100 Campus' },
+                      { value: '153 Campus', label: '153 Campus' },
+                      { value: '154 Campus', label: '154 Campus' },
+                      { value: '172 Campus', label: '172 Campus' },
                     ]}
                     value={form.campus}
                     onChange={(val) => setForm({ ...form, campus: val })}
@@ -227,12 +276,14 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                 ))}
               </div>
 
-              {paymentMethod !== 'cod' && (
+              {paymentMethod !== 'cod' && paymentMethod !== 'payfast' && (
                 <div className="payment-note">
                   <FontAwesomeIcon icon={faCheckCircle} />
                   <span>You'll receive payment instructions after placing the order.</span>
                 </div>
               )}
+
+
             </div>
           )}
 
@@ -319,6 +370,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
             </div>
           </div>
         )}
+
       </div>
     </div>
   );

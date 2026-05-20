@@ -38,13 +38,12 @@ const LoginPage = () => {
           navigate('/admin', { replace: true });
           break;
         case 'Teacher':
+        case 'HOD':
+        case 'PM':
           navigate('/teacher', { replace: true });
           break;
         case 'Student':
           navigate('/student', { replace: true });
-          break;
-        case 'HOD':
-          navigate('/hod', { replace: true });
           break;
         default:
           navigate('/', { replace: true });
