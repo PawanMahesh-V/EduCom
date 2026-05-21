@@ -3,22 +3,66 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle, faTimesCircle, faArrowLeft, faShoppingBag } from '@fortawesome/free-solid-svg-icons';
 import '../styles/Marketplace.css'; // Reuse marketplace styles
+import api from '../api/client';
+import API_BASE_URL from '../config/api';
 
 const PaymentCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const status = searchParams.get('status');
-  const orderId = searchParams.get('order_id');
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
+  const orderId = searchParams.get('order_id') || searchParams.get('basket_id');
+  const errCode = searchParams.get('err_code');
+  const statusParam = searchParams.get('status');
   const simulated = searchParams.get('simulated');
 
   useEffect(() => {
-    // Simulate a brief verification delay
-    const timer = setTimeout(() => {
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, []);
+    const verifyPayment = async () => {
+      try {
+        if (!orderId) {
+          setErrorMessage('No order reference found.');
+          setIsSuccess(false);
+          setLoading(false);
+          return;
+        }
+
+        const validationHash = searchParams.get('validation_hash');
+
+        if (validationHash) {
+          console.log('[PaymentCallback] Initiating backend hash verification for order:', orderId);
+          // Convert searchParams to a string to pass along
+          const queryParams = searchParams.toString();
+          const response = await api.get(`${API_BASE_URL}/marketplace/orders/payfast/verify?${queryParams}`);
+          
+          console.log('[PaymentCallback] Backend verification response:', response);
+          if (response && response.success) {
+            setIsSuccess(true);
+          } else {
+            setIsSuccess(false);
+            setErrorMessage(response.message || 'Payment verification failed.');
+          }
+        } else {
+          // Fallback logic for legacy/simulated checkout URLs
+          if (statusParam === 'success' || errCode === '000') {
+            setIsSuccess(true);
+          } else {
+            setIsSuccess(false);
+            setErrorMessage('Payment failed or cancelled.');
+          }
+        }
+      } catch (error) {
+        console.error('[PaymentCallback] Verification error:', error);
+        setIsSuccess(false);
+        setErrorMessage(typeof error === 'string' ? error : (error.message || 'An error occurred during verification.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    verifyPayment();
+  }, [searchParams, orderId, statusParam, errCode]);
 
   if (loading) {
     return (
@@ -31,8 +75,6 @@ const PaymentCallback = () => {
       </div>
     );
   }
-
-  const isSuccess = status === 'success';
 
   return (
     <div className="marketplace-container" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '80vh' }}>
@@ -60,7 +102,7 @@ const PaymentCallback = () => {
             <FontAwesomeIcon icon={faTimesCircle} style={{ fontSize: '80px', color: '#ef4444', marginBottom: '20px' }} />
             <h1 style={{ fontSize: '28px', color: 'var(--color-dark)', marginBottom: '12px' }}>Payment Failed</h1>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '30px', lineHeight: '1.6' }}>
-              We couldn't process your payment. Please try again or choose a different payment method.
+              {errorMessage || "We couldn't process your payment. Please try again or choose a different payment method."}
             </p>
           </>
         )}

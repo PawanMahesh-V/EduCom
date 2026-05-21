@@ -66,7 +66,7 @@ const TransactionHistoryModal = ({ isOpen, onClose, orders }) => {
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
                     <span style={{ fontSize: '1.1rem', fontWeight: '700', color: '#059669' }}>+ Rs. {orderTotal.toFixed(2)}</span>
                     <span style={{ fontSize: '0.75rem', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      {order.payment_method === 'cod' ? 'Cash' : order.payment_method}
+                      Cash on Delivery
                     </span>
                   </div>
                 </div>

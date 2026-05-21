@@ -496,7 +496,7 @@ const Marketplace = ({ onMessageSeller }) => {
                     <div className="order-footer-actions">
                       <div className="order-total">
                         <div style={{ fontSize: '0.85rem', color: 'var(--color-dark)', marginBottom: '4px' }}>
-                          Payment: <strong>{order.payment_method === 'payfast' ? 'Paid via PayFast' : (order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method)}</strong>
+                          Payment: <strong>{order.payment_method === 'payfast' ? '✓ Paid via PayFast' : 'Cash on Delivery'}</strong>
                         </div>
                         Total: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
                       </div>
@@ -582,20 +582,20 @@ const Marketplace = ({ onMessageSeller }) => {
                       )}
                       <div className="order-status-actions">
                         {order.payment_method === 'payfast' && !['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) && (
-                          <button 
-                            className="button danger" 
+                          <button
+                            className="button danger"
                             style={{ padding: '6px 12px', fontSize: '0.8rem', marginRight: '8px' }}
                             onClick={() => {
-                                setConfirmState({
-                                    open: true,
-                                    title: 'Issue Refund',
-                                    message: 'Are you sure you want to refund this PayFast order? This will update the status to Refunded and remove the amount from your earnings.',
-                                    confirmText: 'Issue Refund',
-                                    onConfirm: () => {
-                                        handleUpdateStatus(order.id, 'refunded');
-                                        setConfirmState(prev => ({ ...prev, open: false }));
-                                    }
-                                });
+                              setConfirmState({
+                                open: true,
+                                title: 'Issue Refund',
+                                message: 'Are you sure you want to refund this PayFast order? The status will be set to Refunded.',
+                                confirmText: 'Issue Refund',
+                                onConfirm: () => {
+                                  handleUpdateStatus(order.id, 'refunded');
+                                  setConfirmState(prev => ({ ...prev, open: false }));
+                                }
+                              });
                             }}
                           >
                             Issue Refund
@@ -635,7 +635,7 @@ const Marketplace = ({ onMessageSeller }) => {
                       <div className="contact-line"><strong>Campus:</strong> {order.campus}</div>
                     </div>
                     <div className="order-total">
-                      Payment: <strong>{order.payment_method === 'payfast' ? 'Paid via PayFast' : (order.payment_method === 'cod' ? 'Cash on Delivery' : order.payment_method)}</strong>
+                      Payment: <strong>{order.payment_method === 'payfast' ? '✓ Paid via PayFast' : 'Cash on Delivery'}</strong>
                     </div>
                   </div>
                 </div>
