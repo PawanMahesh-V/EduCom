@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine, faWallet } from '@fortawesome/free-solid-svg-icons';
 import '../styles/Marketplace.css';
@@ -18,9 +19,24 @@ import { showSuccess, showError } from '../utils/alert';
 
 const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const currentUserId = user?.id || user?.userId;
 
-  const [activeTab, setActiveTab] = useState('items'); // 'items' | 'orders' | 'sales' | 'cart'
+  const [activeTab, setActiveTab] = useState(() => {
+    if (location.state?.activeTab) {
+      return location.state.activeTab;
+    }
+    return 'items';
+  });
+
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+      // Clear location state so tab state isn't sticky on subsequent section navigation
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, navigate]);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All Roles');
   const [items, setItems] = useState([]);
@@ -581,26 +597,6 @@ const Marketplace = ({ onMessageSeller }) => {
                         </div>
                       )}
                       <div className="order-status-actions">
-                        {order.payment_method === 'payfast' && !['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) && (
-                          <button
-                            className="button danger"
-                            style={{ padding: '6px 12px', fontSize: '0.8rem', marginRight: '8px' }}
-                            onClick={() => {
-                              setConfirmState({
-                                open: true,
-                                title: 'Issue Refund',
-                                message: 'Are you sure you want to refund this PayFast order? The status will be set to Refunded.',
-                                confirmText: 'Issue Refund',
-                                onConfirm: () => {
-                                  handleUpdateStatus(order.id, 'refunded');
-                                  setConfirmState(prev => ({ ...prev, open: false }));
-                                }
-                              });
-                            }}
-                          >
-                            Issue Refund
-                          </button>
-                        )}
                         {['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) ? (
                           <span className={`order-status ${order.status}`}>
                             {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : (order.status === 'refunded' ? 'Refunded' : order.status)}

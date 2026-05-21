@@ -5,10 +5,12 @@ import { faCheckCircle, faTimesCircle, faArrowLeft, faShoppingBag } from '@forta
 import '../styles/Marketplace.css'; // Reuse marketplace styles
 import api from '../api/client';
 import API_BASE_URL from '../config/api';
+import { useAuth } from '../context/AuthContext';
 
 const PaymentCallback = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -17,6 +19,17 @@ const PaymentCallback = () => {
   const errCode = searchParams.get('err_code');
   const statusParam = searchParams.get('status');
   const simulated = searchParams.get('simulated');
+
+  const role = user?.role;
+
+  const getDashboardPath = () => {
+    if (!role) return '/';
+    const r = role.toLowerCase();
+    if (r === 'admin') return '/admin';
+    if (r === 'student') return '/student';
+    if (['teacher', 'hod', 'pm'].includes(r)) return '/teacher';
+    return '/';
+  };
 
   useEffect(() => {
     const verifyPayment = async () => {
@@ -110,7 +123,7 @@ const PaymentCallback = () => {
         <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
           <button 
             className="button primary" 
-            onClick={() => navigate('/dashboard')}
+            onClick={() => navigate(getDashboardPath(), { state: { activeSection: 'marketplace', activeTab: 'orders' } })}
             style={{ padding: '12px 24px' }}
           >
             <FontAwesomeIcon icon={faShoppingBag} style={{ marginRight: '8px' }} />
@@ -118,7 +131,7 @@ const PaymentCallback = () => {
           </button>
           <button 
             className="button secondary" 
-            onClick={() => navigate('/marketplace')}
+            onClick={() => navigate(getDashboardPath(), { state: { activeSection: 'marketplace', activeTab: 'items' } })}
             style={{ padding: '12px 24px' }}
           >
             <FontAwesomeIcon icon={faArrowLeft} style={{ marginRight: '8px' }} />
