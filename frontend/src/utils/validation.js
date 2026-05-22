@@ -18,18 +18,6 @@ export const isValidEmail = (email) => {
 export const isValidPassword = (password) => {
     return password && password.length >= 6;
 };
-export const isValidRegId = (regId) => {
-    if (!regId) return false;
-    // Alphanumeric only (letters and numbers)
-    const regIdRegex = /^[a-zA-Z0-9]+$/;
-    return regIdRegex.test(regId.trim());
-};
-export const isValidName = (name) => {
-    if (!name) return false;
-    // Letters and spaces only
-    const nameRegex = /^[a-zA-Z\s]+$/;
-    return nameRegex.test(name.trim());
-};
 export const getEmailError = (email) => {
     if (!email) return 'Please enter your email address.';
 
