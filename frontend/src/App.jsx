@@ -17,6 +17,7 @@ const ForgotPasswordPage = React.lazy(() => import('./pages/ForgotPasswordPage')
 const VerifyCodePage = React.lazy(() => import('./pages/VerifyCodePage'));
 const ResetPasswordPage = React.lazy(() => import('./pages/ResetPasswordPage'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const PaymentCallback = React.lazy(() => import('./pages/PaymentCallback'));
 
 // Create a client
 const queryClient = new QueryClient({
@@ -78,6 +79,7 @@ function App() {
                           </ProtectedRoute>
                         }
                       />
+                      <Route path="/payment/callback" element={<PaymentCallback />} />
                       <Route path="/" element={<HomePage />} />
                       <Route path="*" element={<Navigate to="/" />} />
                     </Routes>

@@ -33,16 +33,17 @@ class MarketplaceItem {
         let countQuery = `
             SELECT COUNT(*)
             FROM marketplace_items m
+            LEFT JOIN users u ON m.seller_id = u.id
             WHERE m.status != 'hidden'
         `;
         const values = [];
         let paramCount = 1;
 
-        if (filters.category && filters.category !== 'All Category') {
-            const catClause = ` AND m.category = $${paramCount}`;
-            query += catClause;
-            countQuery += catClause;
-            values.push(filters.category);
+        if (filters.role && filters.role !== 'All Roles') {
+            const roleClause = ` AND u.role = $${paramCount}`;
+            query += roleClause;
+            countQuery += roleClause;
+            values.push(filters.role);
             paramCount++;
         }
 

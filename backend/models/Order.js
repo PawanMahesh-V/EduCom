@@ -2,7 +2,7 @@ const pool = require('../config/database');
 
 class Order {
     static async create(orderData) {
-        const { buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, items } = orderData;
+        const { buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, items, status = 'pending' } = orderData;
         
         const client = await pool.connect();
         
@@ -11,15 +11,15 @@ class Order {
             
             const orderQuery = `
                 INSERT INTO marketplace_orders (
-                    buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, delivery_otp
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                    buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, delivery_otp, status
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                 RETURNING id;
             `;
             
             const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
             
             const { rows } = await client.query(orderQuery, [
-                buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, deliveryOtp
+                buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, deliveryOtp, status
             ]);
             
             const orderId = rows[0].id;

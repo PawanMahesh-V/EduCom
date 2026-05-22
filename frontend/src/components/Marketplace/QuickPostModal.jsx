@@ -10,12 +10,9 @@ import CustomSelect from '../Common/CustomSelect';
 const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
     const [formData, setFormData] = useState({
         title: editItem?.title || '',
-        category: editItem?.category || 'Textbooks',
         description: editItem?.description || '',
         price: editItem?.price || '',
-        quantity: editItem?.quantity || 1,
-        tags: Array.isArray(editItem?.tags) ? editItem.tags.join(', ') : (editItem?.tags || ''),
-        deliveryOptions: []
+        quantity: editItem?.quantity || 1
     });
     
     const [imageFile, setImageFile] = useState(null);
@@ -30,24 +27,18 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
             if (editItem) {
                 setFormData({
                     title: editItem.title || '',
-                    category: editItem.category || 'Textbooks',
                     description: editItem.description || '',
                     price: editItem.price || '',
-                    quantity: editItem.quantity || 1,
-                    tags: Array.isArray(editItem.tags) ? editItem.tags.join(', ') : (editItem.tags || ''),
-                    deliveryOptions: []
+                    quantity: editItem.quantity || 1
                 });
                 setImagePreview(editItem.image_url || null);
                 setImageFile(null);
             } else {
                 setFormData({
                     title: '',
-                    category: 'Textbooks',
                     description: '',
                     price: '',
-                    quantity: 1,
-                    tags: '',
-                    deliveryOptions: []
+                    quantity: 1
                 });
                 setImagePreview(null);
                 setImageFile(null);
@@ -57,10 +48,13 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
 
     if (!isOpen) return null;
 
-    const deliveryChoices = ["Campus Pickup", "Digital Download", "Email Transfer"];
+
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
+        let { name, value } = e.target;
+        if (name === 'quantity' && parseInt(value) > 1000) {
+            value = '1000';
+        }
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
@@ -99,16 +93,7 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
         fileInputRef.current.click();
     };
 
-    const handleDeliveryChange = (choice) => {
-        setFormData(prev => {
-            const options = [...prev.deliveryOptions];
-            if (options.includes(choice)) {
-                return { ...prev, deliveryOptions: options.filter(o => o !== choice) };
-            } else {
-                return { ...prev, deliveryOptions: [...options, choice] };
-            }
-        });
-    };
+
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -116,22 +101,13 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
         setIsSubmitting(true);
 
         try {
-            // Append delivery options to tags as a comma separated string
-            let finalTags = formData.tags;
-            if (formData.deliveryOptions.length > 0) {
-                const deliveryStr = formData.deliveryOptions.join(', ');
-                finalTags = finalTags ? `${finalTags}, ${deliveryStr}` : deliveryStr;
-            }
-
             // Using fetch directly because ApiClient.post automatically JSON.stringifies 
             // the body and sets Content-Type to application/json, which breaks multipart/form-data.
             const submitData = new FormData();
             submitData.append('title', formData.title);
-            submitData.append('category', formData.category);
             submitData.append('description', formData.description);
             submitData.append('price', formData.price);
             submitData.append('quantity', formData.quantity);
-            if (finalTags) submitData.append('tags', finalTags);
             if (imageFile) submitData.append('image', imageFile);
 
             const token = localStorage.getItem('userToken');
@@ -158,8 +134,8 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 onSuccess(data);
                 // Reset form
                 setFormData({
-                    title: '', category: 'Textbooks', description: '',
-                    price: '', quantity: 1, tags: '', deliveryOptions: []
+                    title: '', description: '',
+                    price: '', quantity: 1
                 });
                 setImageFile(null);
                 setImagePreview(null);
@@ -226,7 +202,7 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                     type="text" 
                                     name="title" 
                                     required 
-                                    placeholder="e.g., CS-101 Lab Manual" 
+                                    placeholder="e.g., Book" 
                                     value={formData.title} 
                                     onChange={handleChange} 
                                 />
@@ -234,27 +210,14 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
 
                             <div className="form-row">
                                 <div className="form-group">
-                                    <label>Category *</label>
-                                    <CustomSelect
-                                        options={[
-                                            { value: 'Textbooks', label: 'Textbook' },
-                                            { value: 'Equipment', label: 'Equipment' },
-                                            { value: 'Notes', label: 'Notes' },
-                                            { value: 'Tutoring', label: 'Tutoring' }
-                                        ]}
-                                        value={formData.category}
-                                        onChange={(val) => setFormData({ ...formData, category: val })}
-                                    />
-                                </div>
-                                <div className="form-group">
-                                    <label>Price (Rs.) *</label>
+                                    <label>Price *</label>
                                     <input 
                                         type="number" 
                                         name="price" 
+                                        className="no-spin"
                                         required 
                                         min="0" 
-                                        step="0.01" 
-                                        placeholder="0.00" 
+                                        placeholder="10000" 
                                         value={formData.price} 
                                         onChange={handleChange} 
                                     />
@@ -265,7 +228,8 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                         type="number" 
                                         name="quantity" 
                                         required 
-                                        min="0" 
+                                        min="1" 
+                                        max="1000"
                                         value={formData.quantity} 
                                         onChange={handleChange} 
                                     />
@@ -282,35 +246,6 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                     value={formData.description} 
                                     onChange={handleChange} 
                                 ></textarea>
-                            </div>
-
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Tags (comma-separated)</label>
-                                    <input 
-                                        type="text" 
-                                        name="tags" 
-                                        placeholder="e.g., Programming, CS101, Notes" 
-                                        value={formData.tags} 
-                                        onChange={handleChange} 
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="form-group delivery-options">
-                                <label>Delivery/Exchange Method</label>
-                                <div className="checkbox-group">
-                                    {deliveryChoices.map(choice => (
-                                        <label key={choice} className="checkbox-label">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={formData.deliveryOptions.includes(choice)} 
-                                                onChange={() => handleDeliveryChange(choice)} 
-                                            />
-                                            {choice}
-                                        </label>
-                                    ))}
-                                </div>
                             </div>
 
                             <div className="modal-footer">

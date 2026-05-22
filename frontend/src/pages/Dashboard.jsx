@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import {
   faBook,
   faComments,
@@ -38,10 +38,23 @@ import { useDashboardData } from '../hooks/useDashboardData';
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const role = user?.role?.toLowerCase();
 
-  const [activeSection, setActiveSection] = useState(role === 'admin' ? 'overview' : 'courses');
+  const [activeSection, setActiveSection] = useState(() => {
+    if (location.state?.activeSection) {
+      return location.state.activeSection;
+    }
+    return role === 'admin' ? 'overview' : 'courses';
+  });
+
+  useEffect(() => {
+    if (location.state?.activeSection) {
+      setActiveSection(location.state.activeSection);
+    }
+  }, [location.state]);
+
   const [courseInitialTab, setCourseInitialTab] = useState('courses');
   const [initialChat, setInitialChat] = useState(null);
   const [initialMessageUser, setInitialMessageUser] = useState(null);

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faTimes, faShoppingBag, faMapMarkerAlt, faCreditCard,
-  faMobileAlt, faMoneyBillWave, faCheckCircle, faChevronRight,
-  faUser, faPhone, faEnvelope, faUniversity
+  faTimes, faShoppingBag, faMapMarkerAlt,
+  faCreditCard, faMoneyBillWave, faCheckCircle, faChevronRight,
+  faUser, faPhone, faEnvelope, faSpinner, faLock
 } from '@fortawesome/free-solid-svg-icons';
 import '../../styles/CheckoutModal.css';
 import api from '../../api/client';
@@ -11,78 +11,203 @@ import API_BASE_URL from '../../config/api';
 import CustomSelect from '../Common/CustomSelect';
 import { showError } from '../../utils/alert';
 
+// ─── Payment Options ────────────────────────────────────────────────────────
 const PAYMENT_METHODS = [
-  { id: 'cod', label: 'Cash on Delivery', icon: faMoneyBillWave, desc: 'Pay when you receive' },
-  { id: 'easypaisa', label: 'Easypaisa', icon: faMobileAlt, desc: 'Mobile wallet payment' },
-  { id: 'jazzcash', label: 'JazzCash', icon: faMobileAlt, desc: 'Mobile wallet payment' },
-  { id: 'bank', label: 'Bank Transfer', icon: faUniversity, desc: 'Direct bank transfer' },
+  {
+    id: 'cod',
+    label: 'Cash on Delivery',
+    desc: 'Pay when you receive the item',
+    icon: faMoneyBillWave,
+    color: '#10b981',
+  },
+  {
+    id: 'payfast',
+    label: 'PayFast',
+    desc: 'Pay securely via card, bank or mobile wallet',
+    icon: faCreditCard,
+    color: '#0d627a',
+  },
 ];
 
 const STEPS = ['Order Review', 'Contact Info', 'Payment', 'Confirm'];
 
+// ─── Dynamically load the GoPayFast onsite engine script ────────────────────
+const loadPayFastEngine = (engineUrl) =>
+  new Promise((resolve, reject) => {
+    if (typeof window.payfast_do_onsite_payment === 'function') {
+      resolve();
+      return;
+    }
+    // Remove any stale script tag first
+    const existing = document.getElementById('pf-engine-script');
+    if (existing) existing.remove();
+
+    const script = document.createElement('script');
+    script.id   = 'pf-engine-script';
+    script.src  = engineUrl || 'https://sandbox.gopayfast.com/onsite/engine.js';
+    script.onload  = resolve;
+    script.onerror = () => reject(new Error('Failed to load PayFast engine'));
+    document.head.appendChild(script);
+  });
+
+// ─── Component ────────────────────────────────────────────────────────────────
 const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, currentUser }) => {
-  const [step, setStep] = useState(0);
+  const [step, setStep]                 = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('cod');
-  const [form, setForm] = useState({
-    fullName: currentUser?.name || '',
-    email: currentUser?.email || '',
-    phone: '',
-    campus: 'SZABIST Campus',
+  const [form, setForm]                 = useState({
+    fullName:   currentUser?.name  || '',
+    email:      currentUser?.email || '',
+    phone:      '',
+    campus:     'SZABIST Campus',
     pickupNote: '',
   });
   const [placing, setPlacing] = useState(false);
-  const [placed, setPlaced] = useState(false);
+  const [placed,  setPlaced]  = useState(false);
+  const [pfStatus, setPfStatus] = useState(''); // '' | 'loading' | 'redirecting'
 
   if (!isOpen) return null;
 
+  // ── Helpers ──────────────────────────────────────────────────────────────
   const handleChange = (e) => {
-    setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
+    let value = e.target.value;
+    if (e.target.name === 'phone') value = value.replace(/\D/g, '').slice(0, 11);
+    setForm(prev => ({ ...prev, [e.target.name]: value }));
   };
 
   const handleNext = () => setStep(s => Math.min(s + 1, STEPS.length - 1));
   const handleBack = () => setStep(s => Math.max(s - 1, 0));
 
+  const isPhoneValid    = /^03\d{9}$/.test(form.phone.trim());
+  const canProceedStep1 = form.fullName.trim() && form.email.trim() && isPhoneValid;
+
+  const resetModal = () => {
+    setPlaced(false);
+    setStep(0);
+    setForm({
+      fullName:   currentUser?.name  || '',
+      email:      currentUser?.email || '',
+      phone:      '',
+      campus:     'SZABIST Campus',
+      pickupNote: '',
+    });
+    setPaymentMethod('cod');
+    setPfStatus('');
+  };
+
+  // ── Place Order ──────────────────────────────────────────────────────────
   const handlePlaceOrder = async () => {
     try {
       setPlacing(true);
+
       const orderData = {
-        full_name: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        campus: form.campus,
-        pickup_note: form.pickupNote,
+        full_name:      form.fullName,
+        email:          form.email,
+        phone:          form.phone,
+        campus:         form.campus,
+        pickup_note:    form.pickupNote,
         payment_method: paymentMethod,
-        total_amount: cartTotal,
-        items: cartItems.map(item => ({
-          id: item.id,
+        total_amount:   cartTotal,
+        items:          cartItems.map(item => ({
+          id:    item.id,
           title: item.title,
           price: item.price,
-          qty: item.qty || 1
-        }))
+          qty:   item.qty || 1,
+        })),
       };
 
+      // ── PayFast flow ──────────────────────────────────────────────────
+      if (paymentMethod === 'payfast') {
+        setPfStatus('loading');
+
+        const response = await api.post(
+          `${API_BASE_URL}/marketplace/orders/payfast/initiate`,
+          orderData
+        );
+
+        if (!response.success) {
+          throw new Error('PayFast initiation failed');
+        }
+
+        // ── ONSITE POPUP MODE ─────────────────────────────────────────
+        if (response.mode === 'onsite' && response.uuid) {
+          try {
+            await loadPayFastEngine(response.engineUrl);
+
+            // window.payfast_do_onsite_payment is now available
+            window.payfast_do_onsite_payment(
+              { uuid: response.uuid },
+              async (result) => {
+                if (result === true) {
+                  // Payment confirmed by popup
+                  setPlacing(false);
+                  setPfStatus('');
+                  setPlaced(true);
+                  setTimeout(() => {
+                    resetModal();
+                    if (onOrderPlaced) onOrderPlaced();
+                    onClose();
+                  }, 2500);
+                } else {
+                  // User closed / cancelled the popup
+                  setPlacing(false);
+                  setPfStatus('');
+                  showError('Payment was cancelled. Your order has not been placed.');
+                }
+              }
+            );
+            return; // wait for popup callback
+          } catch (engineErr) {
+            console.warn('[PayFast] Engine load failed, falling back to redirect:', engineErr.message);
+            // Fall through to redirect mode below
+          }
+        }
+
+        // ── REDIRECT MODE (fallback) ──────────────────────────────────
+        setPfStatus('redirecting');
+        const payload    = response.payload || {};
+        const paymentUrl = response.paymentUrl;
+
+        if (paymentUrl && Object.keys(payload).length > 0) {
+          // Build a hidden form and submit it
+          const formEl = document.createElement('form');
+          formEl.method = 'POST';
+          formEl.action = paymentUrl;
+          Object.keys(payload).forEach(key => {
+            const input   = document.createElement('input');
+            input.type    = 'hidden';
+            input.name    = key;
+            input.value   = payload[key];
+            formEl.appendChild(input);
+          });
+          document.body.appendChild(formEl);
+          formEl.submit();
+        } else if (response.paymentUrl) {
+          window.location.href = response.paymentUrl;
+        } else {
+          throw new Error('No payment URL returned');
+        }
+        return;
+      }
+
+      // ── Cash on Delivery flow ─────────────────────────────────────────
       await api.post(`${API_BASE_URL}/marketplace/orders`, orderData);
-      
       setPlacing(false);
       setPlaced(true);
-      
       setTimeout(() => {
-        setPlaced(false);
-        setStep(0);
-        setForm({ fullName: currentUser?.name || '', email: currentUser?.email || '', phone: '', campus: 'SZABIST Campus', pickupNote: '' });
-        setPaymentMethod('cod');
+        resetModal();
         if (onOrderPlaced) onOrderPlaced();
         onClose();
       }, 2500);
+
     } catch (error) {
-      console.error('Failed to place order:', error);
+      console.error('[Checkout] Failed to place order:', error);
       showError('Failed to place order. Please try again.');
       setPlacing(false);
+      setPfStatus('');
     }
   };
 
-  const canProceedStep1 = form.fullName.trim() && form.email.trim() && form.phone.trim();
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="checkout-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="checkout-modal">
@@ -105,14 +230,16 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
         <div className="checkout-steps">
           {STEPS.map((label, i) => (
             <div key={i} className={`checkout-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-              <div className="step-circle">{i < step ? <FontAwesomeIcon icon={faCheckCircle} /> : i + 1}</div>
+              <div className="step-circle">
+                {i < step ? <FontAwesomeIcon icon={faCheckCircle} /> : i + 1}
+              </div>
               <span className="step-label">{label}</span>
               {i < STEPS.length - 1 && <div className="step-line" />}
             </div>
           ))}
         </div>
 
-        {/* Step Content */}
+        {/* Body */}
         <div className="checkout-body">
 
           {/* ─── STEP 0: Order Review ─── */}
@@ -156,35 +283,32 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
               <div className="checkout-form">
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faUser} /> Full Name</label>
-                  <input
-                    name="fullName"
-                    value={form.fullName}
-                    readOnly
-                    className="readonly-field"
-                  />
+                  <input name="fullName" value={form.fullName} readOnly className="readonly-field" />
                 </div>
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faEnvelope} /> Email</label>
-                  <input
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    readOnly
-                    className="readonly-field"
-                  />
+                  <input name="email" type="email" value={form.email} readOnly className="readonly-field" />
                 </div>
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faPhone} /> Phone Number</label>
                   <input name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="03xx-xxxxxxx" />
+                  {form.phone.length > 0 && !isPhoneValid && (
+                    <span style={{ color: '#e74c3c', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
+                      {form.phone.length !== 11 ? 'Phone number must be exactly 11 digits.' : 'Phone number is invalid'}
+                    </span>
+                  )}
                 </div>
                 <div className="checkout-field">
                   <label><FontAwesomeIcon icon={faMapMarkerAlt} /> Pickup Campus</label>
                   <CustomSelect
                     options={[
-                      { value: 'SZABIST Campus', label: 'SZABIST Campus' },
-                      { value: 'Main Library', label: 'Main Library' },
-                      { value: 'Student Center', label: 'Student Center' },
-                      { value: 'Cafeteria Area', label: 'Cafeteria Area' }
+                      { value: '79 Campus',  label: '79 Campus'  },
+                      { value: '98 Campus',  label: '98 Campus'  },
+                      { value: '99 Campus',  label: '99 Campus'  },
+                      { value: '100 Campus', label: '100 Campus' },
+                      { value: '153 Campus', label: '153 Campus' },
+                      { value: '154 Campus', label: '154 Campus' },
+                      { value: '172 Campus', label: '172 Campus' },
                     ]}
                     value={form.campus}
                     onChange={(val) => setForm({ ...form, campus: val })}
@@ -204,7 +328,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
             </div>
           )}
 
-          {/* ─── STEP 2: Payment ─── */}
+          {/* ─── STEP 2: Payment Method ─── */}
           {step === 2 && (
             <div className="checkout-section">
               <h3 className="section-title">Select Payment Method</h3>
@@ -215,7 +339,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                     className={`payment-card ${paymentMethod === pm.id ? 'selected' : ''}`}
                     onClick={() => setPaymentMethod(pm.id)}
                   >
-                    <div className="payment-card-icon">
+                    <div className="payment-card-icon" style={{ color: pm.color }}>
                       <FontAwesomeIcon icon={pm.icon} />
                     </div>
                     <div className="payment-card-info">
@@ -227,10 +351,21 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                 ))}
               </div>
 
-              {paymentMethod !== 'cod' && (
+              {/* PayFast info box */}
+              {paymentMethod === 'payfast' && (
+                <div className="payment-note pf-info">
+                  <FontAwesomeIcon icon={faLock} />
+                  <span>
+                    You'll be redirected to PayFast Pakistan's secure payment portal. Powered by{' '}
+                    <strong>gopayfast.com</strong>.
+                  </span>
+                </div>
+              )}
+
+              {paymentMethod === 'cod' && (
                 <div className="payment-note">
                   <FontAwesomeIcon icon={faCheckCircle} />
-                  <span>You'll receive payment instructions after placing the order.</span>
+                  <span>Pay the seller in cash when you pick up your item on campus.</span>
                 </div>
               )}
             </div>
@@ -264,7 +399,19 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                 </div>
                 <div className="confirm-block">
                   <div className="confirm-block-title">Payment</div>
-                  <div className="confirm-detail">{PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label}</div>
+                  <div className="confirm-detail">
+                    <FontAwesomeIcon
+                      icon={paymentMethod === 'payfast' ? faCreditCard : faMoneyBillWave}
+                      style={{ marginRight: '6px', color: paymentMethod === 'payfast' ? '#0d627a' : '#10b981' }}
+                    />
+                    {PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label}
+                  </div>
+                  {paymentMethod === 'payfast' && (
+                    <div className="confirm-detail muted" style={{ fontSize: '0.78rem' }}>
+                      <FontAwesomeIcon icon={faLock} style={{ marginRight: '4px' }} />
+                      Powered by gopayfast.com
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -274,6 +421,20 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                   <span>Rs. {cartTotal.toFixed(2)}</span>
                 </div>
               </div>
+
+              {/* PayFast loading/redirecting overlay message */}
+              {pfStatus === 'loading' && (
+                <div className="pf-loading-msg">
+                  <FontAwesomeIcon icon={faSpinner} spin />
+                  &nbsp; Connecting to PayFast Pakistan…
+                </div>
+              )}
+              {pfStatus === 'redirecting' && (
+                <div className="pf-loading-msg">
+                  <FontAwesomeIcon icon={faSpinner} spin />
+                  &nbsp; Redirecting to PayFast Pakistan payment page…
+                </div>
+              )}
             </div>
           )}
 
@@ -285,20 +446,25 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
               </div>
               <h3 className="success-title">Order Placed!</h3>
               <p className="success-msg">
-                Your order has been submitted successfully. The seller will contact you at <strong>{form.email}</strong> or <strong>{form.phone}</strong>.
+                Your order has been submitted successfully. The seller will contact you at{' '}
+                <strong>{form.email}</strong> or <strong>{form.phone}</strong>.
               </p>
             </div>
           )}
         </div>
 
-        {/* Footer Buttons */}
+        {/* Footer */}
         {!placed && (
           <div className="checkout-footer">
             {step > 0 && (
-              <button className="checkout-btn secondary" onClick={handleBack}>Back</button>
+              <button className="checkout-btn secondary" onClick={handleBack} disabled={placing}>
+                Back
+              </button>
             )}
             <div className="checkout-footer-right">
-              <span className="checkout-total-label">Total: <strong>Rs. {cartTotal.toFixed(2)}</strong></span>
+              <span className="checkout-total-label">
+                Total: <strong>Rs. {cartTotal.toFixed(2)}</strong>
+              </span>
               {step < STEPS.length - 1 ? (
                 <button
                   className="checkout-btn primary"
@@ -313,12 +479,18 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                   onClick={handlePlaceOrder}
                   disabled={placing}
                 >
-                  {placing ? 'Placing Order...' : 'Place Order'}
+                  {placing
+                    ? <><FontAwesomeIcon icon={faSpinner} spin />&nbsp;{pfStatus === 'loading' ? 'Connecting…' : 'Placing…'}</>
+                    : paymentMethod === 'payfast'
+                      ? <><FontAwesomeIcon icon={faLock} />&nbsp;Pay with PayFast</>
+                      : 'Place Order'
+                  }
                 </button>
               )}
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
