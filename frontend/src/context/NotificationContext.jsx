@@ -15,8 +15,10 @@ export const NotificationProvider = ({ children }) => {
   const { socketService, isConnected } = useSocket();
   const { user } = useAuth(); // Use centralized auth state
   const [notifications, setNotifications] = useState([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
+
+  // Derive unread count dynamically
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
   // Fetch initial notifications on mount
   useEffect(() => {
@@ -35,7 +37,6 @@ export const NotificationProvider = ({ children }) => {
             // Ensure data is an array
             if (Array.isArray(data)) {
                 setNotifications(data);
-                setUnreadCount(data.filter(n => !n.is_read).length);
             }
         } catch (err) {
             console.error("[NotificationProvider] Failed to fetch notifications", err);
@@ -54,10 +55,6 @@ export const NotificationProvider = ({ children }) => {
       const handleNewNotification = (notification) => {
           console.log('[NotificationProvider] New notification received:', notification);
           setNotifications(prev => [notification, ...prev]);
-          setUnreadCount(prev => prev + 1);
-          
-          // Trigger global alert - Removing as it is too intrusive for chat communities
-          // showAlert(notification.title || 'New Notification', 'info');
       };
       socketService.onNewNotification(handleNewNotification);
       return () => {
@@ -68,7 +65,6 @@ export const NotificationProvider = ({ children }) => {
   const markAsRead = async (id) => {
       // Optimistic update
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
-      setUnreadCount(prev => Math.max(0, prev - 1));
       
       try {
           await notificationApi.markAsRead(id);
@@ -83,7 +79,12 @@ export const NotificationProvider = ({ children }) => {
 
       // Optimistic update
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-      setUnreadCount(0);
+
+      try {
+          await notificationApi.markAllAsRead();
+      } catch (err) {
+          console.error("[NotificationProvider] Failed to mark all as read", err);
+      }
   };
 
   const clearContextNotifications = async (courseId, senderId) => {
@@ -93,16 +94,6 @@ export const NotificationProvider = ({ children }) => {
           if (senderId && n.sender_id === senderId) return { ...n, is_read: true };
           return n;
       }));
-      
-      // Recalculate unread count based on current notifications
-      setUnreadCount(prev => {
-          const count = notifications.filter(n => {
-              if (courseId && n.course_id === courseId) return false;
-              if (senderId && n.sender_id === senderId) return false;
-              return !n.is_read;
-          }).length;
-          return count;
-      });
 
       try {
           if (courseId) {

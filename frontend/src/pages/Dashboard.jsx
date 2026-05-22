@@ -39,7 +39,7 @@ import { useDashboardData } from '../hooks/useDashboardData';
 const Dashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const role = user?.role?.toLowerCase();
 
   const [activeSection, setActiveSection] = useState(() => {
@@ -91,11 +91,8 @@ const Dashboard = () => {
     setActiveSection('messages');
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('user');
-    sessionStorage.removeItem('userToken');
-    sessionStorage.removeItem('user');
+  const handleLogout = async () => {
+    await logout();
     navigate('/login', { replace: true });
   };
 

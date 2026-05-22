@@ -13,8 +13,9 @@ export const SocketProvider = ({ children }) => {
 
   useEffect(() => {
     // Only connect if we have a valid logged-in user
-    if (user?.id) {
-       const socketInstance = socketService.connect(user.id);
+    const userId = user?.id || user?.userId;
+    if (userId) {
+       const socketInstance = socketService.connect(userId);
        setSocket(socketInstance);
        
        const onConnect = () => {

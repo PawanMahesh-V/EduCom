@@ -1,7 +1,7 @@
 
 const getAuthToken = () => {
-  // Standardize on localStorage for auth token
-  return localStorage.getItem('userToken');
+  // Standardize on checking both localStorage and sessionStorage fallback
+  return localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
 };
 
 const getAuthHeaders = () => {

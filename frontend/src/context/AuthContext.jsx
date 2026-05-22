@@ -15,11 +15,11 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize auth state from localStorage
+  // Initialize auth state from localStorage or sessionStorage fallback
   useEffect(() => {
     const initAuth = async () => {
-      const storedUser = localStorage.getItem('user');
-      const storedToken = localStorage.getItem('userToken');
+      const storedUser = localStorage.getItem('user') || sessionStorage.getItem('user');
+      const storedToken = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
 
       if (storedUser && storedToken) {
         try {
@@ -28,6 +28,8 @@ export const AuthProvider = ({ children }) => {
           console.error('Failed to parse stored user:', error);
           localStorage.removeItem('user');
           localStorage.removeItem('userToken');
+          sessionStorage.removeItem('user');
+          sessionStorage.removeItem('userToken');
         }
       }
       setLoading(false);
@@ -38,11 +40,38 @@ export const AuthProvider = ({ children }) => {
     const handleLogoutEvent = () => {
       localStorage.removeItem('userToken');
       localStorage.removeItem('user');
+      sessionStorage.removeItem('userToken');
+      sessionStorage.removeItem('user');
       setUser(null);
     };
 
+    const handleStorageChange = (e) => {
+      if (e.key === 'userToken') {
+        if (!e.newValue) {
+          // Session cleared (logout) on another tab
+          sessionStorage.removeItem('userToken');
+          sessionStorage.removeItem('user');
+          setUser(null);
+        } else {
+          // Session created (login) on another tab
+          const storedUser = localStorage.getItem('user');
+          if (storedUser) {
+            try {
+              setUser(JSON.parse(storedUser));
+            } catch (err) {
+              console.error('Failed to parse synchronized user:', err);
+            }
+          }
+        }
+      }
+    };
+
     window.addEventListener('auth:logout', handleLogoutEvent);
-    return () => window.removeEventListener('auth:logout', handleLogoutEvent);
+    window.addEventListener('storage', handleStorageChange);
+    return () => {
+      window.removeEventListener('auth:logout', handleLogoutEvent);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   const login = async (identifier, password) => {
@@ -51,10 +80,11 @@ export const AuthProvider = ({ children }) => {
       
       const { user, token } = response;
       
-      localStorage.setItem('userToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      
-      setUser(user);
+      if (user && token) {
+        localStorage.setItem('userToken', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        setUser(user);
+      }
       return response;
     } catch (error) {
       throw error;
@@ -72,13 +102,20 @@ export const AuthProvider = ({ children }) => {
     } finally {
       localStorage.removeItem('userToken');
       localStorage.removeItem('user');
+      sessionStorage.removeItem('userToken');
+      sessionStorage.removeItem('user');
       setUser(null);
     }
   };
 
   const updateUser = (userData) => {
     const updatedUser = { ...user, ...userData };
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    if (localStorage.getItem('user')) {
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+    }
+    if (sessionStorage.getItem('user')) {
+      sessionStorage.setItem('user', JSON.stringify(updatedUser));
+    }
     setUser(updatedUser);
   };
 

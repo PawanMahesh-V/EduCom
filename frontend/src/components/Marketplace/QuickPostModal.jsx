@@ -110,7 +110,7 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
             submitData.append('quantity', formData.quantity);
             if (imageFile) submitData.append('image', imageFile);
 
-            const token = localStorage.getItem('userToken');
+            const token = localStorage.getItem('userToken') || sessionStorage.getItem('userToken');
             
             const url = editItem 
                 ? `${API_BASE_URL}/marketplace/${editItem.id}` 

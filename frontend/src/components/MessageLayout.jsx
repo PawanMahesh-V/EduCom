@@ -76,7 +76,7 @@ const MessageLayout = ({
   // Banned state
   const [isChatBanned, setIsChatBanned] = useState(() => {
      try {
-         const userStr = localStorage.getItem('user');
+         const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
          if (userStr) {
              const userObj = JSON.parse(userStr);
              return userObj.is_active === false;
@@ -260,11 +260,12 @@ const MessageLayout = ({
     const handleChatBanned = (data) => {
         setIsChatBanned(true);
         try {
-             const userStr = localStorage.getItem('user');
+             const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
              if (userStr) {
                  const userObj = JSON.parse(userStr);
                  userObj.is_active = false;
-                 localStorage.setItem('user', JSON.stringify(userObj));
+                 if (localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(userObj));
+                 if (sessionStorage.getItem('user')) sessionStorage.setItem('user', JSON.stringify(userObj));
              }
          } catch (e) {}
     };
@@ -272,11 +273,12 @@ const MessageLayout = ({
     const handleChatUnbanned = (data) => {
         setIsChatBanned(false);
         try {
-             const userStr = localStorage.getItem('user');
+             const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
              if (userStr) {
                  const userObj = JSON.parse(userStr);
                  userObj.is_active = true;
-                 localStorage.setItem('user', JSON.stringify(userObj));
+                 if (localStorage.getItem('user')) localStorage.setItem('user', JSON.stringify(userObj));
+                 if (sessionStorage.getItem('user')) sessionStorage.setItem('user', JSON.stringify(userObj));
              }
          } catch (e) {}
     };
