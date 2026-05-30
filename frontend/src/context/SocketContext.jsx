@@ -1,19 +1,28 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
 import socketService from '../services/socket';
 import { useAuth } from './AuthContext';
 
-const SocketContext = createContext();
+const SocketContext = createContext(null);
 
-export const useSocket = () => useContext(SocketContext);
+export const useSocket = () => {
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
+};
 
 export const SocketProvider = ({ children }) => {
   const [isConnected, setIsConnected] = useState(false);
   const [socket, setSocket] = useState(null);
-  const { user } = useAuth(); // consume user from AuthContext
+  const { user } = useAuth(); // Safely consuming identity metadata vectors from centralized context
 
+  /* ==========================================================================
+     1. LIFECYCLE CONNECTION MANAGER (Tied to state mutations)
+     ========================================================================== */
   useEffect(() => {
-    // Only connect if we have a valid logged-in user
     const userId = user?.id || user?.userId;
+    
     if (userId) {
        const socketInstance = socketService.connect(userId);
        setSocket(socketInstance);
@@ -29,28 +38,35 @@ export const SocketProvider = ({ children }) => {
        socketInstance.on('connect', onConnect);
        socketInstance.on('disconnect', onDisconnect);
 
-       // Check initial state
+       // Intercept immediate connection status states safely
        if (socketInstance.connected) {
          setIsConnected(true);
        }
 
+       // Explicit unmount channel cleanup mapping prevents memory leaks or cross-session leakages
        return () => {
          socketInstance.off('connect', onConnect);
          socketInstance.off('disconnect', onDisconnect);
-         // Optionally disconnect on unmount or user change
          socketService.disconnect();
        };
     } else {
-        // If no user, ensure socket is disconnected
+        // Enforce safe teardowns immediately upon user sign-off actions
         socketService.disconnect();
         setIsConnected(false);
         setSocket(null);
     }
-  }, [user]); // Re-run when user changes (login/logout)
+  }, [user]);
+  const contextValue = useMemo(() => ({
+    socket,
+    isConnected,
+    socketService
+  }), [socket, isConnected]);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, socketService }}>
+    <SocketContext.Provider value={contextValue}>
       {children}
     </SocketContext.Provider>
   );
 };
+
+export default SocketContext;

@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faShieldAlt, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
-import './OTPModal.css';
+import { faTimes, faShieldAlt, faCheckCircle, faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 const OTPModal = ({ isOpen, onClose, onVerify, orderId }) => {
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
@@ -28,7 +27,7 @@ const OTPModal = ({ isOpen, onClose, onVerify, orderId }) => {
     newOtp[index] = value.substring(value.length - 1);
     setOtp(newOtp);
 
-    // Move to next input
+    // Auto-advance to next input field block
     if (value && index < 5) {
       inputRefs.current[index + 1].focus();
     }
@@ -54,29 +53,29 @@ const OTPModal = ({ isOpen, onClose, onVerify, orderId }) => {
       await onVerify(orderId, fullOtp);
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || 'Invalid OTP. Please try again.');
+      setError(err.response?.data?.message || 'Invalid OTP code. Please verify and try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="otp-modal-overlay">
-      <div className="otp-modal-content">
-        <button className="otp-modal-close" onClick={onClose}>
+    <div className="om-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="om-modal-box fade-in">
+        <button className="om-close-trigger-btn" onClick={onClose} aria-label="Close verification modal">
           <FontAwesomeIcon icon={faTimes} />
         </button>
 
-        <div className="otp-modal-header">
-          <div className="otp-icon-wrapper">
+        <div className="om-modal-header">
+          <div className="om-icon-shell">
             <FontAwesomeIcon icon={faShieldAlt} />
           </div>
-          <h2>Delivery Verification</h2>
-          <p>Please enter the 6-digit OTP provided by the seller for Order #{orderId}</p>
+          <h2 className="om-modal-title">Delivery Verification</h2>
+          <p className="om-modal-subtitle">Please input the 6-digit verification code provided by the seller node to securely authorize <strong>Order #{orderId}</strong>.</p>
         </div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="otp-input-container">
+        <form onSubmit={handleSubmit} className="om-modal-form">
+          <div className="om-inputs-sequence-row">
             {otp.map((digit, index) => (
               <input
                 key={index}
@@ -86,26 +85,34 @@ const OTPModal = ({ isOpen, onClose, onVerify, orderId }) => {
                 ref={(el) => (inputRefs.current[index] = el)}
                 onChange={(e) => handleChange(index, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(index, e)}
-                className={error ? 'otp-input error' : 'otp-input'}
+                className={`om-digit-field ${error ? 'om-digit-field--error' : ''}`}
                 placeholder="-"
+                disabled={loading}
               />
             ))}
           </div>
 
-          {error && <div className="otp-error-message">{error}</div>}
+          {error && <div className="om-field-error-message fade-in">{error}</div>}
 
           <button 
             type="submit" 
-            className={`otp-submit-btn ${loading ? 'loading' : ''}`}
+            className="om-btn-primary"
             disabled={loading}
           >
-            {loading ? 'Verifying...' : 'Complete Delivery'}
+            {loading ? (
+              <>
+                <FontAwesomeIcon icon={faSpinner} spin />
+                <span>Authorizing Handshake...</span>
+              </>
+            ) : (
+              <span>Complete Delivery Assignment</span>
+            )}
           </button>
         </form>
 
-        <div className="otp-modal-footer">
+        <div className="om-modal-footer">
           <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Secure marketplace transaction</span>
+          <span>Secure escrow handshake token verification active</span>
         </div>
       </div>
     </div>

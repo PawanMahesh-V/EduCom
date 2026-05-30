@@ -49,7 +49,6 @@ const VerifyCodePage = () => {
     const storedFlow = sessionStorage.getItem('verifyFlow');
     
     if (!storedEmail || !storedFlow) {
-      // No valid session, redirect to home
       navigate('/');
     } else {
       setEmail(storedEmail);
@@ -57,7 +56,6 @@ const VerifyCodePage = () => {
       startTimer();
     }
 
-    // Cleanup timer on unmount
     return () => {
       if (timerRef.current) {
         clearInterval(timerRef.current);
@@ -110,26 +108,20 @@ const VerifyCodePage = () => {
 
     try {
       if (flowType === 'registration') {
-        // Registration flow
         await authApi.verifyRegistrationCode(email, verificationCode);
-        // Mark email as verified and navigate to registration details
         sessionStorage.setItem('registrationVerified', 'true');
         navigate('/register?step=details');
       } else if (flowType === 'login') {
-        // Login flow
         const data = await authApi.verifyLogin(email, verificationCode);
         
-        // Store user session
         sessionStorage.setItem('user', JSON.stringify(data.user));
         if (data.token) {
           sessionStorage.setItem('userToken', data.token);
         }
         
-        // Clear verify session
         sessionStorage.removeItem('verifyEmail');
         sessionStorage.removeItem('verifyFlow');
         
-        // Navigate based on role
         switch (data.user.role) {
           case 'Admin':
             navigate('/admin');
@@ -146,7 +138,6 @@ const VerifyCodePage = () => {
             navigate('/');
         }
       } else {
-        // Password reset flow
         const data = await authApi.verifyResetCode(email, verificationCode);
         if (data && data.resetToken) {
           sessionStorage.setItem('resetToken', data.resetToken);
@@ -174,7 +165,6 @@ const VerifyCodePage = () => {
       if (flowType === 'registration') {
         await authApi.sendRegistrationCode(email);
       } else if (flowType === 'login') {
-        // For login, we need to re-authenticate with stored password
         const password = sessionStorage.getItem('loginPassword');
         if (password) {
           await authApi.login(email, password);
@@ -186,7 +176,7 @@ const VerifyCodePage = () => {
       } else {
         await authApi.forgotPassword(email);
       }
-      startTimer(); // Reset timer to 10:00
+      startTimer();
       setCode(['', '', '', '', '', '']);
       document.getElementById('code-0')?.focus();
     } catch (err) {
@@ -196,7 +186,6 @@ const VerifyCodePage = () => {
     }
   };
 
-  // Get title and subtitle based on flow
   const getTitle = () => {
     if (flowType === 'registration') return 'Verify Your Email';
     if (flowType === 'login') return 'Verify Your Login';
@@ -204,15 +193,17 @@ const VerifyCodePage = () => {
   };
 
   const getSubtitle = () => {
-    if (flowType === 'registration') {
-      return <>We sent a 6-digit code to<br /><strong className="color-primary">{email}</strong></>;
-    }
-    return <>We sent a 6-digit code to <strong className="color-primary">{email}</strong></>;
+    return (
+      <>
+        We sent a 6-digit verification code to <br />
+        <strong className="verify-email-highlight">{email}</strong>
+      </>
+    );
   };
 
   return (
     <div className="verify-page">
-      {/* Animated Background */}
+      {/* Ambient Decorative Backdrop Orbs */}
       <div className="verify-background">
         <div className="verify-orb verify-orb--1"></div>
         <div className="verify-orb verify-orb--2"></div>
@@ -225,7 +216,7 @@ const VerifyCodePage = () => {
           <FontAwesomeIcon icon={faArrowLeft} />
           <span>Back</span>
         </button>
-        <div className="verify-brand">
+        <div className="verify-brand" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faShieldHalved} className="verify-brand-icon" />
           <span className="verify-brand-text">
             Edu<span className="verify-brand-accent">Com</span>
@@ -235,19 +226,19 @@ const VerifyCodePage = () => {
 
       <div className="verify-content">
         <div className="verify-container">
-          {/* Welcome Section */}
+          {/* Welcome Heading Block */}
           <div className="verify-welcome">
             <h1 className="verify-title">{getTitle()}</h1>
             <p className="verify-subtitle">{getSubtitle()}</p>
           </div>
 
-          {/* Timer Display */}
+          {/* Countdown Clock Panel */}
           <div className={`verify-timer ${timeLeft <= 60 ? 'verify-timer--warning' : ''} ${timeLeft === 0 ? 'verify-timer--expired' : ''}`}>
             <FontAwesomeIcon icon={faClock} />
             <span>Code expires in: <strong>{formatTime(timeLeft)}</strong></span>
           </div>
 
-          {/* Form */}
+          {/* Core OTP Layout Form */}
           <form onSubmit={handleSubmit} className="verify-form">
             <div className="verify-code-inputs" onPaste={handlePaste}>
               {code.map((digit, index) => (
@@ -273,10 +264,14 @@ const VerifyCodePage = () => {
               </div>
             )}
 
-            <button type="submit" className="verify-submit-button" disabled={loading || code.join('').length !== 6}>
+            <button 
+              type="submit" 
+              className="verify-submit-button" 
+              disabled={loading || code.join('').length !== 6}
+            >
               {loading ? (
                 <>
-                  <div className="spinner-small"></div>
+                  <div className="verify-spinner"></div>
                   <span>Verifying...</span>
                 </>
               ) : (
@@ -301,13 +296,12 @@ const VerifyCodePage = () => {
             </div>
           </form>
 
-          {/* Footer */}
+          {/* Alternative Routes Navigation Footer */}
           <div className="verify-footer">
             <div className="verify-divider">
               <span>or</span>
             </div>
             <button className="verify-back-link" onClick={() => {
-              // Clean up login password if stored
               sessionStorage.removeItem('loginPassword');
               navigate(flowType === 'registration' ? '/register' : '/login');
             }}>

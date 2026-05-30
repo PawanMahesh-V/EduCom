@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useSocket } from '../context/SocketContext';
+import { useAuth } from '../context/AuthContext';
 import { TEACHING_ROLES } from '../constants';
 import ChatSidebar from './Chat/ChatSidebar';
 import ChatWindow from './Chat/ChatWindow';
 import { useNotifications } from '../context/NotificationContext';
-import { moderationApi } from '../api';
-import { showSuccess, showError } from '../utils/alert';
+import { moderationApi, authApi } from '../api';
+import { showSuccess, showError, showWarning } from '../utils/alert';
 
 // Hooks
 import { 
@@ -23,9 +24,8 @@ const MessageLayout = ({
   userRole,
   userName,
   mode = 'direct', // 'direct' or 'community'
-  // Optional initial selection overrides or callbacks
   initialChatId = null,
-  initialUserObject = null, // { id, name } — opens a new DM if no existing conversation
+  initialUserObject = null, 
   onChatSelected,
   onLeaveCommunity,
   onDisbandCommunity,
@@ -33,14 +33,18 @@ const MessageLayout = ({
 }) => {
   const queryClient = useQueryClient();
   const { socketService } = useSocket();
+  const { updateUser } = useAuth();
   const { clearContextNotifications } = useNotifications();
   const messagesEndRef = React.useRef(null);
+  
   const blockedStorageKey = useMemo(() => {
     if (!userId) return null;
     return `blocked-messages-${userId}`;
   }, [userId]);
 
-  // --- State ---
+  /* ==========================================================================
+     1. STATE HOOK DECLARATIONS FIRST (Prevents Dead-Zone Initialization Errors)
+     ========================================================================== */
   const [selectedItem, setSelectedItem] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const [isAnonymous, setIsAnonymous] = useState(false);
@@ -65,15 +69,43 @@ const MessageLayout = ({
   const [typingUsers, setTypingUsers] = useState([]);
   const [blockedMessages, setBlockedMessages] = useState([]);
 
-  useEffect(() => {
-    if (onToggleChat) {
-      onToggleChat(!!selectedItem);
+  // Sidebar Resize State
+  const [sidebarWidth, setSidebarWidth] = useState(340);
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarRef = React.useRef(null);
+
+  const startResizing = React.useCallback((e) => {
+    setIsResizing(true);
+    e.preventDefault();
+  }, []);
+
+  const resize = React.useCallback((e) => {
+    if (isResizing && sidebarRef.current) {
+      const sidebarLeft = sidebarRef.current.getBoundingClientRect().left;
+      const newWidth = e.clientX - sidebarLeft;
+      if (newWidth >= 250 && newWidth <= 600) {
+        setSidebarWidth(newWidth);
+      }
     }
-  }, [selectedItem, onToggleChat]);
+  }, [isResizing]);
 
+  const stopResizing = React.useCallback(() => {
+    setIsResizing(false);
+  }, []);
 
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
 
-  // Banned state
+  // Banned state initialization: read from localStorage as a fast initial value,
+  // then sync with the real DB value on mount to fix the offline-unban stuck state.
   const [isChatBanned, setIsChatBanned] = useState(() => {
      try {
          const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
@@ -85,7 +117,29 @@ const MessageLayout = ({
      return false;
   });
 
-  // --- Data Fetching ---
+  // On mount: fetch the live is_active value from the server so a user unbanned
+  // while offline is not stuck in the banned state forever.
+  useEffect(() => {
+    const syncBanStatus = async () => {
+      try {
+        const data = await authApi.getCurrentUser();
+        const freshUser = data?.user || data;
+        if (freshUser) {
+          const banned = freshUser.is_active === false;
+          setIsChatBanned(banned);
+          // Keep AuthContext and localStorage in sync
+          updateUser({ is_active: freshUser.is_active });
+        }
+      } catch (e) {
+        // Non-critical — silently ignore if the request fails
+      }
+    };
+    syncBanStatus();
+  }, []);
+
+  /* ==========================================================================
+     2. DATA FETCHING LAYER
+     ========================================================================== */
   const { data: conversations, isLoading: loadingConversations } = useConversations(mode === 'direct' ? userId : null);
   const { data: communities, isLoading: loadingCommunities } = useCommunities(mode === 'community' ? userRole : null, userId);
   const { data: usersData } = useAvailableUsers(mode === 'direct' ? userId : null);
@@ -111,16 +165,22 @@ const MessageLayout = ({
     return `community-${selectedItem.id}`;
   }, [mode, selectedItem]);
 
+  /* ==========================================================================
+     3. SYNC SIDE EFFECT LISTENERS
+     ========================================================================== */
+  useEffect(() => {
+    if (onToggleChat) {
+      onToggleChat(!!selectedItem);
+    }
+  }, [selectedItem, onToggleChat]);
+
   useEffect(() => {
     if (!blockedStorageKey) return;
-
     try {
       const raw = localStorage.getItem(blockedStorageKey);
       if (!raw) return;
-
       const parsed = JSON.parse(raw);
       if (!Array.isArray(parsed)) return;
-
       setBlockedMessages(parsed);
     } catch (error) {
       console.error('Failed to restore blocked messages from storage', error);
@@ -129,7 +189,6 @@ const MessageLayout = ({
 
   useEffect(() => {
     if (!blockedStorageKey) return;
-
     try {
       localStorage.setItem(blockedStorageKey, JSON.stringify(blockedMessages));
     } catch (error) {
@@ -139,10 +198,7 @@ const MessageLayout = ({
 
   const visibleBlockedMessages = useMemo(() => {
     if (!selectedChatKey) return [];
-    
-    // If the message has been approved and fetched into activeMessages, hide the blocked version immediately
     const activeIds = new Set((activeMessages || []).map(m => String(m.id)));
-    
     return blockedMessages.filter((msg) => 
       msg.chat_key === selectedChatKey && !activeIds.has(String(msg.id))
     );
@@ -154,7 +210,7 @@ const MessageLayout = ({
     return all;
   }, [activeMessages, visibleBlockedMessages]);
 
-  // --- Mutations ---
+  // Mutations
   const { 
     sendDM, 
     deleteMultipleDMs, 
@@ -162,13 +218,11 @@ const MessageLayout = ({
     deleteMultipleCommunityMessages
   } = useChatMutations();
 
-  // --- Socket Listeners (Invalidation) ---
+  // Socket Listeners
   useEffect(() => {
     if (!socketService || !socketService.socket) return;
 
-
     const handleNewNotification = (data) => {
-      console.log('[NOTIFICATION] new-notification received in Layout:', data);
       if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
       } else {
@@ -176,20 +230,16 @@ const MessageLayout = ({
       }
     };
 
-     const handleNewMessage = (data) => {
-       // Remove from blocked messages if it was approved
+    const handleNewMessage = (data) => {
        setBlockedMessages(prev => prev.filter(msg => String(msg.id) !== String(data.id)));
-
-       // Ideally verify if message belongs to current context, but usually safe to invalidate all
        if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
           if (selectedItem && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id)) {
              queryClient.invalidateQueries(['dm-messages', userId, selectedItem.user_id]);
           }
        } else {
-          // Community
           if (data.community_id) {
-             queryClient.invalidateQueries(['communities']); // update unread
+             queryClient.invalidateQueries(['communities']); 
              if (selectedItem?.id === data.community_id) {
                 queryClient.invalidateQueries(['community-messages', selectedItem.id]);
              }
@@ -198,19 +248,22 @@ const MessageLayout = ({
     };
 
     const handleNewDirectMessage = (data) => {
-       // Remove from blocked messages if it was approved
        setBlockedMessages(prev => prev.filter(msg => String(msg.id) !== String(data.id)));
-
        if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
-          if (selectedItem && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id)) {
+          
+          const isCurrentChat = selectedItem && (
+             (selectedItem.user_id === 'anonymous' && data.is_anonymous) ||
+             (!data.is_anonymous && (data.sender_id === selectedItem.user_id || data.receiver_id === selectedItem.user_id))
+          );
+          
+          if (isCurrentChat) {
              queryClient.invalidateQueries(['dm-messages', userId, selectedItem.user_id]);
           }
        }
     };
 
     const handleTyping = (data) => {
-        // Simple typing indicator handling
         if (data.isTyping) {
              setTypingUsers(prev => [...new Set([...prev, data.senderName || data.userName])]);
         } else {
@@ -219,7 +272,6 @@ const MessageLayout = ({
     };
 
     const handleDMTyping = (data) => {
-        // DM typing indicator handling
         if (data.isTyping) {
              setTypingUsers(prev => [...new Set([...prev, data.senderName])]);
         } else {
@@ -228,37 +280,31 @@ const MessageLayout = ({
     };
 
     const handleMessageDelivered = (data) => {
-        // Update message status in cache
         if (mode === 'direct') {
             queryClient.setQueryData(['dm-messages', userId, selectedItem?.user_id], (oldData) => {
                 if (!oldData) return oldData;
                 return oldData.map(msg => 
-                    msg.id === data.messageId 
-                        ? { ...msg, delivered_at: data.delivered_at }
-                        : msg
+                    msg.id === data.messageId ? { ...msg, delivered_at: data.delivered_at } : msg
                 );
             });
         }
     };
 
     const handleMessageRead = (data) => {
-        // Update message status in cache
         if (mode === 'direct') {
             queryClient.setQueryData(['dm-messages', userId, selectedItem?.user_id], (oldData) => {
                 if (!oldData) return oldData;
                 return oldData.map(msg => 
-                    msg.id === data.messageId 
-                        ? { ...msg, is_read: true, read_at: data.read_at }
-                        : msg
+                    msg.id === data.messageId ? { ...msg, is_read: true, read_at: data.read_at } : msg
                 );
             });
-            // Also update conversations to reflect read status
             queryClient.invalidateQueries(['conversations', userId]);
          }
     };
 
-    const handleChatBanned = (data) => {
+    const handleChatBanned = () => {
         setIsChatBanned(true);
+        updateUser({ is_active: false });
         try {
              const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
              if (userStr) {
@@ -270,8 +316,9 @@ const MessageLayout = ({
          } catch (e) {}
     };
 
-    const handleChatUnbanned = (data) => {
+    const handleChatUnbanned = () => {
         setIsChatBanned(false);
+        updateUser({ is_active: true });
         try {
              const userStr = localStorage.getItem('user') || sessionStorage.getItem('user');
              if (userStr) {
@@ -283,51 +330,45 @@ const MessageLayout = ({
          } catch (e) {}
     };
 
-        const handleMessageBlocked = (data) => {
-          const chatKey = mode === 'direct'
-            ? `direct-${data.receiver_id}`
-            : `community-${data.community_id}`;
+    const handleMessageBlocked = (data) => {
+      const chatKey = mode === 'direct' ? `direct-${data.receiver_id}` : `community-${data.community_id}`;
+      const baseBlockedMessage = {
+        id: data.id || `blocked-${Date.now()}`,
+        chat_key: chatKey,
+        client_message_id: data.client_message_id,
+        sender_id: data.sender_id,
+        receiver_id: data.receiver_id,
+        community_id: data.community_id,
+        sender_name: data.sender_name || userName || 'You',
+        content: data.content,
+        created_at: data.created_at || new Date().toISOString(),
+        is_anonymous: Boolean(data.is_anonymous),
+        moderation_blocked: true,
+        blocked_reason: data.blocked_reason || 'content_moderation',
+        confidence: data.confidence || 0,
+        local_only: true
+      };
 
-          const baseBlockedMessage = {
-            id: data.id || `blocked-${Date.now()}`,
-            chat_key: chatKey,
-            client_message_id: data.client_message_id,
-            sender_id: data.sender_id,
-            receiver_id: data.receiver_id,
-            community_id: data.community_id,
-            sender_name: data.sender_name || userName || 'You',
-            content: data.content,
-            created_at: data.created_at || new Date().toISOString(),
-            is_anonymous: Boolean(data.is_anonymous),
-            moderation_blocked: true,
-            blocked_reason: data.blocked_reason || 'content_moderation',
-            confidence: data.confidence || 0,
-            local_only: true
-          };
+      setBlockedMessages((prev) => {
+        const exists = prev.some((msg) => {
+          if (data.client_message_id && msg.client_message_id) {
+            return msg.client_message_id === data.client_message_id;
+          }
+          return msg.id === baseBlockedMessage.id;
+        });
+        if (exists) return prev;
+        return [...prev, baseBlockedMessage];
+      });
+    };
 
-          setBlockedMessages((prev) => {
-            const exists = prev.some((msg) => {
-              if (data.client_message_id && msg.client_message_id) {
-                return msg.client_message_id === data.client_message_id;
-              }
-              return msg.id === baseBlockedMessage.id;
-            });
-
-            if (exists) return prev;
-            return [...prev, baseBlockedMessage];
-          });
-        };
-
-    // Listen to correct socket events based on backend implementation
-    socketService.socket.on('new-message', handleNewMessage); // Community messages
-    socketService.socket.on('new-direct-message', handleNewDirectMessage); // Direct messages
-    socketService.socket.on('direct-message-sent', handleNewDirectMessage); // Sent direct messages
-    socketService.socket.on('user-typing', handleTyping); // Community typing
-    socketService.socket.on('dm-user-typing', handleDMTyping); // DM typing
-    socketService.socket.on('message-delivered', handleMessageDelivered); // Delivery receipts
-    socketService.socket.on('message-read', handleMessageRead); // Read receipts
-    socketService.socket.on('message-blocked', handleMessageBlocked); // Moderation blocked (local only)
-
+    socketService.socket.on('new-message', handleNewMessage); 
+    socketService.socket.on('new-direct-message', handleNewDirectMessage); 
+    socketService.socket.on('direct-message-sent', handleNewDirectMessage); 
+    socketService.socket.on('user-typing', handleTyping); 
+    socketService.socket.on('dm-user-typing', handleDMTyping); 
+    socketService.socket.on('message-delivered', handleMessageDelivered); 
+    socketService.socket.on('message-read', handleMessageRead); 
+    socketService.socket.on('message-blocked', handleMessageBlocked); 
     socketService.socket.on('chat-banned', handleChatBanned);
     socketService.socket.on('chat-unbanned', handleChatUnbanned);
     socketService.socket.on('new-notification', handleNewNotification);
@@ -341,40 +382,34 @@ const MessageLayout = ({
         socketService.socket.off('message-delivered', handleMessageDelivered);
         socketService.socket.off('message-read', handleMessageRead);
         socketService.socket.off('message-blocked', handleMessageBlocked);
-
+        socketService.socket.off('chat-banned', handleChatBanned);
+        socketService.socket.off('chat-unbanned', handleChatUnbanned);
         socketService.socket.off('new-notification', handleNewNotification);
     };
   }, [socketService, queryClient, userId, selectedItem, mode, userName]);
 
-  // Join/leave community room when selected (for community mode)
   useEffect(() => {
     if (mode === 'community' && selectedItem?.id && socketService?.socket) {
-      // Pass userId and userName so other members get a join notification
       socketService.socket.emit('join-community', {
         communityId: selectedItem.id,
         userId,
         userName
       });
-
       return () => {
         socketService.socket.emit('leave-community', selectedItem.id);
       };
     }
   }, [mode, selectedItem?.id, socketService, userId, userName]);
 
-  // Refresh conversations after selecting a chat (to update unread count)
   useEffect(() => {
     if (mode === 'direct' && selectedItem && userId) {
-      // Give time for messages to be fetched and marked as read, then refresh conversations
       const timer = setTimeout(() => {
         queryClient.invalidateQueries(['conversations', userId]);
       }, 500);
-      
       return () => clearTimeout(timer);
     }
   }, [mode, selectedItem, userId, queryClient]);
 
-  // Initial Selection — by ID (existing conversation)
   useEffect(() => {
       if (initialChatId && activeList.length > 0 && !selectedItem) {
           const found = activeList.find(i => (i.id === initialChatId || i.user_id === initialChatId));
@@ -382,19 +417,15 @@ const MessageLayout = ({
       }
   }, [initialChatId, activeList]);
 
-  // Initial Selection — by User Object (open/create DM with seller even if no conversation exists)
   useEffect(() => {
     if (!initialUserObject) return;
     if (mode !== 'direct') return;
-
-    // Wait until conversations have been fetched
     if (conversations === undefined) return;
 
     const existing = (conversations || []).find(c => c.user_id === initialUserObject.id);
     if (existing) {
       handleSelect(existing);
     } else {
-      // Create a synthetic conversation object so the chat window opens immediately
       const newConv = {
         user_id: initialUserObject.id,
         user_name: initialUserObject.name,
@@ -404,27 +435,27 @@ const MessageLayout = ({
       };
       handleSelect(newConv);
     }
-  // Only run once when initialUserObject first arrives and conversations are loaded
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialUserObject, conversations]);
 
-  // --- Handlers ---
-
+  /* ==========================================================================
+     4. COMPONENT INTERACTION HANDLERS
+     ========================================================================== */
   const handleSelect = (item) => {
       setSelectedItem(item);
       setInputValue('');
       setTypingUsers([]);
-
-      // Reset search/select modes
       setIsSearchMode(false);
       setIsSelectMode(false);
       setSelectedMessages([]);
       if (onChatSelected) onChatSelected(item);
       
-      // Invalidate the list query to clear unread badges immediately
       if (mode === 'direct') {
           queryClient.invalidateQueries(['conversations', userId]);
-          clearContextNotifications(null, item.user_id);
+          // Skip sender-based notification clear for anonymous conversations —
+          // user_id is the string "anonymous", not a real integer sender ID.
+          if (item.user_id !== 'anonymous') {
+              clearContextNotifications(null, item.user_id);
+          }
       } else {
           queryClient.invalidateQueries(['communities', userRole, userId]);
           clearContextNotifications(item.course_id, null);
@@ -433,7 +464,6 @@ const MessageLayout = ({
 
   const handleSend = async (anon) => {
       if (!inputValue.trim() || !selectedItem) return;
-
       const messageText = inputValue;
       const clientMessageId = `client-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
@@ -458,7 +488,6 @@ const MessageLayout = ({
               });
           }
           setInputValue('');
-          // Stop typing?
       } catch (err) {
           console.error('Send failed', err);
       }
@@ -471,18 +500,16 @@ const MessageLayout = ({
       } catch (err) {
           const msg = err?.response?.data?.message || err?.message || 'Failed to report message';
           showError(msg);
-          throw err; // re-throw so MessageBubble can reset its state
+          throw err; 
       }
   };
 
   const handleDeleteSelected = async () => {
       if (selectedMessages.length === 0) return;
-      
       try {
           if (mode === 'direct') {
               await deleteMultipleDMs.mutateAsync(selectedMessages);
           } else {
-              // Now implemented!
               await deleteMultipleCommunityMessages.mutateAsync({
                   communityId: selectedItem.id, 
                   messageIds: selectedMessages 
@@ -495,47 +522,30 @@ const MessageLayout = ({
       }
   };
 
-  // Scroll to bottom when messages change
   useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
-      }, [renderedMessages]);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+  }, [renderedMessages]);
 
-  // Mark messages as delivered and read (for direct messages only)
   useEffect(() => {
     if (mode !== 'direct' || !activeMessages || activeMessages.length === 0 || !socketService?.socket || !selectedItem) {
       return;
     }
+    const undeliveredMessages = activeMessages.filter(msg => msg.receiver_id === userId && !msg.delivered_at);
+    undeliveredMessages.forEach(msg => { socketService.markMessageDelivered(msg.id); });
 
-    // Mark messages as delivered (messages we received that haven't been delivered yet)
-    const undeliveredMessages = activeMessages.filter(
-      msg => msg.receiver_id === userId && !msg.delivered_at
-    );
-    undeliveredMessages.forEach(msg => {
-      socketService.markMessageDelivered(msg.id);
-    });
-
-    // Mark messages as read (messages we received that haven't been read yet)
-    const unreadMessages = activeMessages.filter(
-      msg => msg.receiver_id === userId && !msg.is_read
-    );
+    const unreadMessages = activeMessages.filter(msg => msg.receiver_id === userId && !msg.is_read);
     if (unreadMessages.length > 0) {
       const unreadIds = unreadMessages.map(msg => msg.id);
       socketService.markMessagesRead(unreadIds, userId);
-      
-      // Invalidate conversations to update unread count
-      setTimeout(() => {
-        queryClient.invalidateQueries(['conversations', userId]);
-      }, 300);
+      setTimeout(() => { queryClient.invalidateQueries(['conversations', userId]); }, 300);
     }
   }, [activeMessages, mode, userId, socketService, selectedItem, queryClient]);
 
   const onStartNewConversation = (user) => {
-    // Check if conversation exists
     const existing = conversations.find(c => c.user_id === user.id);
     if (existing) {
       handleSelect(existing);
     } else {
-      // Create temp conversation object
       const newConv = {
         user_id: user.id,
         user_name: user.name,
@@ -550,7 +560,7 @@ const MessageLayout = ({
   };
 
   const canSendAnonymously = mode === 'direct' && userRole === 'Student' && 
-                             TEACHING_ROLES.includes(selectedItem?.user_role);
+                            TEACHING_ROLES.includes(selectedItem?.user_role);
 
   const scrollToMessage = (msgId) => {
     if (!msgId) return;
@@ -558,11 +568,9 @@ const MessageLayout = ({
       const el = document.getElementById(`message-${msgId}`);
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        el.style.backgroundColor = 'rgba(255, 255, 0, 0.3)';
+        el.style.backgroundColor = 'rgba(6, 78, 59, 0.15)';
         el.style.transition = 'background-color 0.5s';
-        setTimeout(() => {
-          if (el) el.style.backgroundColor = '';
-        }, 2000);
+        setTimeout(() => { if (el) el.style.backgroundColor = ''; }, 2000);
       }
     }, 100);
   };
@@ -594,9 +602,16 @@ const MessageLayout = ({
   };
 
   return (
-    <div className="chat-container">
-      <div className="chat-layout">
-        <ChatSidebar 
+    <div className="ch-layout-outer-frame">
+      <div className={`ch-layout-split-view ${selectedItem ? 'ch-layout-split-view--active-window' : ''}`}>
+        
+        {/* Real-time Channels/DM Sidebar Component Wrapper */}
+        <div 
+          className="ch-sidebar-panel-wrapper"
+          ref={sidebarRef}
+          style={{ '--dynamic-sidebar-width': `${sidebarWidth}px` }}
+        >
+          <ChatSidebar 
             mode={mode}
             loading={loading}
             items={activeList}
@@ -604,30 +619,33 @@ const MessageLayout = ({
             onSelect={handleSelect}
             searchQuery={sidebarSearchQuery}
             onSearchChange={setSidebarSearchQuery}
-            // Direct specific
             showUserSearch={showUserSearch}
             setShowUserSearch={setShowUserSearch}
             userSearchQuery={userSearchQuery}
             setUserSearchQuery={setUserSearchQuery}
             availableUsers={usersData || []}
             onStartNewConversation={onStartNewConversation}
-        />
+          />
+        </div>
+
+        {/* Resizer Handle */}
+        <div 
+          className={`ch-sidebar-resizer ${isResizing ? 'is-resizing' : ''}`}
+          onMouseDown={startResizing}
+        >
+          <div className="ch-sidebar-resizer-line"></div>
+        </div>
         
-        <ChatWindow 
+        {/* Focus Communications Thread Window Wrapper */}
+        <div className="ch-window-panel-wrapper">
+          <ChatWindow 
             mode={mode}
             userId={userId}
             selectedItem={selectedItem}
-            // Simplify onBack to just clear selection
-            onBack={() => {
-              setSelectedItem(null);
-            }}
-            
-            // Messages
+            onBack={() => setSelectedItem(null)}
             messages={renderedMessages}
             typingUsers={typingUsers}
             messagesEndRef={messagesEndRef}
-            
-            // Search (simplified, keeping UI props)
             isSearchMode={isSearchMode}
             messageSearchQuery={messageSearchQuery}
             setMessageSearchQuery={setMessageSearchQuery}
@@ -641,8 +659,6 @@ const MessageLayout = ({
                 setSearchResults([]);
             }}
             setIsSearchMode={setIsSearchMode}
-            
-            // Selection / Delete
             isSelectMode={isSelectMode}
             setIsSelectMode={setIsSelectMode}
             selectedMessages={selectedMessages}
@@ -651,8 +667,6 @@ const MessageLayout = ({
             toggleMessageSelection={(id) => {
                 setSelectedMessages(prev => prev.includes(id) ? prev.filter(x => x!==id) : [...prev, id]);
             }}
-            
-            // Options
             showOptions={showOptions}
             setShowOptions={setShowOptions}
             handleOptionClick={(action) => {
@@ -660,27 +674,20 @@ const MessageLayout = ({
                if (action === 'delete' || action === 'select') setIsSelectMode(true);
                if (action === 'search') setIsSearchMode(true);
             }}
-
-            // Direct specific
             canSendAnonymously={canSendAnonymously}
             isAnonymous={isAnonymous}
             setIsAnonymous={setIsAnonymous}
-            
-            // Input
             inputValue={inputValue}
             setInputValue={setInputValue}
             isChatBanned={isChatBanned}
-            // Typing omitted for brevity
             onTyping={() => {}}
             onSend={(anon) => handleSend(anon || isAnonymous)}
-            
-            // Community specific
             onLeaveCommunity={onLeaveCommunity}
             onDisbandCommunity={onDisbandCommunity}
-
-            // Reporting
             onReport={handleReport}
-        />
+          />
+        </div>
+
       </div>
     </div>
   );

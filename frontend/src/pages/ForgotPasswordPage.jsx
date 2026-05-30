@@ -43,7 +43,6 @@ const ForgotPasswordPage = () => {
       const data = await authApi.forgotPassword(email);
       if (data) {
         setMessage('Verification code sent! Check your email.');
-        // Store email and flow type, navigate to verify page
         sessionStorage.setItem('verifyEmail', email);
         sessionStorage.setItem('verifyFlow', 'passwordReset');
         setTimeout(() => {
@@ -61,20 +60,20 @@ const ForgotPasswordPage = () => {
 
   return (
     <div className="forgot-page">
-      {/* Animated Background */}
+      {/* Background Ambient Blur Decor Orbs */}
       <div className="forgot-background">
         <div className="forgot-orb forgot-orb--1"></div>
         <div className="forgot-orb forgot-orb--2"></div>
         <div className="forgot-orb forgot-orb--3"></div>
       </div>
 
-      {/* Header Bar */}
+      {/* Top Navigation Bar */}
       <header className="forgot-header">
         <button className="forgot-back-button" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faArrowLeft} />
           <span>Back</span>
         </button>
-        <div className="forgot-brand">
+        <div className="forgot-brand" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faKey} className="forgot-brand-icon" />
           <span className="forgot-brand-text">
             Edu<span className="forgot-brand-accent">Com</span>
@@ -84,17 +83,19 @@ const ForgotPasswordPage = () => {
 
       <div className="forgot-content">
         <div className="forgot-container">
-          {/* Welcome Section */}
+          {/* Welcome Identity Section */}
           <div className="forgot-welcome">
             <h1 className="forgot-title">Forgot Password?</h1>
-            <p className="forgot-subtitle">Enter your email address and we'll send you a verification code to reset your password.</p>
+            <p className="forgot-subtitle">
+              Enter your email address and we'll send you a verification code to reset your password.
+            </p>
           </div>
 
-          {/* Form */}
+          {/* Verification Form */}
           <form onSubmit={handleSubmit} className="forgot-form">
             <div className="forgot-form-group">
               <label htmlFor="email" className="forgot-label">Email Address</label>
-              <div className="forgot-input-wrapper">
+              <div className={`forgot-input-wrapper ${fieldError ? 'forgot-input-wrapper--error' : ''}`}>
                 <div className="forgot-input-icon">
                   <FontAwesomeIcon icon={faEnvelope} />
                 </div>
@@ -113,7 +114,7 @@ const ForgotPasswordPage = () => {
                 />
               </div>
               {fieldError && (
-                <div className="forgot-error-message fade-in mt-2">
+                <div className="forgot-error-message fade-in">
                   <FontAwesomeIcon icon={faExclamationCircle} />
                   <span>{fieldError}</span>
                 </div>
@@ -121,7 +122,7 @@ const ForgotPasswordPage = () => {
             </div>
 
             {error && (
-              <div className="forgot-error-message fade-in">
+              <div className="forgot-error-message forgot-error-message--general fade-in">
                 <FontAwesomeIcon icon={faExclamationCircle} />
                 <span>{error}</span>
               </div>
@@ -137,7 +138,7 @@ const ForgotPasswordPage = () => {
             <button type="submit" className="forgot-submit-button" disabled={loading}>
               {loading ? (
                 <>
-                  <div className="spinner-small"></div>
+                  <div className="forgot-spinner"></div>
                   <span>Sending Code...</span>
                 </>
               ) : (
@@ -149,7 +150,7 @@ const ForgotPasswordPage = () => {
             </button>
           </form>
 
-          {/* Footer */}
+          {/* Form Alternative Action Footer */}
           <div className="forgot-footer">
             <div className="forgot-divider">
               <span>or</span>

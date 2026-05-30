@@ -1,21 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBook,
-  faChalkboardTeacher,
-  faUsers,
-  faPlus,
-  faKey,
-  faCopy,
-  faTrash
+import { 
+  faBook, faChalkboardTeacher, faUsers, faPlus, faKey, faCopy, faTrash, faTimes, faSpinner 
 } from '@fortawesome/free-solid-svg-icons';
 import { courseApi, communityApi } from '../../api';
-import socketService from '../../services/socket';
 import { showAlert } from '../../utils/alert';
 import ConfirmDialog from '../../components/ConfirmDialog';
-import CustomSelect from '../../components/Common/CustomSelect';
-
+import { useSocket } from '../../context/SocketContext';
 import { useAuth } from '../../context/AuthContext';
+import CustomSelect from '../../components/Common/CustomSelect';
 
 const MyCourses = ({ onNavigateToCommunity }) => {
   const { user } = useAuth();
@@ -23,51 +16,24 @@ const MyCourses = ({ onNavigateToCommunity }) => {
 
   const [courses, setCourses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({
-    totalCourses: 0,
-    totalStudents: 0,
-    activeAssignments: 0,
-    pendingGrading: 0
-  });
-
-  // Course request modal states
   const [isCourseRequestModalOpen, setIsCourseRequestModalOpen] = useState(false);
-  const [courseRequestData, setCourseRequestData] = useState({
-    code: '',
-    name: '',
-    department: 'CS',
-    semester: ''
-  });
+  const [courseRequestData, setCourseRequestData] = useState({ code: '', name: '', department: 'CS', semester: '' });
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, title: '', message: '', onConfirm: null });
+
+  const { socketService, isConnected } = useSocket();
 
   useEffect(() => {
     if (userId) {
       fetchMyCourses();
-      fetchTeacherStats();
     }
   }, [userId]);
 
-  // Listen for course approval events
   useEffect(() => {
-    if (!userId) return;
-    
-    const socket = socketService.connect(userId);
-    
-    const handleCourseApproved = (data) => {
-      console.log('[MyCourses] Course approved event received:', data);
-      if (data.teacherId === userId) {
-        setCourses(prev => {
-          if (prev.some(c => c.id === data.course.id)) return prev;
-          return [...prev, data.course];
-        });
-      }
-    };
-    
-    socket.on('course-approved', handleCourseApproved);
-    
-    return () => {
-      socket.off('course-approved', handleCourseApproved);
-    };
-  }, [userId]);
+    if (isConnected && socketService?.socket) {
+      socketService.socket.on('course-approved', fetchMyCourses);
+      return () => socketService.socket.off('course-approved', fetchMyCourses);
+    }
+  }, [isConnected, socketService]);
 
   const fetchMyCourses = async () => {
     try {
@@ -81,126 +47,71 @@ const MyCourses = ({ onNavigateToCommunity }) => {
     }
   };
 
-  const fetchTeacherStats = async () => {
-    try {
-      const data = await courseApi.getTeacherStats(userId);
-      setStats(data);
-    } catch (err) {
-      console.error('Failed to fetch stats:', err);
-    }
-  };
-
   const handleCourseClick = async (course) => {
-    if (onNavigateToCommunity) {
-      try {
-        const allCommunities = await communityApi.getAll();
-        const courseCommunity = allCommunities.communities?.find(c => c.course_id === course.id);
-        
-        if (courseCommunity) {
-          const formattedChat = {
-            id: courseCommunity.id,
-            name: courseCommunity.name || `${course.name} Community`,
-            courseId: course.id,
-            courseName: course.name,
-            courseCode: course.code,
-            lastMessage: 'Start chatting...',
-            time: 'Now',
-            unread: 0
-          };
-          onNavigateToCommunity(formattedChat);
-        } else {
-          showAlert('No Community', `No community found for ${course.name}`, 'warning');
-        }
-      } catch (err) {
-        showAlert('Error', 'Failed to load course community', 'error');
+    if (!onNavigateToCommunity) return;
+    try {
+      const allCommunities = await communityApi.getAll();
+      const courseCommunity = allCommunities.communities?.find(c => c.course_id === course.id);
+      
+      if (courseCommunity) {
+        onNavigateToCommunity({
+          id: courseCommunity.id,
+          name: courseCommunity.name || `${course.name} Community`,
+          courseId: course.id,
+          courseName: course.name,
+          courseCode: course.code,
+          lastMessage: 'Start chatting...',
+          time: 'Now',
+          unread: 0
+        });
+      } else {
+        showAlert('No Community', `No community found for ${course.name}`, 'warning');
       }
+    } catch (err) {
+      showAlert('Error', 'Failed to load community', 'error');
     }
-  };
-
-  const handleCourseRequestInputChange = (e) => {
-    setCourseRequestData({
-      ...courseRequestData,
-      [e.target.name]: e.target.value
-    });
   };
 
   const handleCourseRequestSubmit = async (e) => {
     e.preventDefault();
     try {
-      const requestData = {
-        ...courseRequestData,
-        teacher_id: userId
-      };
-      await courseApi.submitCourseRequest(requestData);
-      showAlert('Success', 'Course request submitted successfully! Waiting for admin approval.', 'success');
-      setCourseRequestData({
-        code: '',
-        name: '',
-        department: 'CS',
-        semester: ''
-      });
+      await courseApi.submitCourseRequest({ ...courseRequestData, teacher_id: userId });
+      showAlert('Success', 'Request submitted for admin approval.', 'success');
       setIsCourseRequestModalOpen(false);
+      setCourseRequestData({ code: '', name: '', department: 'CS', semester: '' });
     } catch (err) {
-      showAlert('Error', err.message || 'Failed to submit course request', 'error');
+      showAlert('Error', err.message || 'Failed to submit request', 'error');
     }
   };
 
-  const handleCloseCourseRequestModal = () => {
-    setIsCourseRequestModalOpen(false);
-    setCourseRequestData({
-      code: '',
-      name: '',
-      department: 'CS',
-      semester: ''
-    });
-  };
-
-  const handleCopyJoinCode = async (joinCode, courseName, e) => {
+  const handleCopyJoinCode = async (joinCode, e) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(joinCode);
-      showAlert('Copied!', `Join code ${joinCode} copied to clipboard`, 'success');
-    } catch (err) {
-      showAlert('Error', 'Failed to copy join code', 'error');
+      showAlert('Copied', 'Join code copied', 'success');
+    } catch {
+      showAlert('Error', 'Failed to copy', 'error');
     }
   };
 
-  // Confirmation Dialog State
-  const [confirmDialog, setConfirmDialog] = useState({
-    open: false,
-    title: '',
-    message: '',
-    onConfirm: null
-  });
-
   const handleDisbandCourse = async (e, course) => {
-    e.stopPropagation(); // Prevent card click
-    
+    e.stopPropagation();
     setConfirmDialog({
       open: true,
       title: 'Disband Community',
-      message: `Are you sure you want to disband the community for "${course.name}"? This will delete the community and all messages permanently.`,
+      message: `Disband "${course.name}"? This deletes the community and all messages.`,
       onConfirm: async () => {
         try {
-          setLoading(true);
-          // Fetch backend communities to find the correct ID
-          const allCommunities = await communityApi.getAll();
-          const courseCommunity = allCommunities.communities?.find(c => c.course_id === course.id);
-          
-          if (courseCommunity) {
-            await communityApi.delete(courseCommunity.id);
-            showAlert('Success', 'Community disbanded from course successfully', 'success');
-            // Optionally refresh courses or just stay here
-            fetchMyCourses(); 
-          } else {
-             // If no community found, checking if we should alert user
-            showAlert('Error', 'Could not find the community to disband.', 'error');
+          const all = await communityApi.getAll();
+          const target = all.communities?.find(c => c.course_id === course.id);
+          if (target) {
+            await communityApi.delete(target.id);
+            showAlert('Success', 'Community disbanded', 'success');
+            fetchMyCourses();
           }
         } catch (err) {
-          console.error(err);
-          showAlert('Error', 'Failed to disband community', 'error');
+          showAlert('Error', 'Failed to disband', 'error');
         } finally {
-          setLoading(false);
           setConfirmDialog(prev => ({ ...prev, open: false }));
         }
       }
@@ -208,186 +119,67 @@ const MyCourses = ({ onNavigateToCommunity }) => {
   };
 
   return (
-    <div className="container">
-      <div className="header-actions mb-3">
-        <button 
-          className="floating-join-btn"
-          onClick={() => setIsCourseRequestModalOpen(true)}
-        >
+    <div className="mc-viewport">
+      <div className="mc-header-row">
+        <button className="mc-float-add-btn" onClick={() => setIsCourseRequestModalOpen(true)}>
           <FontAwesomeIcon icon={faPlus} />
         </button>
       </div>
       
       {loading ? (
-        <div className="text-center p-4 text-secondary">
-          Loading your courses...
+        <div className="mc-state-message">
+          <FontAwesomeIcon icon={faSpinner} spin className="mc-empty-icon" />
+          <p>Loading courses...</p>
         </div>
       ) : courses.length === 0 ? (
-        <div className="empty-state text-center p-4 text-secondary">
-          <FontAwesomeIcon icon={faBook} className="icon-xl mb-3 opacity-30" />
-          <p>No courses assigned yet.</p>
+        <div className="mc-state-message">
+          <FontAwesomeIcon icon={faBook} className="mc-empty-icon" />
+          <p>No courses assigned.</p>
         </div>
       ) : (
-        <div className="course-card-grid">
+        <div className="mc-course-grid">
           {courses.map((course) => (
-            <div 
-              key={course.id}
-              className="course-card clickable"
-              onClick={() => handleCourseClick(course)}
-            >
-              <div className="course-card-header">
-                <span className="course-card-code">{course.code}</span>
-                <button 
-                  className="course-leave-btn"
-                  onClick={(e) => handleDisbandCourse(e, course)}
-                  title="Disband Community"
-                >
-                  <FontAwesomeIcon icon={faTrash} />
-                </button>
+            <div key={course.id} className="mc-course-card" onClick={() => handleCourseClick(course)}>
+              <div className="mc-card-header">
+                <span className="mc-course-code">{course.code}</span>
+                <button className="mc-leave-btn" onClick={(e) => handleDisbandCourse(e, course)}><FontAwesomeIcon icon={faTrash} /></button>
               </div>
-              
-              <h3 className="course-card-title">
-                {course.name}
-              </h3>
-              
+              <h3 className="mc-card-title">{course.name}</h3>
               {course.join_code && (
-                <div className="join-code-section">
-                  <div className="join-code-label">
-                    <FontAwesomeIcon icon={faKey} />
-                    <span>Join Code</span>
-                  </div>
-                  <div className="join-code-value">
-                    <span className="join-code-text">{course.join_code}</span>
-                    <button 
-                      className="copy-btn"
-                      onClick={(e) => handleCopyJoinCode(course.join_code, course.name, e)}
-                      title="Copy join code"
-                    >
-                      <FontAwesomeIcon icon={faCopy} />
-                    </button>
-                  </div>
+                <div className="mc-join-code-box">
+                  <span>Code: {course.join_code}</span>
+                  <button className="mc-copy-btn" onClick={(e) => handleCopyJoinCode(course.join_code, e)}><FontAwesomeIcon icon={faCopy}/></button>
                 </div>
               )}
-              
-              <div className="course-card-meta">
-                <div className="course-card-meta-item">
-                  <FontAwesomeIcon icon={faUsers} />
-                  <span>{course.enrolled_count || 0} students enrolled</span>
-                </div>
-                <div className="course-card-meta-item">
-                  <FontAwesomeIcon icon={faBook} />
-                  <span>{course.department} - {course.semester}</span>
-                </div>
-                <div className="course-card-meta-item">
-                  <FontAwesomeIcon icon={faChalkboardTeacher} />
-                  <span>Instructor</span>
-                </div>
+              <div className="mc-card-meta">
+                <span><FontAwesomeIcon icon={faUsers} /> {course.enrolled_count || 0} Students</span>
+                <span><FontAwesomeIcon icon={faBook} /> {course.department} - Sem {course.semester}</span>
               </div>
             </div>
           ))}
         </div>
       )}
-      
+
+      {/* Request Modal */}
       {isCourseRequestModalOpen && (
-        <div className="modal">
-          <div className="modal-content modal-content-medium">
-            <h2>Request New Course</h2>
-            <p className="modal-description">Submit a request for a new course. Admin will review and approve.</p>
+        <div className="mc-modal-overlay" onClick={() => setIsCourseRequestModalOpen(false)}>
+          <div className="mc-modal-box" onClick={e => e.stopPropagation()}>
+            <h3>Request New Course</h3>
             <form onSubmit={handleCourseRequestSubmit}>
-              <div className="grid-2col">
-                <div className="form-group">
-                  <label>Course Code+Sec Name:</label>
-                  <input
-                    type="text"
-                    name="code"
-                    value={courseRequestData.code}
-                    onChange={handleCourseRequestInputChange}
-                    placeholder="CS101-A(Section Name)"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Course Name:</label>
-                  <input
-                    type="text"
-                    name="name"
-                    value={courseRequestData.name}
-                    onChange={handleCourseRequestInputChange}
-                    placeholder="e.g., Introduction to Programming"
-                    required
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Department:</label>
-                  <CustomSelect
-                    options={[
-                      { value: 'CS', label: 'CS' },
-                      { value: 'BBA', label: 'BBA' }
-                    ]}
-                    value={courseRequestData.department}
-                    onChange={(val) => setCourseRequestData({ ...courseRequestData, department: val })}
-                  />
-                </div>
-                <div className="form-group">
-                  <label>Semester:</label>
-                  <CustomSelect
-                    options={[
-                      { value: '1', label: 'Semester 1' },
-                      { value: '2', label: 'Semester 2' },
-                      { value: '3', label: 'Semester 3' },
-                      { value: '4', label: 'Semester 4' },
-                      { value: '5', label: 'Semester 5' },
-                      { value: '6', label: 'Semester 6' },
-                      { value: '7', label: 'Semester 7' },
-                      { value: '8', label: 'Semester 8' }
-                    ]}
-                    value={courseRequestData.semester}
-                    onChange={(val) => setCourseRequestData({ ...courseRequestData, semester: val })}
-                    placeholder="Select Semester"
-                  />
-                </div>
-                <div className="form-group form-group-full">
-                  <label>Teacher:</label>
-                  <input
-                    type="text"
-                    value={user?.name || 'Current User'}
-                    disabled
-                    className="input-disabled"
-                  />
-                  <small className="helper-text">
-                    This course will be assigned to you
-                  </small>
-                </div>
-              </div>
-              <div className="modal-actions">
-                <button 
-                  type="submit" 
-                  className="button primary"
-                >
-                  Submit Request
-                </button>
-                <button 
-                  type="button" 
-                  className="button secondary"
-                  onClick={handleCloseCourseRequestModal}
-                >
-                  Cancel
-                </button>
+              <input className="mc-join-input" placeholder="Course Code (e.g., CS101-A)" required onChange={e => setCourseRequestData({...courseRequestData, code: e.target.value})} />
+              <input className="mc-join-input" placeholder="Course Name" required onChange={e => setCourseRequestData({...courseRequestData, name: e.target.value})} />
+              <CustomSelect options={[{value:'CS', label:'CS'}, {value:'BBA', label:'BBA'}]} onChange={v => setCourseRequestData({...courseRequestData, department: v})} value={courseRequestData.department} />
+              <CustomSelect options={Array.from({length:8}, (_, i) => ({value: `${i+1}`, label: `Semester ${i+1}`}))} onChange={v => setCourseRequestData({...courseRequestData, semester: v})} value={courseRequestData.semester} />
+              <div className="mc-modal-footer">
+                <button type="button" className="mc-btn-secondary" onClick={() => setIsCourseRequestModalOpen(false)}>Cancel</button>
+                <button type="submit" className="mc-btn-primary">Submit Request</button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      <ConfirmDialog
-        open={confirmDialog.open}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
-        confirmText="Disband"
-        variant="danger"
-      />
+      <ConfirmDialog {...confirmDialog} onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))} confirmText="Disband" variant="danger" />
     </div>
   );
 };

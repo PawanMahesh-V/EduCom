@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import '../../styles/CustomSelect.css';
 
 const CustomSelect = ({ options, value, onChange, placeholder = "Select an option", className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -25,23 +24,23 @@ const CustomSelect = ({ options, value, onChange, placeholder = "Select an optio
   };
 
   return (
-    <div className={`custom-select-container ${className}`} ref={dropdownRef}>
+    <div className={`cs-dropdown-container ${className}`} ref={dropdownRef}>
       <div 
-        className={`custom-select-trigger ${isOpen ? 'open' : ''}`} 
+        className={`cs-dropdown-trigger ${isOpen ? 'cs-dropdown-trigger--open' : ''}`} 
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="selected-value">
+        <span className="cs-dropdown-selected-value">
           {selectedOption ? selectedOption.label : placeholder}
         </span>
-        <FontAwesomeIcon icon={faChevronDown} className={`dropdown-arrow ${isOpen ? 'up' : ''}`} />
+        <FontAwesomeIcon icon={faChevronDown} className={`cs-dropdown-arrow ${isOpen ? 'cs-dropdown-arrow--up' : ''}`} />
       </div>
       
       {isOpen && (
-        <div className="custom-select-options">
+        <div className="cs-dropdown-options-pane fade-in">
           {options.map((option) => (
             <div 
               key={option.value} 
-              className={`custom-option ${value === option.value ? 'selected' : ''}`}
+              className={`cs-dropdown-option-item ${value === option.value ? 'cs-dropdown-option-item--selected' : ''}`}
               onClick={() => handleSelect(option.value)}
             >
               {option.label}

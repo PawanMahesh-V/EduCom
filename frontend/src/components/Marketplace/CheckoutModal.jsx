@@ -3,33 +3,32 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faTimes, faShoppingBag, faMapMarkerAlt,
   faCreditCard, faMoneyBillWave, faCheckCircle, faChevronRight,
-  faUser, faPhone, faEnvelope, faSpinner, faLock
+  faUser, faPhone, faEnvelope, faSpinner, faLock, faExclamationCircle
 } from '@fortawesome/free-solid-svg-icons';
-import '../../styles/CheckoutModal.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
 import CustomSelect from '../Common/CustomSelect';
 import { showError } from '../../utils/alert';
 
-// ─── Payment Options ────────────────────────────────────────────────────────
+// ─── Payment Options Options ────────────────────────────────────────────────
 const PAYMENT_METHODS = [
   {
     id: 'cod',
     label: 'Cash on Delivery',
-    desc: 'Pay when you receive the item',
+    desc: 'Pay the seller manually upon item pickup on campus',
     icon: faMoneyBillWave,
     color: '#10b981',
   },
   {
     id: 'payfast',
-    label: 'PayFast',
-    desc: 'Pay securely via card, bank or mobile wallet',
+    label: 'PayFast Secure Gateway',
+    desc: 'Pay securely instantly via bank accounts, card or mobile wallets',
     icon: faCreditCard,
-    color: '#0d627a',
+    color: '#064e3b',
   },
 ];
 
-const STEPS = ['Order Review', 'Contact Info', 'Payment', 'Confirm'];
+const STEPS = ['Order Review', 'Contact Info', 'Payment Option', 'Confirmation'];
 
 // ─── Dynamically load the GoPayFast onsite engine script ────────────────────
 const loadPayFastEngine = (engineUrl) =>
@@ -38,7 +37,6 @@ const loadPayFastEngine = (engineUrl) =>
       resolve();
       return;
     }
-    // Remove any stale script tag first
     const existing = document.getElementById('pf-engine-script');
     if (existing) existing.remove();
 
@@ -58,7 +56,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
     fullName:   currentUser?.name  || '',
     email:      currentUser?.email || '',
     phone:      '',
-    campus:     'SZABIST Campus',
+    campus:     '79 Campus',
     pickupNote: '',
   });
   const [placing, setPlacing] = useState(false);
@@ -87,7 +85,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
       fullName:   currentUser?.name  || '',
       email:      currentUser?.email || '',
       phone:      '',
-      campus:     'SZABIST Campus',
+      campus:     '79 Campus',
       pickupNote: '',
     });
     setPaymentMethod('cod');
@@ -133,12 +131,10 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
           try {
             await loadPayFastEngine(response.engineUrl);
 
-            // window.payfast_do_onsite_payment is now available
             window.payfast_do_onsite_payment(
               { uuid: response.uuid },
               async (result) => {
                 if (result === true) {
-                  // Payment confirmed by popup
                   setPlacing(false);
                   setPfStatus('');
                   setPlaced(true);
@@ -148,17 +144,15 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                     onClose();
                   }, 2500);
                 } else {
-                  // User closed / cancelled the popup
                   setPlacing(false);
                   setPfStatus('');
                   showError('Payment was cancelled. Your order has not been placed.');
                 }
               }
             );
-            return; // wait for popup callback
+            return; 
           } catch (engineErr) {
             console.warn('[PayFast] Engine load failed, falling back to redirect:', engineErr.message);
-            // Fall through to redirect mode below
           }
         }
 
@@ -168,7 +162,6 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
         const paymentUrl = response.paymentUrl;
 
         if (paymentUrl && Object.keys(payload).length > 0) {
-          // Build a hidden form and submit it
           const formEl = document.createElement('form');
           formEl.method = 'POST';
           formEl.action = paymentUrl;
@@ -200,291 +193,291 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
       }, 2500);
 
     } catch (error) {
-      console.error('[Checkout] Failed to place order:', error);
+      console.error(error);
       showError('Failed to place order. Please try again.');
+    } finally {
       setPlacing(false);
       setPfStatus('');
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="checkout-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="checkout-modal">
+    <div className="ck-modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="ck-modal-box fade-in">
 
-        {/* Header */}
-        <div className="checkout-header">
-          <div className="checkout-header-left">
-            <FontAwesomeIcon icon={faShoppingBag} className="checkout-header-icon" />
-            <div>
-              <h2 className="checkout-title">Checkout</h2>
-              <p className="checkout-subtitle">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''}</p>
+        {/* Header Title Section */}
+        <div className="ck-modal-header">
+          <div className="ck-header-profile-block">
+            <div className="ck-header-icon-shell">
+              <FontAwesomeIcon icon={faShoppingBag} />
+            </div>
+            <div className="ck-header-text-stack">
+              <h2 className="ck-modal-title">Checkout</h2>
+              <p className="ck-modal-subtitle">{cartItems.length} item{cartItems.length !== 1 ? 's' : ''} in cart</p>
             </div>
           </div>
-          <button className="checkout-close-btn" onClick={onClose}>
+          <button className="ck-close-trigger-btn" onClick={onClose}>
             <FontAwesomeIcon icon={faTimes} />
           </button>
         </div>
 
-        {/* Step Progress */}
-        <div className="checkout-steps">
-          {STEPS.map((label, i) => (
-            <div key={i} className={`checkout-step ${i === step ? 'active' : ''} ${i < step ? 'done' : ''}`}>
-              <div className="step-circle">
-                {i < step ? <FontAwesomeIcon icon={faCheckCircle} /> : i + 1}
+        {/* Step Flow Tracker Matrix */}
+        {!placed && (
+          <div className="ck-step-flow-bar">
+            {STEPS.map((label, i) => (
+              <div key={i} className={`ck-step-node ${i === step ? 'ck-step-node--active' : ''} ${i < step ? 'ck-step-node--done' : ''}`}>
+                <div className="ck-step-badge">
+                  {i < step ? <FontAwesomeIcon icon={faCheckCircle} /> : i + 1}
+                </div>
+                <span className="ck-step-label">{label}</span>
+                {i < STEPS.length - 1 && <div className="ck-step-pipeline" />}
               </div>
-              <span className="step-label">{label}</span>
-              {i < STEPS.length - 1 && <div className="step-line" />}
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
-        {/* Body */}
-        <div className="checkout-body">
+        {/* Form Sections Viewport Render */}
+        <div className="ck-modal-body-viewport">
 
-          {/* ─── STEP 0: Order Review ─── */}
+          {/* ─── STEP 0: Item Review ─── */}
           {step === 0 && (
-            <div className="checkout-section">
-              <h3 className="section-title">Review Your Order</h3>
-              <div className="checkout-items-list">
+            <div className="ck-section-view">
+              <h3 className="ck-section-heading">Review Your Order</h3>
+              <div className="ck-items-list-frame">
                 {cartItems.map(item => {
                   const price = parseFloat(item.price);
                   return (
-                    <div key={item.id} className="checkout-item-row">
+                    <div key={item.id} className="ck-item-manifest-row">
                       <img
                         src={item.image_url || '/assets/marketplace/textbook.png'}
                         alt={item.title}
-                        className="checkout-item-img"
+                        className="ck-item-thumbnail"
                       />
-                      <div className="checkout-item-info">
-                        <div className="checkout-item-title">{item.title}</div>
-                        <div className="checkout-item-meta">{item.category} · Seller: {item.seller_name || 'User'}</div>
-                        <div className="checkout-item-qty">Qty: {item.qty || 1}</div>
+                      <div className="ck-item-details-stack">
+                        <div className="ck-item-title-text">{item.title}</div>
+                        <div className="ck-item-metadata-text">{item.category} · Seller: {item.seller_name || 'User'}</div>
+                        <div className="ck-item-qty-tag">Quantity: {item.qty || 1}</div>
                       </div>
-                      <div className="checkout-item-price">
-                        Rs. {!isNaN(price) ? (price * (item.qty || 1)).toFixed(2) : '0.00'}
+                      <div className="ck-item-calculated-price">
+                        Rs. {!isNaN(price) ? (price * (item.qty || 1)).toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'}
                       </div>
                     </div>
                   );
                 })}
               </div>
-              <div className="checkout-order-summary">
-                <div className="summary-row"><span>Subtotal</span><span>Rs. {cartTotal.toFixed(2)}</span></div>
-                <div className="summary-row"><span>Delivery</span><span className="free-tag">Free (Campus Pickup)</span></div>
-                <div className="summary-row total-row"><span>Total</span><span>Rs. {cartTotal.toFixed(2)}</span></div>
+              <div className="ck-financial-breakdown-card">
+                <div className="ck-summary-row"><span>Subtotal</span><span>Rs. {cartTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
+                <div className="ck-summary-row"><span>Delivery</span><span className="ck-free-badge">Free (Campus Pickup)</span></div>
+                <div className="ck-summary-row ck-summary-row--grand-total"><span>Total</span><span>Rs. {cartTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span></div>
               </div>
             </div>
           )}
 
-          {/* ─── STEP 1: Contact Info ─── */}
+          {/* ─── STEP 1: Contact Form Input Info ─── */}
           {step === 1 && (
-            <div className="checkout-section">
-              <h3 className="section-title">Contact & Pickup Info</h3>
-              <div className="checkout-form">
-                <div className="checkout-field">
-                  <label><FontAwesomeIcon icon={faUser} /> Full Name</label>
-                  <input name="fullName" value={form.fullName} readOnly className="readonly-field" />
+            <div className="ck-section-view">
+              <h3 className="ck-section-heading">Contact Information</h3>
+              <div className="ck-form-layout-stack">
+                <div className="ck-form-group">
+                  <label><FontAwesomeIcon icon={faUser} /> Name</label>
+                  <input name="fullName" value={form.fullName} readOnly className="ck-input-field ck-input-field--readonly" />
                 </div>
-                <div className="checkout-field">
+                <div className="ck-form-group">
                   <label><FontAwesomeIcon icon={faEnvelope} /> Email</label>
-                  <input name="email" type="email" value={form.email} readOnly className="readonly-field" />
+                  <input name="email" type="email" value={form.email} readOnly className="ck-input-field ck-input-field--readonly" />
                 </div>
-                <div className="checkout-field">
+                <div className="ck-form-group">
                   <label><FontAwesomeIcon icon={faPhone} /> Phone Number</label>
-                  <input name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="03xx-xxxxxxx" />
+                  <input name="phone" type="tel" value={form.phone} onChange={handleChange} placeholder="e.g., 03xxxxxxxxx" className="ck-input-field" />
                   {form.phone.length > 0 && !isPhoneValid && (
-                    <span style={{ color: '#e74c3c', fontSize: '0.8rem', marginTop: '4px', display: 'block' }}>
-                      {form.phone.length !== 11 ? 'Phone number must be exactly 11 digits.' : 'Phone number is invalid'}
-                    </span>
+                    <div className="ck-field-error-notice">
+                      <FontAwesomeIcon icon={faExclamationCircle} />
+                      <span>{form.phone.length !== 11 ? 'Phone number must be exactly 11 digits.' : 'Invalid format. Must start with 03.'}</span>
+                    </div>
                   )}
                 </div>
-                <div className="checkout-field">
+                <div className="ck-form-group">
                   <label><FontAwesomeIcon icon={faMapMarkerAlt} /> Pickup Campus</label>
                   <CustomSelect
                     options={[
-                      { value: '79 Campus',  label: '79 Campus'  },
-                      { value: '98 Campus',  label: '98 Campus'  },
-                      { value: '99 Campus',  label: '99 Campus'  },
-                      { value: '100 Campus', label: '100 Campus' },
-                      { value: '153 Campus', label: '153 Campus' },
-                      { value: '154 Campus', label: '154 Campus' },
-                      { value: '172 Campus', label: '172 Campus' },
+                      { value: '79 Campus',  label: '79 Campus Block'  },
+                      { value: '98 Campus',  label: '98 Campus Block'  },
+                      { value: '99 Campus',  label: '99 Campus Block'  },
+                      { value: '100 Campus', label: '100 Campus Block' },
+                      { value: '153 Campus', label: '153 Campus Block' },
+                      { value: '154 Campus', label: '154 Campus Block' },
+                      { value: '172 Campus', label: '172 Campus Block' },
                     ]}
                     value={form.campus}
                     onChange={(val) => setForm({ ...form, campus: val })}
                   />
                 </div>
-                <div className="checkout-field">
-                  <label>Pickup Note (Optional)</label>
+                <div className="ck-form-group">
+                  <label>Notes (Optional)</label>
                   <textarea
                     name="pickupNote"
                     value={form.pickupNote}
                     onChange={handleChange}
                     rows="3"
-                    placeholder="e.g. I'm available after 2PM on weekdays..."
+                    placeholder="e.g., Available after 3:00 PM..."
+                    className="ck-textarea-field"
                   />
                 </div>
               </div>
             </div>
           )}
 
-          {/* ─── STEP 2: Payment Method ─── */}
+          {/* ─── STEP 2: Secure Payment Gateway Selection ─── */}
           {step === 2 && (
-            <div className="checkout-section">
-              <h3 className="section-title">Select Payment Method</h3>
-              <div className="payment-methods-grid">
+            <div className="ck-section-view">
+              <h3 className="ck-section-heading">Select Payment Method</h3>
+              <div className="ck-payment-methods-stack">
                 {PAYMENT_METHODS.map(pm => (
                   <div
                     key={pm.id}
-                    className={`payment-card ${paymentMethod === pm.id ? 'selected' : ''}`}
+                    className={`ck-payment-selection-card ${paymentMethod === pm.id ? 'ck-payment-selection-card--selected' : ''}`}
                     onClick={() => setPaymentMethod(pm.id)}
                   >
-                    <div className="payment-card-icon" style={{ color: pm.color }}>
+                    <div className="ck-payment-card-icon-avatar" style={{ color: pm.color }}>
                       <FontAwesomeIcon icon={pm.icon} />
                     </div>
-                    <div className="payment-card-info">
-                      <div className="payment-card-label">{pm.label}</div>
-                      <div className="payment-card-desc">{pm.desc}</div>
+                    <div className="ck-payment-card-text-block">
+                      <div className="ck-payment-card-label-title">{pm.label}</div>
+                      <div className="ck-payment-card-description">{pm.desc}</div>
                     </div>
-                    <div className={`payment-radio ${paymentMethod === pm.id ? 'checked' : ''}`} />
+                    <div className={`ck-payment-radio-node ${paymentMethod === pm.id ? 'ck-payment-radio-node--checked' : ''}`} />
                   </div>
                 ))}
               </div>
 
-              {/* PayFast info box */}
+              {/* Dynamic contextual payment notice banners fields */}
               {paymentMethod === 'payfast' && (
-                <div className="payment-note pf-info">
+                <div className="ck-payment-informational-box ck-payment-informational-box--payfast">
                   <FontAwesomeIcon icon={faLock} />
-                  <span>
-                    You'll be redirected to PayFast Pakistan's secure payment portal. Powered by{' '}
-                    <strong>gopayfast.com</strong>.
-                  </span>
+                  <span>You will be redirected to PayFast's secure website to complete your payment.</span>
                 </div>
               )}
 
               {paymentMethod === 'cod' && (
-                <div className="payment-note">
+                <div className="ck-payment-informational-box ck-payment-informational-box--cod">
                   <FontAwesomeIcon icon={faCheckCircle} />
-                  <span>Pay the seller in cash when you pick up your item on campus.</span>
+                  <span>Pay with cash when you pick up your order on campus.</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* ─── STEP 3: Confirm ─── */}
+          {/* ─── STEP 3: Final Aggregate Confirmation Summary ─── */}
           {step === 3 && !placed && (
-            <div className="checkout-section">
-              <h3 className="section-title">Order Summary</h3>
+            <div className="ck-section-view">
+              <h3 className="ck-section-heading">Confirm Your Order</h3>
 
-              <div className="confirm-grid">
-                <div className="confirm-block">
-                  <div className="confirm-block-title">Items ({cartItems.length})</div>
-                  {cartItems.map(item => (
-                    <div key={item.id} className="confirm-item">
-                      <span>{item.title}</span>
-                      <span>Rs. {(parseFloat(item.price) * (item.qty || 1)).toFixed(2)}</span>
-                    </div>
-                  ))}
+              <div className="ck-confirmation-bento-grid">
+                <div className="ck-confirm-summary-card">
+                  <div className="ck-confirm-card-header">Items ({cartItems.length})</div>
+                  <div className="ck-confirm-card-scroll-area">
+                    {cartItems.map(item => (
+                      <div key={item.id} className="ck-confirm-item-manifest-line">
+                        <span className="ck-confirm-item-title-string">{item.title}</span>
+                        <span className="ck-confirm-item-price-string">Rs. {(parseFloat(item.price) * (item.qty || 1)).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <div className="confirm-block">
-                  <div className="confirm-block-title">Contact</div>
-                  <div className="confirm-detail">{form.fullName}</div>
-                  <div className="confirm-detail">{form.email}</div>
-                  <div className="confirm-detail">{form.phone}</div>
+                <div className="ck-confirm-summary-card">
+                  <div className="ck-confirm-card-header">Contact Details</div>
+                  <div className="ck-confirm-meta-text-line"><strong>Name:</strong> {form.fullName}</div>
+                  <div className="ck-confirm-meta-text-line"><strong>Email:</strong> {form.email}</div>
+                  <div className="ck-confirm-meta-text-line"><strong>Phone:</strong> {form.phone}</div>
                 </div>
-                <div className="confirm-block">
-                  <div className="confirm-block-title">Pickup</div>
-                  <div className="confirm-detail">{form.campus}</div>
-                  {form.pickupNote && <div className="confirm-detail muted">{form.pickupNote}</div>}
+                <div className="ck-confirm-summary-card">
+                  <div className="ck-confirm-card-header">Logistics</div>
+                  <div className="ck-confirm-meta-text-line"><strong>Campus:</strong> {form.campus}</div>
+                  {form.pickupNote && <div className="ck-confirm-meta-text-line ck-confirm-meta-text-line--italic">"{form.pickupNote}"</div>}
                 </div>
-                <div className="confirm-block">
-                  <div className="confirm-block-title">Payment</div>
-                  <div className="confirm-detail">
+                <div className="ck-confirm-summary-card">
+                  <div className="ck-confirm-card-header">Payment Method</div>
+                  <div className="ck-confirm-meta-text-line ck-confirm-meta-text-line--emerald">
                     <FontAwesomeIcon
                       icon={paymentMethod === 'payfast' ? faCreditCard : faMoneyBillWave}
-                      style={{ marginRight: '6px', color: paymentMethod === 'payfast' ? '#0d627a' : '#10b981' }}
+                      className="mr-2"
                     />
-                    {PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label}
+                    <span>{PAYMENT_METHODS.find(p => p.id === paymentMethod)?.label}</span>
                   </div>
-                  {paymentMethod === 'payfast' && (
-                    <div className="confirm-detail muted" style={{ fontSize: '0.78rem' }}>
-                      <FontAwesomeIcon icon={faLock} style={{ marginRight: '4px' }} />
-                      Powered by gopayfast.com
-                    </div>
-                  )}
                 </div>
               </div>
 
-              <div className="checkout-order-summary" style={{ marginTop: '20px' }}>
-                <div className="summary-row total-row">
-                  <span>Total Payable</span>
-                  <span>Rs. {cartTotal.toFixed(2)}</span>
+              <div className="ck-financial-breakdown-card" style={{ marginTop: '24px' }}>
+                <div className="ck-summary-row ck-summary-row--grand-total">
+                  <span>Total Amount</span>
+                  <span>Rs. {cartTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
               </div>
 
-              {/* PayFast loading/redirecting overlay message */}
-              {pfStatus === 'loading' && (
-                <div className="pf-loading-msg">
+              {/* PayFast Background Thread Intercept Banners */}
+              {pfStatus && (
+                <div className="ck-gateway-loading-overlay-banner fade-in">
                   <FontAwesomeIcon icon={faSpinner} spin />
-                  &nbsp; Connecting to PayFast Pakistan…
-                </div>
-              )}
-              {pfStatus === 'redirecting' && (
-                <div className="pf-loading-msg">
-                  <FontAwesomeIcon icon={faSpinner} spin />
-                  &nbsp; Redirecting to PayFast Pakistan payment page…
+                  <span>{pfStatus === 'loading' ? 'Connecting to PayFast...' : 'Redirecting to payment gateway. Please wait...'}</span>
                 </div>
               )}
             </div>
           )}
 
-          {/* ─── SUCCESS ─── */}
+          {/* ─── SUCCESS SCREEN VIEWPORT RENDERING FLOW ─── */}
           {placed && (
-            <div className="checkout-success">
-              <div className="success-icon-wrap">
-                <FontAwesomeIcon icon={faCheckCircle} className="success-icon" />
+            <div className="ck-success-state-view slide-up">
+              <div className="ck-success-icon-ring">
+                <FontAwesomeIcon icon={faCheckCircle} />
               </div>
-              <h3 className="success-title">Order Placed!</h3>
-              <p className="success-msg">
-                Your order has been submitted successfully. The seller will contact you at{' '}
-                <strong>{form.email}</strong> or <strong>{form.phone}</strong>.
+              <h3 className="ck-success-headline">Order Placed!</h3>
+              <p className="co-success-message">
+                Your order has been placed successfully. The seller will contact you via <strong>{form.email}</strong> or <strong>{form.phone}</strong> soon.
               </p>
             </div>
           )}
         </div>
 
-        {/* Footer */}
+        {/* Modal Action Footer Controlling State Navigation Buttons */}
         {!placed && (
-          <div className="checkout-footer">
+          <div className="ck-modal-footer">
             {step > 0 && (
-              <button className="checkout-btn secondary" onClick={handleBack} disabled={placing}>
+              <button className="ck-btn-secondary" onClick={handleBack} disabled={placing}>
                 Back
               </button>
             )}
-            <div className="checkout-footer-right">
-              <span className="checkout-total-label">
-                Total: <strong>Rs. {cartTotal.toFixed(2)}</strong>
+            <div className="ck-modal-footer-right-alignment">
+              <span className="ck-footer-pricing-aggregate-label">
+                Total Amount: <strong>Rs. {cartTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong>
               </span>
               {step < STEPS.length - 1 ? (
                 <button
-                  className="checkout-btn primary"
+                  className="ck-btn-primary"
                   onClick={handleNext}
                   disabled={step === 1 && !canProceedStep1}
                 >
-                  Continue <FontAwesomeIcon icon={faChevronRight} />
+                  <span>Continue</span>
+                  <FontAwesomeIcon icon={faChevronRight} />
                 </button>
               ) : (
                 <button
-                  className="checkout-btn primary place-order"
+                  className={`ck-btn-primary ${paymentMethod === 'payfast' ? 'ck-btn-primary--payfast' : 'ck-btn-primary--order'}`}
                   onClick={handlePlaceOrder}
                   disabled={placing}
                 >
-                  {placing
-                    ? <><FontAwesomeIcon icon={faSpinner} spin />&nbsp;{pfStatus === 'loading' ? 'Connecting…' : 'Placing…'}</>
-                    : paymentMethod === 'payfast'
-                      ? <><FontAwesomeIcon icon={faLock} />&nbsp;Pay with PayFast</>
-                      : 'Place Order'
-                  }
+                  {placing ? (
+                    <>
+                      <FontAwesomeIcon icon={faSpinner} spin />
+                      <span>{pfStatus === 'loading' ? 'Encrypting...' : 'Deploying...'}</span>
+                    </>
+                  ) : paymentMethod === 'payfast' ? (
+                    <>
+                      <FontAwesomeIcon icon={faLock} />
+                      <span>Authorize PayFast Gateway</span>
+                    </>
+                  ) : (
+                    <span>Confirm & Place Order</span>
+                  )}
                 </button>
               )}
             </div>

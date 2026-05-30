@@ -1,205 +1,119 @@
 # EduCom
 
-EduCom is a full-stack education communication platform with real-time chat, course communities, notifications, role-based access, and AI-powered toxic content moderation.
+EduCom is a full‑stack education communication platform providing real‑time chat, course communities, notifications, role‑based access, and an AI moderation microservice to keep conversations safer.
 
-It is designed to help institutes manage classroom communication in one place with safer messaging.
-
-## Tech Stack
+## Tech stack
 
 - Frontend: React, Vite, React Query, Socket.IO Client
 - Backend: Node.js, Express, Socket.IO, PostgreSQL
-- ML Service: Python, scikit-learn, FastAPI
-- Database: PostgreSQL
+- ML moderation: Python, scikit‑learn, FastAPI
 
-## Repository Structure
+## Repo layout
 
 ```text
 EduCom/
-|-- backend/        # Express API + Socket.IO server
-|-- frontend/       # React web app
-|-- ml-service/     # Training pipeline + FastAPI moderation API
-|-- DB.sql          # Database schema / setup SQL
+├─ backend/        # Express API + Socket.IO server
+├─ frontend/       # React web app
+├─ ml-service/     # Training pipeline + FastAPI moderation API
+├─ DB.sql          # Database schema / setup SQL
 ```
 
-## Core Features
+## Quick start (development)
 
-- JWT-based authentication and role-based access
-- Course and community management
-- Real-time community chat and direct messaging
-- Notifications and delivery/read state handling
-- Toxic message moderation using a Python ML microservice
-- Blocked message UX in chat with status indicator
+1) Ensure prerequisites are installed:
 
-## Moderation Flow
-
-1. User sends a message from frontend.
-2. Backend forwards text to ML moderation API.
-3. ML service predicts toxic or safe.
-4. If safe, backend saves and delivers message.
-5. If toxic, backend blocks delivery and emits a blocked status event.
-6. Frontend shows the sender message as blocked (not delivered).
-
-## Prerequisites
-
-- Node.js 18+
-- npm 9+
+- Node.js 18+, npm 9+
 - Python 3.10+
 - PostgreSQL 14+
 
-## 1) Database Setup
+2) Database
 
-1. Create a PostgreSQL database.
-2. Run schema setup from `DB.sql`.
-3. Ensure user credentials match backend `.env`.
+- Create a PostgreSQL database and run `DB.sql` to create schema.
+- Update backend environment variables to point to the DB (see `backend/.env.example` below).
 
-## 2) Backend Setup
+3) ML moderation service (recommended before backend)
+
+```bash
+cd ml-service
+python -m pip install -r requirements.txt
+# prepare dataset at ml-service/dataset/toxic_comments.csv
+python training/train_model.py
+python main.py
+```
+
+Notes:
+- The training script saves a timestamped pipeline under `ml-service/models/` (e.g. `moderation_model_20260429_201457.pkl`) and writes the chosen filename into `ml-service/models/latest_model.txt` which the API reads on startup.
+- Check health: `curl http://127.0.0.1:8001/health`
+
+4) Backend
 
 ```bash
 cd backend
 npm install
+# create backend/.env from backend/.env.example
+npm run dev
 ```
 
-Create `backend/.env` (example):
+Important backend env vars (example):
 
-```env
+```
 DB_USER=postgres
 DB_HOST=localhost
-DB_NAME=final
+DB_NAME=educom
 DB_PASSWORD=your_password
 DB_PORT=5432
 
 PORT=5000
-HOST=0.0.0.0
 JWT_SECRET=your_jwt_secret
-
-FRONTEND_URL=http://localhost:5173
-
-EMAIL_SERVICE=gmail
-EMAIL_USER=your_email@gmail.com
-EMAIL_PASSWORD=your_app_password
 
 ML_MODERATION_API_URL=http://127.0.0.1:8001
 ML_MODERATION_TIMEOUT_MS=3000
 ML_MODERATION_FAIL_OPEN=true
 ```
 
-Run backend:
-
-```bash
-npm run dev
-```
-
-## 3) Frontend Setup
+5) Frontend
 
 ```bash
 cd frontend
 npm install
+# create frontend/.env from frontend/.env.example
+npm run dev
 ```
 
-Create `frontend/.env` (example):
+Frontend env example:
 
-```env
+```
 VITE_API_URL=http://localhost:5000/api
 ```
 
-Run frontend:
+## Moderation flow (summary)
 
-```bash
-npm run dev
-```
+1. Client sends message to backend.
+2. Backend forwards text to ML moderation API (`/moderate`).
+3. ML API returns `{ toxic: bool, confidence: float }` (the service loads the model referenced by `ml-service/models/latest_model.txt`).
+4. Backend either saves/delivers the message or emits a blocked status.
 
-## 4) ML Service Setup
+## Useful commands
 
-```bash
-cd ml-service
-python -m pip install -r requirements.txt
-```
+- Backend: `npm run dev`, `npm start`
+- Frontend: `npm run dev`, `npm run build`, `npm run preview`
+- ML: `python training/train_model.py`, `python main.py`
 
-### Prepare Dataset
+## Notes and troubleshooting
 
-The training CSV must be at:
+- If the moderation API is down and `ML_MODERATION_FAIL_OPEN=true`, the backend will allow messages through. Set it to `false` to reject while ML is unavailable.
+- The ML training script validates that the dataset contains `comment_text` and `toxic` columns.
+- Model artifacts are stored in `ml-service/models/` and the API uses the filename found in `latest_model.txt`.
 
-- `ml-service/dataset/toxic_comments.csv`
+## Next steps / roadmap
 
-Expected columns:
+- Persist moderation events to DB for audit and cross‑device visibility
+- Admin moderation dashboard and bulk tools
+- Improve multilingual moderation and reduce false positives
+- Add automated tests for socket + moderation integration
 
-- `comment_text`
-- `toxic` (0 or 1)
+If you'd like, I can:
+- Add `backend/.env.example` and `frontend/.env.example` files
+- Create a single `start_project.py` launcher (if wanted)
 
-### Train Model
-
-```bash
-python training/train_model.py
-```
-
-This generates:
-
-- `ml-service/models/moderation_model.pkl`
-- `ml-service/models/vectorizer.pkl`
-
-### Start Moderation API
-
-```bash
-python main.py
-```
-
-Health check:
-
-```bash
-curl http://127.0.0.1:8001/health
-```
-
-## 5) Unified Startup (Recommended)
-
-To start the entire project (Backend, Frontend, and ML Service) with a single command, use the provided Python script in the root directory:
-
-```bash
-python start_project.py
-```
-
-This will launch all services in the background and show their status. Press **Ctrl+C** to stop all services at once.
-
-## Startup Order
-
-1. Start PostgreSQL
-2. Start ML service (`ml-service`)
-3. Start backend (`backend`)
-4. Start frontend (`frontend`)
-
-## Useful Commands
-
-Backend:
-
-```bash
-npm run dev
-npm start
-```
-
-Frontend:
-
-```bash
-npm run dev
-npm run build
-npm run preview
-```
-
-ML Service:
-
-```bash
-python training/train_model.py
-python main.py
-```
-
-## Notes
-
-- If moderation service is unavailable and `ML_MODERATION_FAIL_OPEN=true`, backend allows messages.
-- To enforce strict blocking when ML is down, set `ML_MODERATION_FAIL_OPEN=false`.
-- Blocked-message chat bubbles currently persist per user in browser local storage.
-
-## Future Improvements
-
-- Persist blocked moderation attempts in database for cross-device history
-- Add admin moderation dashboard and analytics
-- Add multilingual moderation model tuning
-- Add automated tests for socket moderation events
 

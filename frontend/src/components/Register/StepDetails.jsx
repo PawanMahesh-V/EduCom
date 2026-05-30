@@ -8,13 +8,13 @@ import { ROLES, DEPARTMENTS } from '../../constants';
 import CustomSelect from '../Common/CustomSelect';
 
 const StepDetails = ({ 
-    register,
-    errors, 
-    watch,
-    loading, 
-    error, 
-    onSubmit,
-    setValue
+  register,
+  errors, 
+  watch,
+  loading, 
+  error, 
+  onSubmit,
+  setValue
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -25,7 +25,7 @@ const StepDetails = ({
   const renderFieldError = (fieldName) => {
     if (!errors[fieldName]) return null;
     return (
-      <div className="register-error-message fade-in mt-1">
+      <div className="register-error-message fade-in">
         <span className="field-error-text">{errors[fieldName].message}</span>
       </div>
     );
@@ -33,28 +33,33 @@ const StepDetails = ({
 
   return (
     <>
+      {/* Welcome & Verification Badge Section */}
       <div className="register-welcome">
-        <div className="register-verified-badge">
+        <div className="register-verified-badge fade-in">
           <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Email Verified</span>
+          <span>Email Verified Successfully</span>
         </div>
         <h1 className="register-title">Complete Your Profile</h1>
-        <p className="register-subtitle">Note: Fill in your details. If Role is Teacher/HOD/PM, Registration ID is auto-generated.</p>
+        <p className="register-subtitle">
+          Please fill in your remaining institutional details. For Faculty, HOD, or PM accounts, your Registration ID will be automatically configured.
+        </p>
       </div>
+
       <form className="register-form" onSubmit={onSubmit}>
         <div className="register-form-grid">
-          {/* Only show Registration ID field for roles that require manual entry */}
+          
+          {/* Conditionally render Registration ID for roles requiring manual entry (Students/Admins) */}
           {!['Teacher', 'HOD', 'PM'].includes(currentRole) && (
             <div className="register-form-group">
               <label className="register-label" htmlFor="reg_id">
                 Registration ID
               </label>
-              <div className="register-input-wrapper">
+              <div className={`register-input-wrapper ${errors.reg_id ? 'register-input-wrapper--error' : ''}`}>
                 <div className="register-input-icon">
                   <FontAwesomeIcon icon={faIdCard} />
                 </div>
                 <input
-                  className={`register-input ${errors.reg_id ? 'register-input--error' : ''}`}
+                  className="register-input"
                   type="text"
                   id="reg_id"
                   placeholder="e.g., BCSBS2212263"
@@ -70,12 +75,12 @@ const StepDetails = ({
             <label className="register-label" htmlFor="name">
               Full Name
             </label>
-            <div className="register-input-wrapper">
+            <div className={`register-input-wrapper ${errors.name ? 'register-input-wrapper--error' : ''}`}>
               <div className="register-input-icon">
                 <FontAwesomeIcon icon={faUser} />
               </div>
               <input
-                className={`register-input ${errors.name ? 'register-input--error' : ''}`}
+                className="register-input"
                 type="text"
                 id="name"
                 placeholder="Enter your full name"
@@ -90,12 +95,12 @@ const StepDetails = ({
             <label className="register-label" htmlFor="password">
               Password
             </label>
-            <div className="register-input-wrapper">
+            <div className={`register-input-wrapper ${errors.password ? 'register-input-wrapper--error' : ''}`}>
               <div className="register-input-icon">
                 <FontAwesomeIcon icon={faLock} />
               </div>
               <input
-                className={`register-input ${errors.password ? 'register-input--error' : ''}`}
+                className="register-input"
                 type={showPassword ? 'text' : 'password'}
                 id="password"
                 placeholder="Create a password"
@@ -106,6 +111,7 @@ const StepDetails = ({
                 type="button"
                 className="register-password-toggle"
                 onClick={() => setShowPassword(!showPassword)}
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
               </button>
@@ -117,12 +123,12 @@ const StepDetails = ({
             <label className="register-label" htmlFor="confirmPassword">
               Confirm Password
             </label>
-            <div className="register-input-wrapper">
+            <div className={`register-input-wrapper ${errors.confirmPassword ? 'register-input-wrapper--error' : ''}`}>
               <div className="register-input-icon">
                 <FontAwesomeIcon icon={faLock} />
               </div>
               <input
-                className={`register-input ${errors.confirmPassword ? 'register-input--error' : ''}`}
+                className="register-input"
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="confirmPassword"
                 placeholder="Confirm your password"
@@ -133,6 +139,7 @@ const StepDetails = ({
                 type="button"
                 className="register-password-toggle"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                aria-label={showConfirmPassword ? "Hide password" : "Show password"}
               >
                 <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
               </button>
@@ -142,7 +149,7 @@ const StepDetails = ({
 
           <div className="register-form-group">
             <label className="register-label" htmlFor="role">
-              Role
+              Account Role
             </label>
             <div className="register-input-wrapper">
               <div className="register-input-icon">
@@ -162,7 +169,7 @@ const StepDetails = ({
 
           <div className="register-form-group">
             <label className="register-label" htmlFor="department">
-              Department
+              Department Target
             </label>
             <div className="register-input-wrapper">
               <div className="register-input-icon">
@@ -177,10 +184,11 @@ const StepDetails = ({
             </div>
           </div>
 
+          {/* Conditional Semester Placement Fields for Student Role Selection */}
           {currentRole === 'Student' && (
             <div className="register-form-group">
               <label className="register-label" htmlFor="semester">
-                Semester
+                Academic Semester
               </label>
               <div className="register-input-wrapper">
                 <div className="register-input-icon">
@@ -206,10 +214,11 @@ const StepDetails = ({
             </div>
           )}
 
+          {/* Conditional Program Year Tracking for Program Managers */}
           {currentRole === 'PM' && (
             <div className="register-form-group">
               <label className="register-label" htmlFor="program_year">
-                Program Year
+                Program Year Focus
               </label>
               <div className="register-input-wrapper">
                 <div className="register-input-icon">
@@ -233,7 +242,7 @@ const StepDetails = ({
         </div>
 
         {error && (
-          <div className="register-error-message fade-in">
+          <div className="register-error-message register-error-message--general fade-in">
             {error}
           </div>
         )}
@@ -245,11 +254,11 @@ const StepDetails = ({
         >
           {loading ? (
             <>
-              <div className="spinner-small"></div>
-              Registering...
+              <div className="register-spinner"></div>
+              <span>Registering Profile...</span>
             </>
           ) : (
-            'Register'
+            'Complete Registration'
           )}
         </button>
       </form>

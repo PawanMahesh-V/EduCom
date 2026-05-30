@@ -16,13 +16,12 @@ const MessageBubble = ({
   isSelected, 
   onToggleSelection, 
   onContextMenu,
-  onReport,        // (messageId, reason) => Promise<void>
+  onReport,        
 }) => {
   const senderId = msg.sender_id ?? msg.senderId;
   const isOwnMessage = Number(senderId) === Number(userId);
   const isAnonymous = msg.is_anonymous;
   
-  // Normalizing properties between DM and Community messages
   const senderName = msg.sender_name || msg.sender || 'Unknown';
   const content = msg.content || msg.text;
   const time = msg.created_at 
@@ -49,22 +48,21 @@ const MessageBubble = ({
     }
   };
 
-  // Message status for tick marks (only for own messages and direct messages)
   const getMessageStatus = () => {
-    if (!isOwnMessage) return null;
-
     if (msg.moderation_blocked) {
       return 'blocked';
     }
 
-    if (msg.community_id) return null; // No ticks for normal community messages
+    if (!isOwnMessage) return null;
+
+    if (msg.community_id) return null; 
     
     if (msg.read_at || msg.is_read) {
-      return 'read'; // Double blue ticks
+      return 'read'; 
     } else if (msg.delivered_at) {
-      return 'delivered'; // Double grey ticks
+      return 'delivered'; 
     } else {
-      return 'sent'; // Single grey tick
+      return 'sent'; 
     }
   };
 
@@ -73,117 +71,133 @@ const MessageBubble = ({
   return (
     <div 
       id={`message-${msg.id}`}
-      className={`chat-message ${isOwnMessage ? 'sent' : 'received'} ${isSelected ? 'selected' : ''} ${isSelectionMode && isOwnMessage ? 'selectable' : ''} ${canReport ? 'reportable' : ''}`}
+      className={`mb-message-row ${isOwnMessage ? 'mb-message-row--sent' : 'mb-message-row--received'} ${isSelected ? 'mb-message-row--selected' : ''} ${isSelectionMode && isOwnMessage ? 'mb-message-row--selectable' : ''} ${canReport ? 'mb-message-row--reportable' : ''}`}
       onClick={isSelectionMode && isOwnMessage ? (e) => { e.stopPropagation(); onToggleSelection(msg.id); } : undefined}
       onContextMenu={(e) => onContextMenu && onContextMenu(e, msg)}
-      style={isSelectionMode && isOwnMessage ? { cursor: 'pointer' } : {}}
     >
-      {isSelectionMode && isOwnMessage && (
-        <div className="message-checkbox" onClick={(e) => e.stopPropagation()}>
-          <input 
-            type="checkbox" 
-            checked={Boolean(isSelected)}
-            onChange={(e) => { e.stopPropagation(); onToggleSelection(msg.id); }}
-          />
-        </div>
-      )}
+      {/* Moderation Block Banner Notice */}
       {messageStatus === 'blocked' && (
-        <div className="blocked-message-warning-outside">
-          (Message blocked: Abusive or sensitive content)
+        <div className="mb-blocked-alert-text">
+          (Message blocked: Abusive or sensitive language auto-detected)
         </div>
       )}
-      <div className={`chat-message-bubble ${isOwnMessage ? 'sent' : 'received'} ${isAnonymous ? 'anonymous-message' : ''}`}>
-        {!isOwnMessage && (
-          <div className="chat-message-sender">
-            {isAnonymous ? (
-              <>
-                <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-left" />
-                 Anonymous Student
-              </>
+
+      {/* Bubble Wrapper for positioning elements beside the message */}
+      <div className="mb-bubble-wrapper">
+        {/* Checkbox Overlay for Selection Mode */}
+        {isSelectionMode && isOwnMessage && (
+          <div className="mb-action-checkbox-wrapper" onClick={(e) => e.stopPropagation()}>
+            <input 
+              type="checkbox" 
+              checked={Boolean(isSelected)}
+              onChange={(e) => { e.stopPropagation(); onToggleSelection(msg.id); }}
+            />
+          </div>
+        )}
+
+        {/* Bubble Shell Container */}
+        <div className={`mb-bubble ${isOwnMessage ? 'mb-bubble--sent' : 'mb-bubble--received'} ${isAnonymous ? 'mb-bubble--anonymous' : ''}`}>
+          {!isOwnMessage && (
+            <div className="mb-sender-label">
+              {isAnonymous ? (
+                <>
+                  <FontAwesomeIcon icon={faUserSecret} className="mb-anonymous-icon" />
+                  <span>Anonymous Student</span>
+                </>
+              ) : (
+                `${senderName}`
+              )}
+            </div>
+          )}
+          
+          <div className={`mb-text-payload ${msg.moderation_blocked ? 'mb-text-payload--blocked' : ''}`}>
+            {msg.moderation_blocked ? <i>Message blocked by moderation rules</i> : content}
+          </div>
+          
+          <div className="mb-timestamp-metadata">
+            <span>{time}</span>
+            
+            {isAnonymous && isOwnMessage && (
+              <span className="mb-self-anon-badge" title="Dispatched anonymously to target">
+                <FontAwesomeIcon icon={faUserSecret} />
+              </span>
+            )}
+            
+            {/* Real-time Status Ticks */}
+            {messageStatus && (
+              <span className={`mb-receipt-ticks mb-receipt-ticks--${messageStatus}`} title={
+                messageStatus === 'blocked' ? 'Blocked by safety rules' :
+                messageStatus === 'read' ? 'Read' :
+                messageStatus === 'delivered' ? 'Delivered' : 'Sent'
+              }>
+                {messageStatus === 'blocked' && (
+                  <FontAwesomeIcon icon={faCircleExclamation} className="mb-tick-blocked" />
+                )}
+                {messageStatus === 'sent' && (
+                  <FontAwesomeIcon icon={faCheck} className="mb-tick-single" />
+                )}
+                {(messageStatus === 'delivered' || messageStatus === 'read') && (
+                  <span className="mb-double-ticks-container">
+                    <FontAwesomeIcon icon={faCheck} className="mb-tick-stacked-1" />
+                    <FontAwesomeIcon icon={faCheck} className="mb-tick-stacked-2" />
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* ── Hover Report Flag (Received Normal Text Logs Only) ── */}
+        {canReport && !isSelectionMode && (
+          <div className="mb-report-action-portal">
+            {reportState === 'done' ? (
+              <span className="mb-report-logged-tag" title="Report successfully sent to system admins">
+                <FontAwesomeIcon icon={faFlag} /> Reported
+              </span>
             ) : (
-              `${senderName}`
+              <button
+                className="mb-flag-trigger-btn"
+                title="Flag this message for admin audit"
+                onClick={(e) => { e.stopPropagation(); setShowReportMenu(v => !v); }}
+              >
+                <FontAwesomeIcon icon={faFlag} />
+              </button>
+            )}
+
+            {/* Contextual Popup Overlays */}
+            {showReportMenu && reportState !== 'done' && (
+              <div className="mb-report-popup-card fade-in" onClick={e => e.stopPropagation()}>
+                <div className="mb-report-popup-header">
+                  <span>Flag Message Content</span>
+                  <button className="mb-report-close-btn" onClick={() => { setShowReportMenu(false); setReportReason(''); }}>
+                    <FontAwesomeIcon icon={faTimes} />
+                  </button>
+                </div>
+                <textarea
+                  className="mb-report-textarea"
+                  placeholder="Reason details (optional)..."
+                  value={reportReason}
+                  onChange={e => setReportReason(e.target.value)}
+                  rows={2}
+                  maxLength={300}
+                />
+                <button
+                  className="mb-report-submit-btn"
+                  disabled={reportState === 'submitting'}
+                  onClick={handleReportSubmit}
+                >
+                  {reportState === 'submitting' ? 'Submitting...' : (
+                    <>
+                      <FontAwesomeIcon icon={faPaperPlane} /> 
+                      <span>Submit Report</span>
+                    </>
+                  )}
+                </button>
+              </div>
             )}
           </div>
         )}
-        <div className="chat-message-text">{content}</div>
-        <div className="chat-message-time">
-          {time}
-          {isAnonymous && isOwnMessage && (
-            <span className="anonymous-indicator" title="Sent anonymously">
-              <FontAwesomeIcon icon={faUserSecret} className="anonymous-icon-right" />
-            </span>
-          )}
-          {messageStatus && (
-            <span className={`message-status-ticks ${messageStatus}`} title={
-              messageStatus === 'blocked' ? 'Blocked: not delivered' :
-              messageStatus === 'read' ? 'Read' :
-              messageStatus === 'delivered' ? 'Delivered' :
-              'Sent'
-            }>
-              {messageStatus === 'blocked' && (
-                <FontAwesomeIcon icon={faCircleExclamation} className="status-icon-blocked" />
-              )}
-              {messageStatus === 'sent' && (
-                <FontAwesomeIcon icon={faCheck} className="tick-icon" />
-              )}
-              {(messageStatus === 'delivered' || messageStatus === 'read') && (
-                <>
-                  <FontAwesomeIcon icon={faCheck} className="tick-icon tick-1" />
-                  <FontAwesomeIcon icon={faCheck} className="tick-icon tick-2" />
-                </>
-              )}
-            </span>
-          )}
-        </div>
       </div>
-
-      {/* ── Report button (hover-reveal, received messages only) ── */}
-      {canReport && !isSelectionMode && (
-        <div className="message-report-action">
-          {reportState === 'done' ? (
-            <span className="report-done-badge" title="You reported this message">
-              <FontAwesomeIcon icon={faFlag} /> Reported
-            </span>
-          ) : (
-            <button
-              className="report-flag-btn"
-              title="Report this message"
-              onClick={(e) => { e.stopPropagation(); setShowReportMenu(v => !v); }}
-            >
-              <FontAwesomeIcon icon={faFlag} />
-            </button>
-          )}
-
-          {/* Inline reason dialog */}
-          {showReportMenu && reportState !== 'done' && (
-            <div className="report-reason-popup" onClick={e => e.stopPropagation()}>
-              <div className="report-reason-header">
-                <span>Report Message</span>
-                <button className="report-close-btn" onClick={() => { setShowReportMenu(false); setReportReason(''); }}>
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              </div>
-              <textarea
-                className="report-reason-input"
-                placeholder="Reason (optional)..."
-                value={reportReason}
-                onChange={e => setReportReason(e.target.value)}
-                rows={2}
-                maxLength={300}
-              />
-              <button
-                className="report-submit-btn"
-                disabled={reportState === 'submitting'}
-                onClick={handleReportSubmit}
-              >
-                {reportState === 'submitting' ? 'Submitting…' : (
-                  <><FontAwesomeIcon icon={faPaperPlane} /> Submit Report</>
-                )}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 };

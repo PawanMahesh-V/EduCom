@@ -12,6 +12,9 @@ import {
 import DashboardLayout from '../components/DashboardLayout';
 import { useSocket } from '../context/SocketContext';
 import { showAlert } from '../utils/alert';
+import { useQueryClient } from '@tanstack/react-query';
+import { useNotifications } from '../context/NotificationContext';
+import { useConversations, useCommunities } from '../hooks/useChatData';
 
 // Admin components
 import AdminOverview from './Admin/Overview';
@@ -62,23 +65,53 @@ const Dashboard = () => {
 
   // Use React Query hook for admin profile
   const { data: adminProfile } = useDashboardData(role);
-
   const { socketService, isConnected } = useSocket();
+  const queryClient = useQueryClient();
+  const currentUserId = user?.id || user?.userId;
+  
+  // Fetch unread data dynamically for badges
+  const { data: conversations } = useConversations(currentUserId);
+  const { data: communities } = useCommunities(user?.role, currentUserId);
+  const { unreadCount: unreadNotificationsCount } = useNotifications();
 
-  // Global listeners
+  // Count chats with unread messages, not total unread message count
+  const unreadMessagesCount = Array.isArray(conversations)
+    ? conversations.filter(conv => (conv.unread_count || 0) > 0).length
+    : 0;
+  const unreadCommunityCount = Array.isArray(communities)
+    ? communities.reduce((acc, chat) => acc + (chat.unread_count || chat.unread || 0), 0)
+    : 0;
+
+  // Global listeners — use raw socket.on/off with named callbacks to avoid wiping
+  // listeners registered by child components like MessageLayout.
   useEffect(() => {
-    if (isConnected && socketService) {
-      const handleEnrollment = (data) => {
-        showAlert(`You have been enrolled in ${data.courseName || 'a new course'}`, 'success');
-      };
-      
-      socketService.onUserEnrolled(handleEnrollment);
-      
-      return () => {
-        socketService.offUserEnrolled();
-      };
-    }
-  }, [isConnected, socketService]);
+    if (!isConnected || !socketService?.socket || !currentUserId) return;
+    const sock = socketService.socket;
+
+    const handleEnrollment = (data) => {
+      showAlert(`You have been enrolled in ${data.courseName || 'a new course'}`, 'success');
+    };
+
+    const handleDashboardDM = () => {
+      queryClient.invalidateQueries(['conversations', currentUserId]);
+    };
+
+    const handleDashboardMsg = () => {
+      queryClient.invalidateQueries(['communities', user?.role, currentUserId]);
+    };
+
+    socketService.onUserEnrolled(handleEnrollment);
+    sock.on('new-direct-message', handleDashboardDM);
+    sock.on('direct-message-sent', handleDashboardDM);
+    sock.on('new-message', handleDashboardMsg);
+
+    return () => {
+      socketService.offUserEnrolled();
+      sock.off('new-direct-message', handleDashboardDM);
+      sock.off('direct-message-sent', handleDashboardDM);
+      sock.off('new-message', handleDashboardMsg);
+    };
+  }, [isConnected, socketService, currentUserId, queryClient, user?.role]);
 
   const handleNavigateToCommunity = (chat) => {
     setInitialChat(chat);
@@ -86,7 +119,6 @@ const Dashboard = () => {
   };
 
   const handleMessageSeller = (seller) => {
-    // seller: { id, name } from marketplace item
     setInitialMessageUser(seller);
     setActiveSection('messages');
   };
@@ -104,44 +136,60 @@ const Dashboard = () => {
     if (section === 'courses' && tab) {
       setCourseInitialTab(tab);
     }
+    // Immediately refetch badge data when navigating to a section
+    // so counts clear as soon as the user opens the relevant page.
+    if (section === 'messages') {
+      queryClient.invalidateQueries(['conversations', currentUserId]);
+    }
+    if (section === 'community') {
+      queryClient.invalidateQueries(['communities', user?.role, currentUserId]);
+    }
   };
 
   // Menu items based on role
   const getMenuItems = () => {
-    switch (role) {
-      case 'admin':
-        return [
-          { id: 'overview', name: 'Overview', icon: faTachometerAlt },
-          { id: 'users', name: 'User Management', icon: faUsers },
-          { id: 'courses', name: 'Course Management', icon: faBook },
-          { id: 'messages', name: 'Messages', icon: faComments },
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
-          { id: 'moderation', name: 'Content Moderation', icon: faShieldHalved },
-        ];
-      case 'student':
-        return [
-          { id: 'courses', name: 'My Courses', icon: faBook },
-          { id: 'community', name: 'Community Chat', icon: faUsers },
-          { id: 'messages', name: 'Messages', icon: faComments },
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
-          { id: 'notifications', name: 'Notifications', icon: faBell },
-        ];
-      case 'teacher':
-      case 'hod':
-      case 'pm':
-        return [
-          { id: 'courses', name: 'My Courses', icon: faBook },
-          { id: 'community', name: 'Community Chat', icon: faUsers },
-          { id: 'messages', name: 'Messages', icon: faComments },
-          { id: 'marketplace', name: 'Academic Marketplace', icon: faStore },
-          { id: 'notifications', name: 'Notifications', icon: faBell },
-        ];
-      default:
-        return [];
-    }
+    const items = (() => {
+      switch (role) {
+        case 'admin':
+          return [
+            { id: 'overview', name: 'Overview', icon: faTachometerAlt },
+            { id: 'users', name: 'Users', icon: faUsers },
+            { id: 'courses', name: 'Courses', icon: faBook },
+            { id: 'messages', name: 'Messages', icon: faComments },
+            { id: 'marketplace', name: 'Marketplace', icon: faStore },
+            { id: 'moderation', name: 'Moderation', icon: faShieldHalved },
+          ];
+        case 'student':
+        case 'teacher':
+        case 'hod':
+        case 'pm':
+          return [
+            { id: 'courses', name: 'My Courses', icon: faBook },
+            { id: 'community', name: 'Community', icon: faUsers },
+            { id: 'messages', name: 'Messages', icon: faComments },
+            { id: 'marketplace', name: 'Marketplace', icon: faStore },
+            { id: 'notifications', name: 'Notifications', icon: faBell },
+          ];
+        default:
+          return [];
+      }
+    })();
+
+    // Attach badge counts dynamically
+    return items.map(item => {
+      if (item.id === 'messages') {
+        return { ...item, badgeCount: unreadMessagesCount };
+      }
+      if (item.id === 'community') {
+        return { ...item, badgeCount: unreadCommunityCount };
+      }
+      if (item.id === 'notifications') {
+        return { ...item, badgeCount: unreadNotificationsCount };
+      }
+      return item;
+    });
   };
 
-  // Render content based on role and active section
   const renderContent = () => {
     switch (role) {
       case 'admin':

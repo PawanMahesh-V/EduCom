@@ -1,48 +1,43 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBell } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
 import { useNotifications } from '../../context/NotificationContext';
-
-
 
 const Notifications = () => {
   const { notifications, loading, markAsRead } = useNotifications();
 
-  const handleMarkAsRead = (notificationId) => {
-    markAsRead(notificationId);
-  };
-
   return (
-    <div className="container">
-      <div className="notifications-header">
-        <h1 className="mb-1">Notifications</h1>
-        <p className="text-secondary m-0">Stay updated with your course activities</p>
+    <div className="nt-viewport">
+      <div className="nt-header">
+        <h1 className="nt-title">Notification Feed</h1>
+        <p className="nt-subtitle">Stay synchronized with your latest course activities and system updates</p>
       </div>
       
       {loading ? (
-        <div className="text-center p-4 text-secondary">
-          Loading notifications...
+        <div className="nt-state-message">
+          <div className="nt-spinner"></div>
+          <span>Syncing notifications...</span>
         </div>
       ) : notifications.length === 0 ? (
-        <div className="empty-state text-center p-4 text-secondary">
-          <FontAwesomeIcon icon={faBell} className="icon-xl mb-3 opacity-30" />
-          <p>No notifications yet</p>
+        <div className="nt-state-message">
+          <FontAwesomeIcon icon={faBell} className="nt-empty-icon" />
+          <p>No new notifications available.</p>
         </div>
       ) : (
-        <div className="notifications-list">
+        <div className="nt-list-stack">
           {notifications.map((notification) => (
             <div 
               key={notification.id}
-              className={`notification-item ${notification.is_read ? 'read' : 'unread'}`}
-              onClick={() => !notification.is_read && handleMarkAsRead(notification.id)}
+              className={`nt-item ${notification.is_read ? 'nt-item--read' : 'nt-item--unread'}`}
+              onClick={() => !notification.is_read && markAsRead(notification.id)}
             >
-              <div className="notification-icon">
+              <div className="nt-icon-wrapper">
                 <FontAwesomeIcon icon={faBell} />
               </div>
-              <div className="notification-content">
-                <h4 className="notification-title">{notification.title}</h4>
-                <p className="notification-message">{notification.message}</p>
-                <span className="notification-time">
+              <div className="nt-body">
+                <h4 className="nt-item-title">{notification.title}</h4>
+                <p className="nt-item-message">{notification.message}</p>
+                <span className="nt-item-time">
                   {new Date(notification.created_at).toLocaleString('en-PK', {
                     month: 'short',
                     day: 'numeric',
@@ -53,7 +48,10 @@ const Notifications = () => {
                 </span>
               </div>
               {!notification.is_read && (
-                <div className="notification-badge">New</div>
+                <div className="nt-unread-badge">New</div>
+              )}
+              {notification.is_read && (
+                <div className="nt-read-tick"><FontAwesomeIcon icon={faCheckCircle} /></div>
               )}
             </div>
           ))}

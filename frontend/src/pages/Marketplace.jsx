@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine, faWallet } from '@fortawesome/free-solid-svg-icons';
-import '../styles/Marketplace.css';
 import QuickPostModal from '../components/Marketplace/QuickPostModal';
 import ItemDetailsModal from '../components/Marketplace/ItemDetailsModal';
 import CheckoutModal from '../components/Marketplace/CheckoutModal';
@@ -16,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import CustomSelect from '../components/Common/CustomSelect';
 import { showSuccess, showError } from '../utils/alert';
+import Pagination from '../components/Common/Pagination';
 
 const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
@@ -33,15 +33,15 @@ const Marketplace = ({ onMessageSeller }) => {
   useEffect(() => {
     if (location.state?.activeTab) {
       setActiveTab(location.state.activeTab);
-      // Clear location state so tab state isn't sticky on subsequent section navigation
       navigate(location.pathname, { replace: true, state: {} });
     }
   }, [location.state, navigate]);
+
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All Roles');
   const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const itemsPerPage = 1;
   
   const [orders, setOrders] = useState([]);
   const [receivedOrders, setReceivedOrders] = useState([]);
@@ -55,14 +55,13 @@ const Marketplace = ({ onMessageSeller }) => {
   useEffect(() => {
       if (!socket) return;
       const handleInventoryUpdate = () => {
-          // Silently refresh items
-          fetchItems(true, page);
+          fetchItems(true);
       };
       socket.on('inventory_updated', handleInventoryUpdate);
       return () => {
           socket.off('inventory_updated', handleInventoryUpdate);
       };
-  }, [socket, activeTab, page, searchQuery, roleFilter]);
+  }, [socket, activeTab, searchQuery, roleFilter]);
 
   // Modals state
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -126,19 +125,13 @@ const Marketplace = ({ onMessageSeller }) => {
         if (activeTab === 'items') {
           if (searchQuery) params.append('search', searchQuery);
           if (roleFilter !== 'All Roles') params.append('role', roleFilter);
-          params.append('page', currentPage);
-          params.append('limit', 20);
+          params.append('page', 1);
+          params.append('limit', 1000); // Fetch all items for client-side pagination
         }
 
         const response = await api.get(`${API_BASE_URL}${endpoint}${params.toString() ? '?' + params.toString() : ''}`);
         
-        if (currentPage === 1) {
-            setItems(response?.items || []);
-        } else {
-            setItems(prev => [...prev, ...(response?.items || [])]);
-        }
-        
-        setHasMore(response?.items?.length === 20);
+        setItems(response?.items || []);
         setHasLoaded(prev => ({ ...prev, items: true }));
       }
     } catch (error) {
@@ -152,41 +145,44 @@ const Marketplace = ({ onMessageSeller }) => {
     }
   };
 
-  // Fetch cart globally on mount so grid items can show cart state
   useEffect(() => {
     if (!hasLoaded.cart) fetchCart();
     if (!hasLoaded.sales) fetchSales();
   }, []);
 
-  // Immediate fetch on tab change if not loaded, or background refresh if already loaded
   useEffect(() => {
     const needsLoading = !hasLoaded[activeTab];
     if (activeTab === 'items') {
-      fetchItems(!needsLoading, 1);
+      fetchItems(!needsLoading);
       setPage(1);
     } else {
       fetchItems(!needsLoading);
     }
   }, [activeTab]);
 
-  // Debounced fetch for search and filters
   useEffect(() => {
     if (activeTab !== 'items') return;
     
     const delayDebounceFn = setTimeout(() => {
-      // Always reset to page 1 on search/filter
       setPage(1);
       if (hasLoaded.items) {
-        fetchItems(false, 1);
+        fetchItems(false);
       }
     }, 300);
     return () => clearTimeout(delayDebounceFn);
   }, [searchQuery, roleFilter]);
 
-  const loadMore = () => {
-    const nextPage = page + 1;
-    setPage(nextPage);
-    fetchItems(false, nextPage);
+  const handleTabClick = (tabName) => {
+    if (activeTab === tabName) {
+      if (tabName === 'items') {
+        fetchItems(false);
+        setPage(1);
+      } else {
+        fetchItems(false);
+      }
+    } else {
+      setActiveTab(tabName);
+    }
   };
 
   const handlePostSuccess = () => {
@@ -229,7 +225,7 @@ const Marketplace = ({ onMessageSeller }) => {
     if (e) e.stopPropagation();
     try {
       await api.post(`${API_BASE_URL}/marketplace/cart`, { item_id: item.id, quantity: 1 });
-      await fetchCart(); // Always refresh cart state
+      await fetchCart(); 
       showSuccess(`${item.title} added to cart!`);
     } catch (error) {
       console.error('Failed to add to cart:', error);
@@ -258,7 +254,7 @@ const Marketplace = ({ onMessageSeller }) => {
   const handleRemoveFromCart = async (id) => {
     try {
       await api.delete(`${API_BASE_URL}/marketplace/cart/${id}`);
-      await fetchCart(); // refresh cart
+      await fetchCart(); 
     } catch (error) {
       console.error('Failed to remove from cart:', error);
       showError('Failed to remove item');
@@ -278,7 +274,7 @@ const Marketplace = ({ onMessageSeller }) => {
   const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
     try {
       await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/status`, { status: newStatus, otp });
-      setHasLoaded(prev => ({ ...prev, orders: false, sales: false })); // Invalidate both order-related tabs
+      setHasLoaded(prev => ({ ...prev, orders: false, sales: false })); 
       fetchItems();
     } catch (error) {
       console.error('Failed to update order status:', error);
@@ -296,7 +292,7 @@ const Marketplace = ({ onMessageSeller }) => {
         setConfirmState(prev => ({ ...prev, open: false }));
         try {
           await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/cancel`);
-          setHasLoaded({ items: false, orders: false, sales: false }); // Invalidate all on cancellation
+          setHasLoaded({ items: false, orders: false, sales: false }); 
           fetchItems();
         } catch (error) {
           console.error('Failed to cancel order:', error);
@@ -307,234 +303,239 @@ const Marketplace = ({ onMessageSeller }) => {
   };
 
   return (
-    <div className="marketplace-container">
-
-      {/* Sub Navigation */}
-      <div className="dashboard-sub-nav">
-        <div className="dashboard-sub-nav-tabs">
-          <div
-            className={`sub-nav-item ${activeTab === 'items' ? 'active' : ''}`}
-            onClick={() => setActiveTab('items')}
+    <div className="mp-portal-layout">
+      {/* Sub Navigation Bar Context */}
+      <div className="mp-sub-nav">
+        <div className="mp-sub-nav-tabs">
+          <button
+            className={`mp-sub-nav-item ${activeTab === 'items' ? 'mp-sub-nav-item--active' : ''}`}
+            onClick={() => handleTabClick('items')}
           >
             Items
-          </div>
-          <div
-            className={`sub-nav-item ${activeTab === 'orders' ? 'active' : ''}`}
-            onClick={() => setActiveTab('orders')}
+          </button>
+          <button
+            className={`mp-sub-nav-item ${activeTab === 'orders' ? 'mp-sub-nav-item--active' : ''}`}
+            onClick={() => handleTabClick('orders')}
           >
-            My Orders
-          </div>
-          <div
-            className={`sub-nav-item ${activeTab === 'sales' ? 'active' : ''}`}
-            onClick={() => setActiveTab('sales')}
+            Orders
+          </button>
+          <button
+            className={`mp-sub-nav-item ${activeTab === 'sales' ? 'mp-sub-nav-item--active' : ''}`}
+            onClick={() => handleTabClick('sales')}
           >
-            My Sales
-          </div>
-          <div
-            className={`sub-nav-item ${activeTab === 'cart' ? 'active' : ''}`}
-            onClick={() => setActiveTab('cart')}
+            Sales
+          </button>
+          <button
+            className={`mp-sub-nav-item ${activeTab === 'cart' ? 'mp-sub-nav-item--active' : ''}`}
+            onClick={() => handleTabClick('cart')}
           >
             <FontAwesomeIcon icon={faShoppingCart} />
-            &nbsp; Cart
+            <span>Cart</span>
             {cartItems.length > 0 && (
-              <span className="cart-count-badge">{cartItems.length}</span>
+              <span className="mp-cart-badge-count">{cartItems.length}</span>
             )}
-          </div>
+          </button>
         </div>
       </div>
 
-      {/* Search + Filter toolbar — only visible on Items tab */}
+      {/* Core Toolbar Controls Sub-Grid */}
       {activeTab === 'items' && (
-        <div className="dashboard-toolbar">
+        <div className="mp-toolbar">
           <input
-            className="dashboard-search-input"
+            className="mp-search-input"
             type="text"
-            placeholder="Search items..."
+            placeholder="Search textbook name, items or course resources..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <CustomSelect
-            options={[
-              { value: 'All Roles', label: 'All Roles' },
-              { value: 'Student', label: 'Student' },
-              { value: 'Teacher', label: 'Teacher' },
-              { value: 'Admin', label: 'Admin' },
-              { value: 'HOD', label: 'HOD' },
-              { value: 'PM', label: 'PM' }
-            ]}
-            value={roleFilter}
-            onChange={(val) => setRoleFilter(val)}
-          />
+          <div className="mp-toolbar-filter-group">
+            <CustomSelect
+              options={[
+                { value: 'All Roles', label: 'All Roles' },
+                { value: 'Student', label: 'Student' },
+                { value: 'Teacher', label: 'Teacher' },
+                { value: 'Admin', label: 'Admin' },
+                { value: 'HOD', label: 'HOD' },
+                { value: 'PM', label: 'PM' }
+              ]}
+              value={roleFilter}
+              onChange={(val) => setRoleFilter(val)}
+            />
+          </div>
           <button
-            className="button primary dashboard-action-btn"
+            className="mp-btn-primary"
             onClick={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
-            style={{ marginLeft: 'auto' }}
           >
             <FontAwesomeIcon icon={faPlus} />
-            Post an Item
+            <span>Create Listing</span>
           </button>
         </div>
       )}
 
-      {/* =================== ITEMS TAB =================== */}
-      {activeTab === 'items' && (
-        <div className="marketplace-items-grid">
+      {/* =================== THE PUBLIC ITEMS CATALOG MARKETPLACE MATRIX =================== */}
+      {activeTab === 'items' && (() => {
+        const paginatedItems = items.slice((page - 1) * itemsPerPage, page * itemsPerPage);
+        
+        return (
+        <div className="mp-fade-in-view">
           {loading && items.length === 0 ? (
-            <div className="marketplace-loading">Loading items...</div>
-          ) : items.length === 0 ? (
-            <div className="marketplace-empty">No items found. Be the first to post!</div>
+            <div className="mp-loading-spinner-state"><div className="mp-spinner"></div><span>Loading items...</span></div>
+          ) : paginatedItems.length === 0 ? (
+            <div className="mp-empty-state-banner">No items match your search. Be the first to list an item!</div>
           ) : (
-            items.map(item => {
-              const parsedPrice = parseFloat(item.price);
-              const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
-              const isOwner = item.seller_id === currentUserId;
-              const cartItem = cartItems.find(c => c.id === item.id);
-              return (
-                <div
-                  key={item.id}
-                  className={`marketplace-card ${isOwner ? 'manageable' : ''}`}
-                  onClick={() => handleItemClick(item)}
-                >
-                  <div className="card-image-wrapper">
-                    {item.category === 'Tutoring' ? (
-                      <div className="avatar-placeholder-bg">
-                        <img src={item.image_url || '/assets/marketplace/tutor.png'} alt={item.title} className="avatar-img" />
-                        <div className="star-badge"><FontAwesomeIcon icon={faStar} /></div>
-                        <div className="avatar-title">{item.seller_name || 'Tutor'}</div>
-                        <div className="avatar-subtitle">{item.quantity} slots available</div>
-                      </div>
-                    ) : (
-                      <div className="card-img-container">
-                        <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="card-image" />
-                        {isOutOfStock && <div className="out-of-stock-banner">Out of Stock</div>}
-                      </div>
-                    )}
-                    {isOwner && (
-                      <div className="item-management-overlay">
-                        <button className="mgmt-btn edit" onClick={(e) => { e.stopPropagation(); handleEdit(item); }}>
-                          Edit Post
-                        </button>
-                        <button className="mgmt-btn delete" onClick={(e) => { e.stopPropagation(); handleDelete(item.id); }}>
-                          Delete Post
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  <div className="card-content">
-                    <h3 className="card-title">{item.title}</h3>
-                    <div className="card-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}</div>
-                    {item.category !== 'Tutoring' && (
-                      <div className="seller-info" onClick={(e) => { e.stopPropagation(); setSelectedSeller(item.seller_id); }} style={{ cursor: 'pointer' }}>
-                        <span className="seller-name">{item.seller_name || 'User'}</span>
-                      </div>
-                    )}
-                    <div className="card-rating-row">
-                      <div className="seller-type">
-                        <FontAwesomeIcon icon={faUserGraduate} className="seller-type-icon" />
-                        {item.seller_role || 'User'}
-                      </div>
+            <div className="mp-catalog-grid">
+              {paginatedItems.map(item => {
+                const parsedPrice = parseFloat(item.price);
+                const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
+                const isOwner = item.seller_id === currentUserId;
+                const cartItem = cartItems.find(c => c.id === item.id);
+                return (
+                  <div
+                    key={item.id}
+                    className={`mp-product-card ${isOwner ? 'mp-product-card--manageable' : ''}`}
+                    onClick={() => handleItemClick(item)}
+                  >
+                    <div className="mp-card-media-wrapper">
+                      {item.category === 'Tutoring' ? (
+                        <div className="mp-tutor-avatar-placeholder">
+                          <img src={item.image_url || '/assets/marketplace/tutor.png'} alt={item.title} className="mp-tutor-img" />
+                          <div className="mp-star-badge"><FontAwesomeIcon icon={faStar} /></div>
+                          <div className="mp-tutor-title">{item.seller_name || 'Tutor Profile'}</div>
+                          <div className="mp-tutor-slots">{item.quantity} slots left</div>
+                        </div>
+                      ) : (
+                        <div className="mp-item-img-frame">
+                          <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="mp-product-image" />
+                          {isOutOfStock && <div className="mp-out-of-stock-tag">Sold Out</div>}
+                        </div>
+                      )}
+                      
+                      {/* Managed Overrides Overlay for Owners */}
+                      {isOwner && (
+                        <div className="mp-owner-management-overlay" onClick={(e) => e.stopPropagation()}>
+                          <button className="mp-overlay-action-btn mp-overlay-action-btn--edit" onClick={() => handleEdit(item)}>
+                            Edit Listing
+                          </button>
+                          <button className="mp-overlay-action-btn mp-overlay-action-btn--delete" onClick={() => handleDelete(item.id)}>
+                            Delete Post
+                          </button>
+                        </div>
+                      )}
                     </div>
-                    {cartItem && !isOwner && !isOutOfStock ? (
-                      <div className="grid-quantity-selector" onClick={(e) => e.stopPropagation()}>
-                        <button className="grid-qty-btn" onClick={(e) => handleUpdateCartQuantity(e, item, -1)}>-</button>
-                        <span className="grid-qty-display">{cartItem.qty}</span>
-                        <button className="grid-qty-btn" onClick={(e) => handleUpdateCartQuantity(e, item, 1)} disabled={cartItem.qty >= item.quantity}>+</button>
-                      </div>
-                    ) : (
-                      <button
-                        className={`card-action-btn ${isOutOfStock ? 'buy' : (isOwner ? 'view' : 'buy')}`}
-                        disabled={isOutOfStock}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (isOwner) {
-                            handleItemClick(item);
-                          } else {
-                            handleAddToCart(e, item);
-                          }
-                        }}
-                      >
-                        {isOutOfStock ? 'Sold Out' : (isOwner ? 'View Product' : 'Add to Cart')}
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })
-          )}
-          {hasMore && items.length > 0 && (
-            <div className="load-more-container" style={{ gridColumn: '1 / -1', textAlign: 'center', marginTop: '20px' }}>
-              <button className="button secondary" onClick={loadMore} disabled={loading}>
-                {loading ? 'Loading...' : 'Load More'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* =================== ORDERS TAB =================== */}
-      {activeTab === 'orders' && (
-        <div className="orders-container">
-          {loading && orders.length === 0 ? (
-            <div className="marketplace-loading">Loading orders...</div>
-          ) : orders.length === 0 ? (
-            <div className="marketplace-empty">
-              <FontAwesomeIcon icon={faBox} style={{ fontSize: '2.5rem', marginBottom: '12px', display: 'block', color: 'var(--color-gray-300)' }} />
-              You haven't placed any orders yet.
-            </div>
-          ) : (
-            <div className="orders-list">
-              {orders.map(order => (
-                <div key={order.id} className="order-card">
-                  <div className="order-header">
-                    <div className="order-header-left">
-                      <div className="order-id">Order #{order.id}</div>
-                      <div className="order-date">{new Date(order.created_at).toLocaleDateString()}</div>
-                    </div>
-                    <div className="order-header-right">
-                      <div className={`order-status ${order.status}`}>
-                        {order.status === 'cancelled_by_buyer' ? 'Cancelled by You' : order.status}
+                    <div className="mp-card-body-details">
+                      <h3 className="mp-card-item-title">{item.title}</h3>
+                      <div className="mp-card-item-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}</div>
+                      
+                      {item.category !== 'Tutoring' && (
+                        <div className="mp-seller-attribution-line" onClick={(e) => { e.stopPropagation(); setSelectedSeller(item.seller_id); }}>
+                          <span>Seller: <strong>{item.seller_name || 'User'}</strong></span>
+                        </div>
+                      )}
+                      
+                      <div className="mp-seller-role-row">
+                        <FontAwesomeIcon icon={faUserGraduate} className="mp-role-mini-icon" />
+                        <span>{item.seller_role || 'User'}</span>
                       </div>
+                      
+                      {/* Multi-staged Cart State Integration Blocks Toggle */}
+                      {cartItem && !isOwner && !isOutOfStock ? (
+                        <div className="mp-quantity-stepper-control" onClick={(e) => e.stopPropagation()}>
+                          <button className="mp-stepper-btn" onClick={(e) => handleUpdateCartQuantity(e, item, -1)}>-</button>
+                          <span className="mp-stepper-display">{cartItem.qty}</span>
+                          <button className="mp-stepper-btn" onClick={(e) => handleUpdateCartQuantity(e, item, 1)} disabled={cartItem.qty >= item.quantity}>+</button>
+                        </div>
+                      ) : (
+                        <button
+                          className={`mp-card-action-trigger ${isOutOfStock ? 'mp-card-action-trigger--disabled' : (isOwner ? 'mp-card-action-trigger--owner' : '')}`}
+                          disabled={isOutOfStock}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (isOwner) {
+                              handleItemClick(item);
+                            } else {
+                              handleAddToCart(e, item);
+                            }
+                          }}
+                        >
+                          {isOutOfStock ? 'Sold Out' : (isOwner ? 'View Details' : 'Add to Cart')}
+                        </button>
+                      )}
                     </div>
                   </div>
-                  <div className="order-items">
+                );
+              })}
+            </div>
+          )}
+          
+          <div style={{ marginTop: '20px' }}>
+            <Pagination 
+              currentPage={page} 
+              totalItems={items.length} 
+              itemsPerPage={itemsPerPage} 
+              onPageChange={setPage} 
+            />
+          </div>
+        </div>
+      );
+      })()}
+
+      {/* =================== BUYER PLACED ORDERS DIRECTORY TAB =================== */}
+      {activeTab === 'orders' && (
+        <div className="mp-fade-in-view">
+          {loading && orders.length === 0 ? (
+            <div className="mp-loading-spinner-state"><div className="mp-spinner"></div><span>Loading your orders...</span></div>
+          ) : orders.length === 0 ? (
+            <div className="mp-empty-state-view">
+              <FontAwesomeIcon icon={faBox} className="mp-empty-icon" />
+              <h3>No Placed Orders Found</h3>
+              <p>You haven't placed any orders yet. Items you buy will appear here.</p>
+            </div>
+          ) : (
+            <div className="mp-orders-list-stack">
+              {orders.map(order => (
+                <div key={order.id} className="mp-transaction-card">
+                  <div className="mp-transaction-header">
+                    <div className="mp-tx-header-left">
+                      <span className="mp-tx-id">Order ID: #{order.id}</span>
+                      <span className="mp-tx-timestamp">{new Date(order.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <span className={`mp-status-pill mp-status-pill--${order.status}`}>
+                      {order.status === 'cancelled_by_buyer' ? 'Cancelled by You' : order.status}
+                    </span>
+                  </div>
+
+                  <div className="mp-transaction-itemized-manifest">
                     {order.items.map((item, idx) => (
-                      <div key={idx} className="order-item">
-                        <span className="order-item-title">{item.title}</span>
-                        <span className="order-item-qty">x{item.quantity}</span>
-                        <span className="order-item-price">Rs. {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                      <div key={idx} className="mp-manifest-row">
+                        <span className="mp-manifest-title">{item.title}</span>
+                        <span className="mp-manifest-qty">x{item.quantity}</span>
+                        <span className="mp-manifest-subtotal">Rs. {(parseFloat(item.price) * item.quantity).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="order-footer">
-                    <div className="order-pickup">
-                      <strong>Pickup:</strong> {order.campus}
-                    </div>
-                    <div className="order-footer-actions">
-                      <div className="order-total">
-                        <div style={{ fontSize: '0.85rem', color: 'var(--color-dark)', marginBottom: '4px' }}>
-                          Payment: <strong>{order.payment_method === 'payfast' ? '✓ Paid via PayFast' : 'Cash on Delivery'}</strong>
-                        </div>
-                        Total: <strong>Rs. {parseFloat(order.total_amount).toFixed(2)}</strong>
+
+                  <div className="mp-transaction-footer">
+                    <p className="mp-pickup-note">
+                      <strong>Location:</strong> {order.campus} Campus
+                    </p>
+                    <div className="mp-tx-footer-actions-layout">
+                      <div className="mp-tx-financial-meta">
+                        <p className="mp-payment-method-indicator">Payment Method: {order.payment_method === 'payfast' ? ' Paid online' : 'Cash on Delivery'}</p>
+                        <p className="mp-grand-total-display">Total Value: <strong>Rs. {parseFloat(order.total_amount).toLocaleString(undefined, {minimumFractionDigits: 2})}</strong></p>
                       </div>
-                      {order.status === 'pending' && (
-                        <button 
-                          className="cancel-order-btn"
-                          onClick={() => handleCancelOrder(order.id)}
-                        >
-                          Cancel Order
-                        </button>
-                      )}
-                      {order.status === 'delivered' && (
-                        <button 
-                          className="receive-order-btn"
-                          onClick={() => {
-                            setOtpOrderId(order.id);
-                            setIsOTPModalOpen(true);
-                          }}
-                        >
-                          Mark as Received
-                        </button>
-                      )}
+                      <div className="mp-action-btn-cluster">
+                        {order.status === 'pending' && (
+                          <button className="mp-action-trigger-link mp-action-trigger-link--danger" onClick={() => handleCancelOrder(order.id)}>
+                            Cancel Order
+                          </button>
+                        )}
+                        {order.status === 'delivered' && (
+                          <button className="mp-action-trigger-link mp-action-trigger-link--success" onClick={() => { setOtpOrderId(order.id); setIsOTPModalOpen(true); }}>
+                            Mark as Received
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -543,70 +544,59 @@ const Marketplace = ({ onMessageSeller }) => {
           )}
         </div>
       )}
-      {/* =================== SALES TAB =================== */}
+
+      {/* =================== SELLER RECEIVED DISPATCHES SALES TAB =================== */}
       {activeTab === 'sales' && (
-        <div className="orders-container">
-          <div className="sales-overview-card">
-            <div>
-              <h2 style={{ margin: 0, color: 'var(--color-dark)', fontSize: '1.25rem' }}>Sales Overview</h2>
-              <p style={{ margin: '4px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>Track your earnings from all orders</p>
+        <div className="mp-fade-in-view">
+          {/* Dashboard Aggregate Earnings Overview Card Element */}
+          <div className="mp-earnings-bento-overview">
+            <div className="mp-earnings-text-stack">
+              <h2>My Sales</h2>
+              <p>Summary of your earnings from sold items</p>
             </div>
-            <div 
-              className="total-earnings-badge"
-              onClick={() => setIsTransactionHistoryOpen(true)}
-              title="Click to view Transaction History"
-            >
-              <div style={{ 
-                backgroundColor: 'var(--color-primary)', 
-                color: 'white', 
-                width: '36px', 
-                height: '36px', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                fontSize: '1rem'
-              }}>
-                <FontAwesomeIcon icon={faWallet} />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1 }}>Total Earnings</span>
-                <span style={{ fontSize: '1.3rem', color: 'var(--color-dark)', lineHeight: 1.2 }}>Rs. {totalEarnings.toFixed(2)}</span>
+            <div className="mp-earnings-wallet-trigger" onClick={() => setIsTransactionHistoryOpen(true)}>
+              <div className="mp-wallet-icon-housing"><FontAwesomeIcon icon={faWallet} /></div>
+              <div className="mp-wallet-digits">
+                <span className="mp-wallet-label">Profits</span>
+                <span className="mp-wallet-value">Rs. {totalEarnings.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
               </div>
             </div>
           </div>
+
           {loading && receivedOrders.length === 0 ? (
-            <div className="marketplace-loading">Loading sales...</div>
+            <div className="mp-loading-spinner-state"><div className="mp-spinner"></div><span>Loading your sales...</span></div>
           ) : receivedOrders.length === 0 ? (
-            <div className="marketplace-empty">
-              <FontAwesomeIcon icon={faChartLine} style={{ fontSize: '2.5rem', marginBottom: '12px', display: 'block', color: 'var(--color-gray-300)' }} />
-              No orders received yet for your items.
+            <div className="mp-empty-state-view">
+              <FontAwesomeIcon icon={faChartLine} className="mp-empty-icon" />
+              <h3>No Sales Yet</h3>
+              <p>Other users haven't purchased your items yet. New orders will appear here.</p>
             </div>
           ) : (
-            <div className="orders-list">
+            <div className="mp-orders-list-stack">
               {receivedOrders.map(order => (
-                <div key={order.id} className="order-card sales-card">
-                  <div className="order-header">
-                    <div className="order-header-left">
-                      <div className="order-id">Order #{order.id}</div>
+                <div key={order.id} className="mp-transaction-card mp-transaction-card--sales">
+                  <div className="mp-transaction-header">
+                    <div className="mp-tx-header-left">
+                      <span className="mp-tx-id">Order ID: #{order.id}</span>
+                      <span className="mp-tx-timestamp">{new Date(order.created_at).toLocaleDateString()}</span>
                     </div>
-                    <div className="order-header-right">
-                      {order.delivery_otp && (
-                        <div className="order-otp-display">
-                          Delivery OTP: <strong>{order.delivery_otp}</strong>
+                    <div className="mp-tx-header-right-action-group">
+                      {order.delivery_otp && order.status === 'delivered' && (
+                        <div className="mp-delivery-otp-pill">
+                          Verification OTP: <strong>{order.delivery_otp}</strong>
                         </div>
                       )}
-                      <div className="order-status-actions">
+                      <div className="mp-status-pill-adjuster">
                         {['completed', 'cancelled', 'cancelled_by_buyer', 'refunded'].includes(order.status) ? (
-                          <span className={`order-status ${order.status}`}>
-                            {order.status === 'cancelled_by_buyer' ? 'Buyer Cancelled' : (order.status === 'refunded' ? 'Refunded' : order.status)}
+                          <span className={`mp-status-pill mp-status-pill--${order.status}`}>
+                            {order.status === 'cancelled_by_buyer' ? 'Cancelled by Buyer' : order.status}
                           </span>
                         ) : (
                           <CustomSelect
                             options={[
-                              { value: 'pending', label: 'Pending' },
-                              { value: 'delivered', label: 'Delivered' },
-                              { value: 'cancelled', label: 'Cancelled' }
+                              { value: 'pending', label: 'Pending Request' },
+                              { value: 'delivered', label: 'Mark Dispatched' },
+                              { value: 'cancelled', label: 'Reject / Terminate' }
                             ]}
                             value={order.status}
                             onChange={(val) => handleUpdateStatus(order.id, val)}
@@ -615,23 +605,25 @@ const Marketplace = ({ onMessageSeller }) => {
                       </div>
                     </div>
                   </div>
-                  <div className="order-items">
+
+                  <div className="mp-transaction-itemized-manifest">
                     {order.items.map((item, idx) => (
-                      <div key={idx} className="order-item">
-                        <span className="order-item-title">{item.title}</span>
-                        <span className="order-item-qty">x{item.quantity}</span>
-                        <span className="order-item-price">Rs. {(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
+                      <div key={idx} className="mp-manifest-row">
+                        <span className="mp-manifest-title">{item.title}</span>
+                        <span className="mp-manifest-qty">x{item.quantity}</span>
+                        <span className="mp-manifest-subtotal">Rs. {(parseFloat(item.price) * item.quantity).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="order-footer">
-                    <div className="order-contact">
-                      <div className="order-date">Buyer: <strong>{order.buyer_name || order.full_name}</strong></div>
-                      <div className="contact-line"><strong>Buyer Phone:</strong> {order.phone}</div>
-                      <div className="contact-line"><strong>Campus:</strong> {order.campus}</div>
+
+                  <div className="mp-transaction-footer">
+                    <div className="mp-buyer-profile-contact-card">
+                      <div className="mp-buyer-meta-name">Buyer: <strong>{order.buyer_name || order.full_name}</strong></div>
+                      <div className="mp-buyer-meta-detail">Phone: {order.phone}</div>
+                      <div className="mp-buyer-meta-detail">Location: {order.campus}</div>
                     </div>
-                    <div className="order-total">
-                      Payment: <strong>{order.payment_method === 'payfast' ? '✓ Paid via PayFast' : 'Cash on Delivery'}</strong>
+                    <div className="mp-tx-financial-meta">
+                      <p className="mp-payment-method-indicator">Payment Method: {order.payment_method === 'payfast' ? ' Paid Online' : 'Cash'}</p>
                     </div>
                   </div>
                 </div>
@@ -641,61 +633,56 @@ const Marketplace = ({ onMessageSeller }) => {
         </div>
       )}
 
-      {/* =================== CART TAB =================== */}
+      {/* =================== SHOPPING CART CHECKOUT TAB =================== */}
       {activeTab === 'cart' && (
-        <div className="cart-container">
+        <div className="mp-fade-in-view">
           {cartItems.length === 0 ? (
-            <div className="marketplace-empty">
-              <FontAwesomeIcon icon={faShoppingCart} style={{ fontSize: '2.5rem', marginBottom: '12px', display: 'block', color: 'var(--color-gray-300)' }} />
-              Your cart is empty. Browse items and add them here!
+            <div className="mp-empty-state-view">
+              <FontAwesomeIcon icon={faShoppingCart} className="mp-empty-icon" />
+              <h3>Your Shopping Cart is Empty</h3>
+              <p>Browse through items and add them here to check out.</p>
             </div>
           ) : (
-            <>
-              <div className="cart-list">
+            <div className="mp-cart-workspace-layout">
+              <div className="mp-cart-items-stack">
                 {cartItems.map(item => {
                   const parsedPrice = parseFloat(item.price);
                   return (
-                    <div key={item.id} className="cart-item-row">
-                      <img
-                        src={item.image_url || '/assets/marketplace/textbook.png'}
-                        alt={item.title}
-                        className="cart-item-img"
-                      />
-                      <div className="cart-item-info">
-                        <div className="cart-item-title">{item.title}</div>
-                        <div className="cart-item-category">{item.category}</div>
-                        <div className="cart-item-seller">Seller: {item.seller_name || 'User'}</div>
-                        <div className="cart-item-seller"> Quantity: {item.qty}</div>
+                    <div key={item.id} className="mp-cart-item-row">
+                      <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="mp-cart-row-img" />
+                      <div className="mp-cart-row-details">
+                        <h4 className="mp-cart-row-title">{item.title}</h4>
+                        <span className="mp-cart-row-category-badge">{item.category}</span>
+                        <p className="mp-cart-row-seller">Seller: {item.seller_name || 'User'}</p>
+                        <p className="mp-cart-row-qty">Quantity: <strong>{item.qty}</strong></p>
                       </div>
-                      <div className="cart-item-price">
-                        Rs. {!isNaN(parsedPrice) ? parsedPrice.toFixed(2) : '0.00'}
+                      <div className="mp-cart-row-price">
+                        Rs. {!isNaN(parsedPrice) ? (parsedPrice * item.qty).toLocaleString(undefined, {minimumFractionDigits: 2}) : '0.00'}
                       </div>
-                      <button
-                        className="button delete icon-button small"
-                        onClick={() => handleRemoveFromCart(item.id)}
-                        title="Remove from cart"
-                      >
+                      <button className="mp-cart-row-remove-btn" onClick={() => handleRemoveFromCart(item.id)} title="Remove item">
                         <FontAwesomeIcon icon={faTrash} />
                       </button>
                     </div>
                   );
                 })}
               </div>
-              <div className="cart-summary">
-                <div className="cart-total">
-                  <span>Total</span>
-                  <span className="cart-total-amount">Rs. {cartTotal.toFixed(2)}</span>
+
+              {/* Checkout Summary Panel */}
+              <div className="mp-cart-checkout-summary-card">
+                <div className="mp-summary-pricing-row">
+                  <span>Subtotal</span>
+                  <span className="mp-summary-grand-total-digits">Rs. {cartTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
-                <button className="button primary cart-checkout-btn" onClick={() => setIsCheckoutOpen(true)}>
+                <button className="mp-btn-primary mp-btn-primary--checkout" onClick={() => setIsCheckoutOpen(true)}>
                   Proceed to Checkout
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
       )}
 
-      {/* Modals */}
+      {/* Global Context Control Modals Portals Initialization Hooks */}
       <QuickPostModal
         isOpen={isPostModalOpen}
         onClose={() => { setIsPostModalOpen(false); setItemToEdit(null); }}
@@ -708,7 +695,7 @@ const Marketplace = ({ onMessageSeller }) => {
         isOpen={!!selectedItem}
         onClose={() => setSelectedItem(null)}
         onMessageSeller={onMessageSeller}
-        onAddToCart={(item) => { handleAddToCart({ stopPropagation: () => {} }, item); setSelectedItem(null); }}
+        onAddToCart={(item) => { handleAddToCart(null, item); setSelectedItem(null); }}
         currentUserId={currentUserId}
       />
 
@@ -719,11 +706,7 @@ const Marketplace = ({ onMessageSeller }) => {
         cartTotal={cartTotal}
         currentUser={user}
         onOrderPlaced={async () => {
-          try {
-            await api.delete(`${API_BASE_URL}/marketplace/cart`);
-          } catch (e) {
-            console.error('Failed to clear backend cart', e);
-          }
+          try { await api.delete(`${API_BASE_URL}/marketplace/cart`); } catch (e) { console.error(e); }
           setCartItems([]);
           setHasLoaded(prev => ({ ...prev, items: false, orders: false, cart: false }));
           setActiveTab('orders');

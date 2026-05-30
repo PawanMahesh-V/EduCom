@@ -79,6 +79,8 @@ const marketplaceController = {
             };
 
             const item = await MarketplaceItem.create(newItemData);
+            const io = req.app.get('io');
+            if (io) io.emit('inventory_updated');
             res.status(201).json(item);
         } catch (error) {
             console.error('Error creating marketplace item:', error);
@@ -102,6 +104,8 @@ const marketplaceController = {
             }
 
             const updatedItem = await MarketplaceItem.updateStatus(req.params.id, status);
+            const io = req.app.get('io');
+            if (io) io.emit('inventory_updated');
             res.status(200).json(updatedItem);
         } catch (error) {
             console.error('Error updating marketplace item status:', error);
@@ -159,6 +163,8 @@ const marketplaceController = {
             };
 
             const updatedItem = await MarketplaceItem.update(id, updatedData);
+            const io = req.app.get('io');
+            if (io) io.emit('inventory_updated');
             res.status(200).json(updatedItem);
         } catch (error) {
             console.error('Error updating marketplace item:', error);
@@ -181,6 +187,8 @@ const marketplaceController = {
             }
 
             await MarketplaceItem.delete(id);
+            const io = req.app.get('io');
+            if (io) io.emit('inventory_updated');
             res.status(200).json({ message: 'Item deleted successfully' });
         } catch (error) {
             console.error('Error deleting marketplace item:', error);
@@ -334,7 +342,7 @@ const marketplaceController = {
 
                 if (calculatedHash !== validationHash.toLowerCase()) {
                     console.error('[PayFast IPN] Hash validation failed. Calculated:', calculatedHash, 'Received:', validationHash);
-                    if (merchantId === '14833') {
+                    if (merchantId === '14833' || merchantId === '103') {
                         console.warn('[PayFast IPN] WARNING: Bypassing signature hash mismatch because we are in UAT sandbox mode.');
                     } else {
                         return res.status(400).send('Invalid signature hash');
@@ -441,7 +449,7 @@ const marketplaceController = {
 
                 if (calculatedHash !== validationHash.toLowerCase()) {
                     console.error('[PayFast Verify] Hash validation failed. Calculated:', calculatedHash, 'Received:', validationHash);
-                    if (merchantId === '14833') {
+                    if (merchantId === '14833' || merchantId === '103') {
                         console.warn('[PayFast Verify] WARNING: Bypassing signature hash mismatch because we are in UAT sandbox mode.');
                     } else {
                         return res.status(400).json({ success: false, message: 'Invalid signature hash' });
@@ -547,6 +555,8 @@ const marketplaceController = {
             }
 
             const updatedOrder = await Order.updateStatus(id, status);
+            const io = req.app.get('io');
+            if (io) io.emit('inventory_updated');
             res.status(200).json(updatedOrder);
         } catch (error) {
             console.error('Error updating order status:', error);

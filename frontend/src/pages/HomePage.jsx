@@ -2,13 +2,16 @@ import { useNavigate } from "react-router-dom";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faGraduationCap,
-  faBook,
+  faBookOpen,
   faUsers,
   faComments,
   faBell,
   faChalkboardTeacher,
   faUserShield,
   faArrowRight,
+  faChartLine,
+  faLaptopCode,
+  faCheckCircle,
 } from "@fortawesome/free-solid-svg-icons";
 
 const HomePage = () => {
@@ -16,156 +19,293 @@ const HomePage = () => {
 
   const features = [
     {
-      icon: faBook,
+      icon: faBookOpen,
       title: "Course Management",
-      description: "Create and manage courses with course codes, departments, semesters, and teacher assignments.",
+      description:
+        "Manage courses, departments, semesters, and faculty assignments from one centralized platform.",
     },
     {
       icon: faUsers,
       title: "Student Enrollment",
-      description: "Assign students to courses with department validation and track enrollment records.",
+      description:
+        "Enroll students efficiently with department validation and academic tracking.",
     },
     {
       icon: faChalkboardTeacher,
       title: "Teacher Dashboard",
-      description: "View assigned courses, student lists, and manage course-related activities.",
+      description:
+        "Empower teachers with course control, student records, and workflow management.",
     },
     {
       icon: faComments,
-      title: "Course Communities",
-      description: "Organize course-specific communities for communication and collaboration.",
+      title: "Academic Communities",
+      description:
+        "Enable communication, discussions, and collaboration through dedicated communities.",
     },
     {
       icon: faBell,
-      title: "Notifications",
-      description: "Broadcast system notifications and course updates to users based on roles.",
+      title: "Smart Notifications",
+      description:
+        "Send announcements and updates instantly based on academic roles and departments.",
     },
     {
       icon: faUserShield,
-      title: "Role-Based Access",
-      description: "Secure dashboards for Students, Teachers, HODs, Program Managers, and Admins.",
+      title: "Secure Access",
+      description:
+        "Role-based authentication system for Admins, Students, HODs, and Teachers.",
+    },
+  ];
+
+  const stats = [
+    {
+      number: "10+",
+      label: "Departments",
+    },
+    {
+      number: "5000+",
+      label: "Students",
+    },
+    {
+      number: "100+",
+      label: "Faculty Members",
+    },
+    {
+      number: "24/7",
+      label: "Platform Access",
     },
   ];
 
   const roles = [
     {
+      icon: faUserShield,
       title: "Admin",
-      description: "Full system management, user creation, course oversight",
+      description:
+        "Manage users, departments, and complete academic workflows.",
     },
     {
+      icon: faChalkboardTeacher,
       title: "Teachers & HODs",
-      description: "Course management, student tracking, community access",
+      description:
+        "Monitor courses, student progress, attendance, and communications.",
     },
     {
+      icon: faUsers,
       title: "Students",
-      description: "View enrolled courses, access communities, receive notifications",
+      description:
+        "Access courses, communities, schedules, and notifications anytime.",
     },
     {
+      icon: faChartLine,
       title: "Program Managers",
-      description: "Oversee program-level operations and year-specific activities",
+      description:
+        "Oversee academic performance and year-specific activities.",
     },
   ];
 
   return (
-    <div className="homepage">
-      {/* Navbar */}
-      <nav className="nav">
-        <div className="nav-brand">
+    <div className="hp-container">
+      {/* ================= NAVBAR ================= */}
+      <nav className="hp-navbar">
+        <div className="hp-logo">
           <FontAwesomeIcon icon={faGraduationCap} />
-          <span>
-            Edu<span className="accent">Com</span>
-          </span>
+          <h2>
+            Edu<span>Com</span>
+          </h2>
         </div>
-        <div className="nav-actions">
-          <button className="btn-secondary" onClick={() => navigate("/register")}>
-            Register
+
+        <div className="hp-nav-buttons">
+          <button
+            className="hp-btn-outline"
+            onClick={() => navigate("/login")}
+          >
+            Login
           </button>
-          <button className="btn-primary" onClick={() => navigate("/login")}>
-            Sign In
+
+          <button
+            className="hp-btn-primary"
+            onClick={() => navigate("/register")}
+          >
+            Get Started
           </button>
         </div>
       </nav>
 
-      <section className="hero">
-        <div className="hero-content fade-up">
+      {/* ================= HERO ================= */}
+      <section className="hp-hero-section">
+        <div className="hp-hero-left">
+          <span className="hp-tag">
+            <FontAwesomeIcon icon={faLaptopCode} />
+            Modern Academic Management System
+          </span>
+
           <h1>
-            Academic Management <span className="accent">Platform</span>
+            Simplify Your <span>Educational Workflow</span>
           </h1>
+
           <p>
-            A comprehensive system for course management, student enrollment,
-            and institutional communication across departments.
+            EduCom helps institutions manage courses, students, faculty,
+            communication, and academic operations through one intelligent and
+            scalable platform.
           </p>
-          <div className="hero-actions">
+
+          <div className="hp-hero-buttons">
             <button
-              className="btn-primary"
+              className="hp-btn-primary"
               onClick={() => navigate("/register")}
             >
-              Register Now <FontAwesomeIcon icon={faArrowRight} />
+              Start Now
+              <FontAwesomeIcon icon={faArrowRight} />
             </button>
+
             <button
-              className="btn-secondary"
+              className="hp-btn-outline"
               onClick={() => navigate("/login")}
             >
               Sign In
             </button>
           </div>
+
+          <div className="hp-hero-features">
+            <div className="hp-feature-item">
+              <FontAwesomeIcon icon={faCheckCircle} />
+              Secure Access
+            </div>
+
+            <div className="hp-feature-item">
+              <FontAwesomeIcon icon={faCheckCircle} />
+              Role-Based Dashboards
+            </div>
+
+            <div className="hp-feature-item">
+              <FontAwesomeIcon icon={faCheckCircle} />
+              Real-Time Notifications
+            </div>
+          </div>
+        </div>
+
+        <div className="hp-hero-right">
+          <div className="hp-hero-card">
+            <div className="hp-card-top">
+              <div className="hp-circle"></div>
+              <div className="hp-circle"></div>
+              <div className="hp-circle"></div>
+            </div>
+
+            <div className="hp-dashboard-preview">
+              <div className="hp-preview-sidebar"></div>
+
+              <div className="hp-preview-content">
+                <div className="hp-preview-box hp-preview-large"></div>
+
+                <div className="hp-preview-row">
+                  <div className="hp-preview-box"></div>
+                  <div className="hp-preview-box"></div>
+                </div>
+
+                <div className="hp-preview-box"></div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section id="features" className="features-section fade-up">
-        <h2>Core Functionality</h2>
-        <p className="subtitle">
-          Streamlined education management system
-        </p>
+      {/* ================= STATS ================= */}
+      <section className="hp-stats-section">
+        <div className="hp-stats-grid">
+          {stats.map((item, index) => (
+            <div className="hp-stat-card" key={index}>
+              <h2>{item.number}</h2>
+              <p>{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        <div className="features-grid">
-          {features.map((feature, i) => (
-            <div key={i} className="feature-card">
-              <div className="feature-icon">
+      {/* ================= FEATURES ================= */}
+      <section className="hp-features-section">
+        <div className="hp-section-header">
+          <span className="hp-section-tag">Core Features</span>
+
+          <h2>Everything You Need in One Platform</h2>
+
+          <p>
+            Designed to streamline academic management and improve
+            institutional productivity.
+          </p>
+        </div>
+
+        <div className="hp-features-grid">
+          {features.map((feature, index) => (
+            <div className="hp-feature-card" key={index}>
+              <div className="hp-feature-icon">
                 <FontAwesomeIcon icon={feature.icon} />
               </div>
+
               <h3>{feature.title}</h3>
+
               <p>{feature.description}</p>
             </div>
           ))}
         </div>
       </section>
 
-      <section className="benefits-section fade-up">
-        <div className="benefits-content">
-          <div className="benefits-text">
-            <h2>Built for Educational Institutions</h2>
-            <p>
-              EduCom provides role-based dashboards and comprehensive tools for
-              managing academic workflows across departments (CS, BBA, IT).
-            </p>
-            <div className="role-info">
-              <h3>User Roles</h3>
-              <div className="role-grid">
-                {roles.map((role, i) => (
-                  <div key={i} className="role-item">
-                    <strong>{role.title}</strong>
-                    <p>{role.description}</p>
-                  </div>
-                ))}
+      {/* ================= ROLES ================= */}
+      <section className="hp-roles-section">
+        <div className="hp-section-header">
+          <span className="hp-section-tag">User Roles</span>
+
+          <h2>Built for Every Academic Role</h2>
+
+          <p>
+            Customized dashboards and features for all institution members.
+          </p>
+        </div>
+
+        <div className="hp-roles-grid">
+          {roles.map((role, index) => (
+            <div className="hp-role-card" key={index}>
+              <div className="hp-role-icon">
+                <FontAwesomeIcon icon={role.icon} />
               </div>
+
+              <h3>{role.title}</h3>
+
+              <p>{role.description}</p>
             </div>
-          </div>
+          ))}
         </div>
       </section>
 
-      <section className="cta-section fade-up">
-        <h2 className="text-white">Access Your Dashboard</h2>
-        <p className="text-white">
-          Sign in to access your role-based dashboard and manage your academic activities.
-        </p>
-        <button className="btn-primary" onClick={() => navigate("/login")}>
-          Sign In Now <FontAwesomeIcon icon={faArrowRight} />
-        </button>
+      {/* ================= CTA ================= */}
+      <section className="hp-cta-section">
+        <div className="hp-cta-content">
+          <h2>Ready to Modernize Your Institution?</h2>
+
+          <p>
+            Join EduCom today and experience seamless academic management with
+            role-based access and smart workflows.
+          </p>
+
+          <button
+            className="hp-btn-light"
+            onClick={() => navigate("/register")}
+          >
+            Create Account
+            <FontAwesomeIcon icon={faArrowRight} />
+          </button>
+        </div>
       </section>
 
-      <footer className="footer">
-        <p>© {new Date().getFullYear()} EduCom. Educational Management Platform.</p>
+      {/* ================= FOOTER ================= */}
+      <footer className="hp-footer">
+        <div className="hp-footer-logo">
+          <FontAwesomeIcon icon={faGraduationCap} />
+          <h3>EduCom</h3>
+        </div>
+
+        <p>
+          © {new Date().getFullYear()} EduCom. All Rights Reserved.
+        </p>
       </footer>
     </div>
   );

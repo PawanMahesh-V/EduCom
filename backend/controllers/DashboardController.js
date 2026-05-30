@@ -33,7 +33,7 @@ class DashboardController {
                 pool.query('SELECT COUNT(*) FROM courses'),
                 pool.query('SELECT COUNT(*) FROM communities'),
                 pool.query('SELECT COUNT(*) FROM marketplace_items'),
-                pool.query("SELECT COUNT(*) FROM marketplace_items WHERE status = 'pending'"),
+                pool.query("SELECT COUNT(*) FROM marketplace_items WHERE created_at >= NOW() - INTERVAL '7 days'"),
                 pool.query(`SELECT id, reg_id, name, email, role, department, created_at 
                             FROM users ORDER BY created_at DESC LIMIT 5`),
                 pool.query(`SELECT c.id, c.code, c.name, c.department, 
@@ -49,8 +49,8 @@ class DashboardController {
                             GROUP BY c.id ORDER BY activity_count DESC LIMIT 3`),
                 pool.query(`SELECT id, title, price, created_at 
                             FROM marketplace_items 
-                            WHERE status = 'pending' 
-                            ORDER BY created_at ASC LIMIT 3`),
+                            WHERE status = 'available' 
+                            ORDER BY created_at DESC LIMIT 3`),
                 pool.query('SELECT COUNT(*) FROM users WHERE is_active = false'),
                 pool.query('SELECT COUNT(*) FROM messages'),
                 pool.query(`SELECT department, COUNT(*) as count 

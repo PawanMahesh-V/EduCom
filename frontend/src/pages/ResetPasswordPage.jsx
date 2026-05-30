@@ -53,7 +53,6 @@ const ResetPasswordPage = () => {
       return;
     }
 
-    // Validation
     const passwordError = validatePassword(newPassword);
     if (passwordError) {
       setError(passwordError);
@@ -71,7 +70,6 @@ const ResetPasswordPage = () => {
       const data = await authApi.resetPassword(resetToken, newPassword);
       if (data) {
         sessionStorage.clear();
-        
         setShowSuccessModal(true);
       } else {
         setError('Failed to reset password');
@@ -85,15 +83,15 @@ const ResetPasswordPage = () => {
 
   return (
     <>
-      {/* Success Modal */}
+      {/* Success Modal Notification Portal */}
       {showSuccessModal && (
         <div className="reset-success-modal-overlay">
-          <div className="reset-success-modal">
+          <div className="reset-success-modal fade-in">
             <div className="reset-success-modal-icon">
               <FontAwesomeIcon icon={faCheckCircle} />
             </div>
             <h2>Password Reset Successfully!</h2>
-            <p>You can now login with your new password.</p>
+            <p>You can now login with your new credentials safely.</p>
             <button 
               className="reset-success-modal-button"
               onClick={() => navigate('/login')}
@@ -105,20 +103,20 @@ const ResetPasswordPage = () => {
       )}
 
       <div className="reset-page">
-        {/* Animated Background */}
+        {/* Ambient Blur Backdrop Decorative Elements */}
         <div className="reset-background">
           <div className="reset-orb reset-orb--1"></div>
           <div className="reset-orb reset-orb--2"></div>
           <div className="reset-orb reset-orb--3"></div>
         </div>
 
-        {/* Header Bar */}
+        {/* Top Header Navigation bar */}
         <header className="reset-header">
           <button className="reset-back-button" onClick={() => navigate('/')}>
             <FontAwesomeIcon icon={faArrowLeft} />
             <span>Back</span>
           </button>
-          <div className="reset-brand">
+          <div className="reset-brand" onClick={() => navigate('/')}>
             <FontAwesomeIcon icon={faCheckCircle} className="reset-brand-icon" />
             <span className="reset-brand-text">
               Edu<span className="reset-brand-accent">Com</span>
@@ -128,13 +126,13 @@ const ResetPasswordPage = () => {
 
         <div className="reset-content">
           <div className="reset-container">
-            {/* Welcome Section */}
+            {/* Title Identity Panel */}
             <div className="reset-welcome">
               <h1 className="reset-title">Create New Password</h1>
               <p className="reset-subtitle">Your identity has been verified. Set your new password below.</p>
             </div>
 
-            {/* Form */}
+            {/* Credential Setup Form */}
             <form onSubmit={handleSubmit} className="reset-form">
               <div className="reset-form-group">
                 <label htmlFor="newPassword" className="reset-label">New Password</label>
@@ -155,6 +153,7 @@ const ResetPasswordPage = () => {
                     type="button"
                     className="reset-password-toggle"
                     onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     <FontAwesomeIcon icon={showPassword ? faEyeSlash : faEye} />
                   </button>
@@ -180,6 +179,7 @@ const ResetPasswordPage = () => {
                     type="button"
                     className="reset-password-toggle"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
                   >
                     <FontAwesomeIcon icon={showConfirmPassword ? faEyeSlash : faEye} />
                   </button>
@@ -196,7 +196,7 @@ const ResetPasswordPage = () => {
               <button type="submit" className="reset-submit-button" disabled={loading}>
                 {loading ? (
                   <>
-                    <div className="spinner-small"></div>
+                    <div className="reset-spinner"></div>
                     <span>Resetting Password...</span>
                   </>
                 ) : (
@@ -208,7 +208,7 @@ const ResetPasswordPage = () => {
               </button>
             </form>
 
-            {/* Footer */}
+            {/* Alternative Routes Redirect Footer */}
             <div className="reset-footer">
               <div className="reset-divider">
                 <span>or</span>
@@ -224,4 +224,5 @@ const ResetPasswordPage = () => {
     </>
   );
 };
+
 export default ResetPasswordPage;

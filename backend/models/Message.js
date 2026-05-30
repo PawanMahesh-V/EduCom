@@ -42,6 +42,7 @@ class Message {
                 WHERE m.community_id IS NULL 
                   AND (m.sender_id = $1 OR m.receiver_id = $1)
                   AND (m.is_anonymous = false OR m.sender_id = $1)
+                  AND (m.status IS NULL OR m.status = 'approved')
                 ORDER BY other_user_id, m.created_at DESC
             ) conversations
             ORDER BY last_message_time DESC
@@ -74,7 +75,8 @@ class Message {
                     FROM messages
                     WHERE community_id IS NULL
                       AND receiver_id = $1
-                      AND is_anonymous = true`,
+                      AND is_anonymous = true
+                      AND (status IS NULL OR status = 'approved')`,
                     [userId]
                 );
                 const data = anonymousData.rows[0];
@@ -145,6 +147,7 @@ class Message {
              WHERE community_id IS NULL 
                AND receiver_id = $1 
                AND sender_id = $2 
+               AND is_anonymous = false
                AND is_read = FALSE`,
             [userId, otherUserId]
         );

@@ -11,27 +11,19 @@ import { showSuccess, showError } from '../../utils/alert';
 import { authApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import CustomSelect from '../../components/Common/CustomSelect';
+import Pagination from '../../components/Common/Pagination';
 import { useSocket } from '../../context/SocketContext';
 
 const UserManagement = () => {
   const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
   const currentUser = raw ? JSON.parse(raw) : null;
 
-  // Real-time notifications
   // Socket connection
   const { socketService, isConnected } = useSocket();
 
-  // Listen for real-time user updates
-  useEffect(() => {
-    if (isConnected && socketService && socketService.socket) {
-        socketService.socket.on('admin-user-update', () => {
-             fetchUsers();
-        });
-        return () => socketService.socket.off('admin-user-update');
-    }
-  }, [isConnected, socketService]);
-
-  // User Management states
+  /* ==========================================================================
+     1. STATE HOOK DECLARATIONS FIRST (Fixes initialization ReferenceError)
+     ========================================================================== */
   const [userTab, setUserTab] = useState('users'); // 'users' or 'requests'
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
@@ -65,6 +57,31 @@ const UserManagement = () => {
   const [requestSearchTerm, setRequestSearchTerm] = useState('');
   const [filteredRequests, setFilteredRequests] = useState([]);
 
+  const [userPage, setUserPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
+  const itemsPerPage = 5;
+
+  /* ==========================================================================
+     2. SIDE EFFECTS LAYER (Placed safely below state initializations)
+     ========================================================================== */
+  
+  // Listen for real-time user updates via Socket Context
+  useEffect(() => {
+    if (isConnected && socketService && socketService.socket) {
+        const handleUserUpdate = () => {
+          fetchUsers();
+          if (userTab === 'requests') fetchRegistrationRequests();
+        };
+        socketService.socket.on('admin-user-update', handleUserUpdate);
+        return () => {
+          if (socketService?.socket) {
+            socketService.socket.off('admin-user-update', handleUserUpdate);
+          }
+        };
+    }
+  }, [isConnected, socketService, userTab]);
+
+  // Initial component data load mount
   useEffect(() => {
     fetchUsers();
     if (userTab === 'requests') {
@@ -72,41 +89,62 @@ const UserManagement = () => {
     }
   }, []);
 
+  // Sync tab transitions with database cache
   useEffect(() => {
     if (userTab === 'requests') {
       fetchRegistrationRequests();
     }
   }, [userTab]);
 
-  // User filtering
+  // User list row filters
   useEffect(() => {
     let filtered = users;
 
-    // Apply role filter
     if (userRoleFilter !== 'All') {
       filtered = filtered.filter(user => user.role === userRoleFilter);
     }
 
-    // Apply department filter
     if (userDepartmentFilter !== 'All') {
       filtered = filtered.filter(user => user.department === userDepartmentFilter);
     }
 
-    // Apply search filter
     if (userSearchTerm) {
       const searchTermLower = userSearchTerm.toLowerCase();
       filtered = filtered.filter(user =>
-        user.reg_id.toLowerCase().includes(searchTermLower) ||
-        user.name.toLowerCase().includes(searchTermLower) ||
-        user.email.toLowerCase().includes(searchTermLower) ||
-        user.role.toLowerCase().includes(searchTermLower) ||
-        user.department.toLowerCase().includes(searchTermLower)
+        (user.reg_id || '').toLowerCase().includes(searchTermLower) ||
+        (user.name || '').toLowerCase().includes(searchTermLower) ||
+        (user.email || '').toLowerCase().includes(searchTermLower) ||
+        (user.role || '').toLowerCase().includes(searchTermLower) ||
+        (user.department || '').toLowerCase().includes(searchTermLower)
       );
     }
 
     setFilteredUsers(filtered);
+    setUserPage(1);
   }, [userSearchTerm, userRoleFilter, userDepartmentFilter, users]);
 
+  // Request list row filters
+  useEffect(() => {
+    let filtered = registrationRequests;
+
+    if (requestSearchTerm) {
+      const lower = requestSearchTerm.toLowerCase();
+      filtered = filtered.filter(req => 
+        (req.name || '').toLowerCase().includes(lower) ||
+        (req.email || '').toLowerCase().includes(lower) ||
+        (req.reg_id || '').toLowerCase().includes(lower) ||
+        (req.role || '').toLowerCase().includes(lower) ||
+        (req.department || '').toLowerCase().includes(lower)
+      );
+    }
+
+    setFilteredRequests(filtered);
+    setRequestPage(1);
+  }, [requestSearchTerm, registrationRequests]);
+
+  /* ==========================================================================
+     3. SYSTEM ACTION HANDLERS
+     ========================================================================== */
   const fetchUsers = async () => {
     try {
       const data = await userApi.getAll();
@@ -134,49 +172,25 @@ const UserManagement = () => {
   };
 
   const handleApproveRequest = async (requestId) => {
-    // Optimistic update - remove from pending list immediately
     setRegistrationRequests(prev => prev.filter(r => r.id !== requestId));
-
     try {
       await authApi.approveRegistration(requestId);
       showSuccess('Registration request approved successfully!');
-      fetchUsers(); // Refresh users list
+      fetchUsers();
     } catch (err) {
-      // Revert on error
       fetchRegistrationRequests();
       showError(err.message || 'Failed to approve registration');
     }
   };
 
-  // Filter requests
-  useEffect(() => {
-    let filtered = registrationRequests;
-
-    if (requestSearchTerm) {
-      const lower = requestSearchTerm.toLowerCase();
-      filtered = filtered.filter(req => 
-        req.name.toLowerCase().includes(lower) ||
-        req.email.toLowerCase().includes(lower) ||
-        req.reg_id.toLowerCase().includes(lower) ||
-        req.role.toLowerCase().includes(lower) ||
-        req.department.toLowerCase().includes(lower)
-      );
-    }
-
-    setFilteredRequests(filtered);
-  }, [requestSearchTerm, registrationRequests]);
-
   const handleRejectRequest = async (requestId) => {
-    // Optimistic update - remove from pending list immediately
     setRegistrationRequests(prev => prev.filter(r => r.id !== requestId));
-
     try {
       await authApi.rejectRegistration(requestId);
       showSuccess('Registration request rejected');
     } catch (err) {
-      // Revert on error
       fetchRegistrationRequests();
-      showError(err.message || 'Failed to reject registration');
+      showError(err.message || 'Failed to reject registration request');
     }
   };
 
@@ -190,7 +204,6 @@ const UserManagement = () => {
   const handleUserSubmit = async (e) => {
     e.preventDefault();
 
-    // Validate email domain (@szabist.pk or @szabist.edu.pk)
     const lower = userFormData.email.toLowerCase();
     if (!(lower.endsWith('@szabist.pk') || lower.endsWith('@szabist.edu.pk'))) {
       showError('Email must end with @szabist.pk or @szabist.edu.pk');
@@ -205,8 +218,6 @@ const UserManagement = () => {
         const newUser = await userApi.create(userFormData);
         showSuccess('User created successfully!');
 
-        // Send welcome notification to new user
-          // Send welcome notification to new user
         if (newUser.id && socketService) {
           socketService.sendNotification({
             userId: newUser.id,
@@ -228,11 +239,10 @@ const UserManagement = () => {
     setConfirmState({
       open: true,
       title: 'Delete User',
-      message: 'Are you sure you want to delete this user?',
-      confirmText: 'Delete User',
+      message: 'Are you sure you want to delete this user profile permanently?',
+      confirmText: 'Delete User Account',
       onConfirm: async () => {
         setConfirmState((s) => ({ ...s, open: false }));
-        // Optimistic update - remove from UI immediately
         setUsers(prev => prev.filter(u => u.id !== userIdToDelete));
         setFilteredUsers(prev => prev.filter(u => u.id !== userIdToDelete));
 
@@ -240,7 +250,6 @@ const UserManagement = () => {
           await userApi.delete(userIdToDelete);
           showSuccess('User deleted successfully');
         } catch (err) {
-          // Revert on error
           fetchUsers();
           showError(err.message || 'Failed to delete user');
         }
@@ -251,12 +260,12 @@ const UserManagement = () => {
   const handleUserEdit = (user) => {
     setSelectedUser(user);
     setUserFormData({
-      reg_id: user.reg_id,
-      name: user.name,
-      email: user.email,
+      reg_id: user.reg_id || '',
+      name: user.name || '',
+      email: user.email || '',
       password: '',
-      role: user.role,
-      department: user.department,
+      role: user.role || 'Student',
+      department: user.department || 'CS',
       semester: (user.semester && String(user.semester)) || '1',
       program_year: (user.program_year && String(user.program_year)) || '1'
     });
@@ -278,117 +287,117 @@ const UserManagement = () => {
     setIsUserModalOpen(false);
   };
 
+  const paginatedUsers = filteredUsers.slice((userPage - 1) * itemsPerPage, userPage * itemsPerPage);
+  const paginatedRequests = filteredRequests.slice((requestPage - 1) * itemsPerPage, requestPage * itemsPerPage);
+
   return (
-    <div className="user-management-wrapper">
-      <div className="dashboard-sub-nav">
-        <div className="dashboard-sub-nav-tabs">
-          <div
-            className={`sub-nav-item ${userTab === 'users' ? 'active' : ''}`}
+    <div className="um-management-wrapper">
+      <div className="um-sub-nav">
+        <div className="um-sub-nav-tabs">
+          <button
+            className={`um-sub-nav-item ${userTab === 'users' ? 'um-sub-nav-item--active' : ''}`}
             onClick={() => setUserTab('users')}
           >
             Manage Users
-          </div>
-          <div
-            className={`sub-nav-item ${userTab === 'requests' ? 'active' : ''}`}
+          </button>
+          <button
+            className={`um-sub-nav-item ${userTab === 'requests' ? 'um-sub-nav-item--active' : ''}`}
             onClick={() => setUserTab('requests')}
           >
             Registration Requests
-          </div>
+          </button>
         </div>
       </div>
 
-      <div className="tab-content">
+      <div className="um-tab-content-area">
         {userTab === 'users' ? (
-          <div className="user-management-tab-content">
-            <div className="dashboard-toolbar">
+          <div className="um-fade-in-view">
+            <div className="um-toolbar">
               <input
-                className="dashboard-search-input"
+                className="um-search-input"
                 type="text"
-                placeholder="Search users..."
+                placeholder="Search by ID, name, email..."
                 value={userSearchTerm}
                 onChange={(e) => setUserSearchTerm(e.target.value)}
               />
               
-              <CustomSelect
-                options={[
-                  { value: 'All', label: 'All Roles' },
-                  { value: 'Student', label: 'Student' },
-                  { value: 'Teacher', label: 'Teacher' },
-                  { value: 'Admin', label: 'Admin' },
-                  { value: 'HOD', label: 'HOD' },
-                  { value: 'PM', label: 'PM' }
-                ]}
-                value={userRoleFilter}
-                onChange={(val) => setUserRoleFilter(val)}
-              />
+              <div className="um-filter-select-group">
+                <CustomSelect
+                  options={[
+                    { value: 'All', label: 'All Roles' },
+                    { value: 'Student', label: 'Student' },
+                    { value: 'Teacher', label: 'Teacher' },
+                    { value: 'Admin', label: 'Admin' },
+                    { value: 'HOD', label: 'HOD' },
+                    { value: 'PM', label: 'PM' }
+                  ]}
+                  value={userRoleFilter}
+                  onChange={(val) => setUserRoleFilter(val)}
+                />
 
-              <CustomSelect
-                options={[
-                  { value: 'All', label: 'All Departments' },
-                  { value: 'Computer Science', label: 'Computer Science' },
-                  { value: 'Management Sciences', label: 'Management Sciences' },
-                  { value: 'Social Sciences', label: 'Social Sciences' },
-                  { value: 'Media Sciences', label: 'Media Sciences' },
-                  { value: 'Mechatronics Engineering', label: 'Mechatronics Engineering' }
-                ]}
-                value={userDepartmentFilter}
-                onChange={(val) => setUserDepartmentFilter(val)}
-              />
+                <CustomSelect
+                  options={[
+                    { value: 'All', label: 'All Departments' },
+                    { value: 'CS', label: 'CS' },
+                    { value: 'BBA', label: 'BBA' },
+                    { value: 'IT', label: 'IT' }
+                  ]}
+                  value={userDepartmentFilter}
+                  onChange={(val) => setUserDepartmentFilter(val)}
+                />
+              </div>
 
               <button
-                className="button primary dashboard-action-btn"
+                className="um-btn-primary"
                 onClick={() => setIsUserModalOpen(true)}
               >
                 <FontAwesomeIcon icon={faUserPlus} />
-                Add User
+                <span>Add User</span>
               </button>
             </div>
 
             {usersLoading ? (
-              <div className="loading-error">Loading...</div>
+              <div className="um-loading-state"><div className="um-spinner"></div><span>Loading users...</span></div>
             ) : (
-              <div className="table-container">
-                {/* Desktop Table View */}
-                <table className="table">
+              <div className="um-table-responsive-container">
+                <table className="um-data-table">
                   <thead>
                     <tr>
                       <th>Registration ID</th>
                       <th>Full Name</th>
-                      <th>Email</th>
-                      <th>Role</th>
+                      <th>Institutional Email</th>
+                      <th>Account Role</th>
                       <th>Department</th>
-                      <th>Actions</th>
+                      <th className="um-text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.length === 0 ? (
+                    {paginatedUsers.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center p-4">
-                          {userSearchTerm ? 'No users found matching your search' : 'No users available'}
+                        <td colSpan="6" className="um-empty-table-cell">
+                          {userSearchTerm ? 'No users match your search' : 'No users found'}
                         </td>
                       </tr>
                     ) : (
-                      filteredUsers.map((user) => (
+                      paginatedUsers.map((user) => (
                         <tr key={user.id}>
-                          <td data-label="Registration ID">{user.reg_id}</td>
-                          <td data-label="Full Name">{user.name}</td>
+                          <td className="um-font-bold um-text-emerald" data-label="Registration ID">{user.reg_id || 'Staff Link'}</td>
+                          <td className="um-font-semibold" data-label="Full Name">{user.name}</td>
                           <td data-label="Email">{user.email}</td>
-                          <td data-label="Role">{user.role}</td>
+                          <td data-label="Role"><span className={`um-role-tag um-role-tag--${user.role?.toLowerCase()}`}>{user.role}</span></td>
                           <td data-label="Department">{user.department}</td>
-                          <td data-label="Actions">
+                          <td data-label="Actions" className="um-actions-cell">
                             <button
-                              className="button edit icon-button small"
+                              className="um-icon-btn um-icon-btn--edit"
                               onClick={() => handleUserEdit(user)}
-                              data-tooltip="Edit User"
-                              aria-label={`Edit user ${user.name}`}
+                              title="Edit Profile"
                             >
                               <FontAwesomeIcon icon={faPenToSquare} />
                             </button>
                             <button
-                              className="button delete icon-button small"
+                              className="um-icon-btn um-icon-btn--delete"
                               onClick={() => handleUserDelete(user.id)}
-                              data-tooltip="Delete User"
-                              aria-label={`Delete user ${user.name}`}
+                              title="Delete User"
                             >
                               <FontAwesomeIcon icon={faTrash} />
                             </button>
@@ -399,130 +408,111 @@ const UserManagement = () => {
                   </tbody>
                 </table>
 
-                {/* Mobile Card View */}
-                <div className="mobile-cards-view">
-                  {filteredUsers.length === 0 ? (
-                    <div className="empty-state">
-                      <p>{userSearchTerm ? 'No users found matching your search' : 'No users available'}</p>
-                    </div>
+                <div className="um-mobile-cards-viewport">
+                  {paginatedUsers.length === 0 ? (
+                    <div className="um-empty-card-fallback">No users found.</div>
                   ) : (
-                    filteredUsers.map((user) => (
-                      <div key={user.id} className="user-card">
-                        <div className="user-card-header">
-                          <div className="user-card-info">
-                            <div className="user-card-label">Registration ID</div>
-                            <div className="user-card-value large">{user.reg_id}</div>
-                          </div>
+                    paginatedUsers.map((user) => (
+                      <div key={user.id} className="um-responsive-data-card">
+                        <div className="um-card-topline">
+                          <span className="um-card-code">{user.reg_id || 'Staff Link'}</span>
+                          <span className={`um-role-tag um-role-tag--${user.role?.toLowerCase()}`}>{user.role}</span>
                         </div>
-                        <div className="user-card-body">
-                          <div className="user-card-row">
-                            <div className="user-card-label">Full Name</div>
-                            <div className="user-card-value">{user.name}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Email</div>
-                            <div className="user-card-value">{user.email}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Role</div>
-                            <div className="user-card-value">{user.role}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Department</div>
-                            <div className="user-card-value">{user.department}</div>
-                          </div>
+                        <h4 className="um-card-heading">{user.name}</h4>
+                        <p className="um-card-email-sub">{user.email}</p>
+                        <div className="um-card-metadata-row">
+                          <span><strong>Department:</strong> {user.department}</span>
                         </div>
-                        <div className="user-card-actions">
-                          <button
-                            className="button edit"
-                            onClick={() => handleUserEdit(user)}
-                          >
-                            <FontAwesomeIcon icon={faPenToSquare} />
-                            Edit
+                        <div className="cm-card-action-bar">
+                          <button className="cm-card-btn cm-card-btn--edit" onClick={() => handleUserEdit(user)}>
+                            <FontAwesomeIcon icon={faPenToSquare} /> Edit
                           </button>
-                          <button
-                            className="button delete"
-                            onClick={() => handleUserDelete(user.id)}
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                            Delete
+                          <button className="cm-card-btn cm-card-btn--delete" onClick={() => handleUserDelete(user.id)}>
+                            <FontAwesomeIcon icon={faTrash} /> Delete
                           </button>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
+
+                <Pagination 
+                  currentPage={userPage} 
+                  totalItems={filteredUsers.length} 
+                  itemsPerPage={itemsPerPage} 
+                  onPageChange={setUserPage} 
+                />
               </div>
             )}
 
             {isUserModalOpen && (
-              <div className="modal">
-                <div className="modal-content modal-content-large">
+              <div className="um-modal-overlay">
+                <div className="um-modal-box um-modal-box--medium fade-in">
                   <h2>{selectedUser ? 'Edit User' : 'Add New User'}</h2>
-                  <form onSubmit={handleUserSubmit}>
-                    <div className="grid-2col">
+                  <form onSubmit={handleUserSubmit} className="um-modal-form">
+                    <div className="um-modal-grid-2col">
                       {!['Teacher', 'HOD', 'PM'].includes(userFormData.role) && (
-                        <div className="form-group">
-                          <label>Registration ID:</label>
+                        <div className="um-form-group">
+                          <label>Registration ID</label>
                           <input
                             type="text"
                             name="reg_id"
+                            placeholder="e.g., 2212263"
                             value={userFormData.reg_id}
                             onChange={handleUserInputChange}
                             required
                           />
                         </div>
                       )}
-                      <div className="form-group">
-                        <label>Full Name:</label>
+                      <div className="um-form-group">
+                        <label>Full Name</label>
                         <input
                           type="text"
                           name="name"
+                          placeholder="Enter complete name"
                           value={userFormData.name}
                           onChange={handleUserInputChange}
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Email:</label>
+                      <div className="um-form-group">
+                        <label>Institutional Email</label>
                         <input
                           type="email"
                           name="email"
                           value={userFormData.email}
                           onChange={handleUserInputChange}
-                          pattern={".*@(szabist\\.pk|szabist\\.edu\\.pk)$"}
-                          title="Email must end with @szabist.pk or @szabist.edu.pk"
-                          placeholder="example@szabist.pk or example@szabist.edu.pk"
+                          placeholder="name@szabist.pk"
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Password:</label>
+                      <div className="um-form-group">
+                        <label>Security Password</label>
                         <input
                           type="password"
                           name="password"
                           value={userFormData.password}
                           onChange={handleUserInputChange}
                           required={!selectedUser}
-                          placeholder={selectedUser ? "Leave blank to keep current password" : "Enter password"}
+                          placeholder={selectedUser ? "Leave empty to preserve baseline" : "Create password"}
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Role:</label>
+                      <div className="um-form-group">
+                        <label>Platform Access Role</label>
                         <CustomSelect
                           options={[
                             { value: 'Student', label: 'Student' },
                             { value: 'Teacher', label: 'Teacher' },
                             { value: 'Admin', label: 'Admin' },
                             { value: 'HOD', label: 'HOD' },
-                            { value: 'PM', label: 'PM (Program Manager)' }
+                            { value: 'PM', label: 'Program Manager' }
                           ]}
                           value={userFormData.role}
                           onChange={(val) => setUserFormData({ ...userFormData, role: val })}
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Department:</label>
+                      <div className="um-form-group">
+                        <label>Department Target</label>
                         <CustomSelect
                           options={[
                             { value: 'CS', label: 'CS' },
@@ -534,18 +524,14 @@ const UserManagement = () => {
                         />
                       </div>
                       {userFormData.role === 'Student' && (
-                        <div className="form-group">
-                          <label>Semester:</label>
+                        <div className="um-form-group">
+                          <label>Current Semester</label>
                           <CustomSelect
                             options={[
-                              { value: '1', label: '1' },
-                              { value: '2', label: '2' },
-                              { value: '3', label: '3' },
-                              { value: '4', label: '4' },
-                              { value: '5', label: '5' },
-                              { value: '6', label: '6' },
-                              { value: '7', label: '7' },
-                              { value: '8', label: '8' }
+                              { value: '1', label: '1' }, { value: '2', label: '2' },
+                              { value: '3', label: '3' }, { value: '4', label: '4' },
+                              { value: '5', label: '5' }, { value: '6', label: '6' },
+                              { value: '7', label: '7' }, { value: '8', label: '8' }
                             ]}
                             value={userFormData.semester}
                             onChange={(val) => setUserFormData({ ...userFormData, semester: val })}
@@ -553,14 +539,14 @@ const UserManagement = () => {
                         </div>
                       )}
                       {userFormData.role === 'PM' && (
-                        <div className="form-group">
-                          <label>Program Year:</label>
+                        <div className="um-form-group">
+                          <label>Program Year Focus</label>
                           <CustomSelect
                             options={[
-                              { value: '1', label: '1' },
-                              { value: '2', label: '2' },
-                              { value: '3', label: '3' },
-                              { value: '4', label: '4' }
+                              { value: '1', label: 'Year 1' },
+                              { value: '2', label: 'Year 2' },
+                              { value: '3', label: 'Year 3' },
+                              { value: '4', label: 'Year 4' }
                             ]}
                             value={userFormData.program_year}
                             onChange={(val) => setUserFormData({ ...userFormData, program_year: val })}
@@ -568,12 +554,10 @@ const UserManagement = () => {
                         </div>
                       )}
                     </div>
-                    <div className="modal-actions">
-                      <button className="button primary" type="submit">
-                        {selectedUser ? 'Update User' : 'Create User'}
-                      </button>
-                      <button className="button secondary" type="button" onClick={handleCloseUserModal}>
-                        Cancel
+                    <div className="um-modal-action-footer">
+                      <button className="um-btn-secondary" type="button" onClick={handleCloseUserModal}>Cancel</button>
+                      <button className="um-btn-primary" type="submit">
+                        {selectedUser ? 'Save Updates' : 'Save User'}
                       </button>
                     </div>
                   </form>
@@ -591,69 +575,64 @@ const UserManagement = () => {
             />
           </div>
         ) : (
-          <div className="registration-requests-tab-content">
-            <div className="dashboard-toolbar">
+          <div className="um-fade-in-view">
+            <div className="um-toolbar">
               <input
-                className="dashboard-search-input"
+                className="um-search-input"
                 type="text"
-                placeholder="Search requests..."
+                placeholder="Search pending requests catalog..."
                 value={requestSearchTerm}
                 onChange={(e) => setRequestSearchTerm(e.target.value)}
               />
             </div>
 
             {requestsLoading ? (
-              <div className="loading-container">
-                <div className="spinner"></div>
-                <p>Loading registration requests...</p>
-              </div>
+              <div className="um-loading-state"><div className="um-spinner"></div><span>Loading requests...</span></div>
             ) : (
-              <div className="table-container">
-                {/* Desktop Table View */}
-                <table className="table">
+              <div className="um-table-responsive-container">
+                <table className="um-data-table">
                   <thead>
                     <tr>
                       <th>Registration ID</th>
                       <th>Name</th>
-                      <th>Email</th>
+                      <th>Email Profile</th>
                       <th>Role</th>
                       <th>Department</th>
                       <th>Semester/Year</th>
                       <th>Request Date</th>
-                      <th>Actions</th>
+                      {/* <th className="um-text-center">Review Decisions</th> */}
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredRequests.length === 0 ? (
+                    {paginatedRequests.length === 0 ? (
                       <tr>
-                        <td colSpan="8" className="text-center p-4">
-                          {requestSearchTerm ? 'No requests found matching your search' : 'No registration requests available'}
+                        <td colSpan="8" className="um-empty-table-cell">
+                          No pending registration requests found
                         </td>
                       </tr>
                     ) : (
-                      filteredRequests.map((request) => (
+                      paginatedRequests.map((request) => (
                         <tr key={request.id}>
-                          <td data-label="Registration ID">{request.reg_id}</td>
-                          <td data-label="Name">{request.name}</td>
+                          <td className="um-font-bold um-text-emerald" data-label="Registration ID">{request.reg_id || 'Staff Link'}</td>
+                          <td className="um-font-semibold" data-label="Name">{request.name}</td>
                           <td data-label="Email">{request.email}</td>
-                          <td data-label="Role">{request.role}</td>
+                          <td data-label="Role"><span className={`um-role-tag um-role-tag--${request.role?.toLowerCase()}`}>{request.role}</span></td>
                           <td data-label="Department">{request.department}</td>
-                          <td data-label="Semester/Year">
+                          <td data-label="Semester/Year" className="um-font-medium">
                             {request.role === 'Student' ? `Semester ${request.semester}` :
-                              request.role === 'PM' ? `Year ${request.program_year}` :
-                                'N/A'}
+                             request.role === 'PM' ? `Year ${request.program_year}` : 'N/A'}
                           </td>
-                          <td data-label="Request Date">{new Date(request.created_at).toLocaleDateString()}</td>
-                          <td data-label="Actions">
+                          <td data-label="Request Date" className="um-text-muted-dark">{new Date(request.created_at).toLocaleDateString()}</td>
+                          <td data-label="Actions" className="um-actions-cell">
                             <button
-                              className="btn-approve"
+                              className="um-icon-btn um-icon-btn--approve"
                               onClick={() => handleApproveRequest(request.id)}
                               title="Approve"
                             >
                               <FontAwesomeIcon icon={faUserCheck} />
                             </button>
                             <button
-                              className="btn-reject ml-2"
+                              className="um-icon-btn um-icon-btn--delete"
                               onClick={() => handleRejectRequest(request.id)}
                               title="Reject"
                             >
@@ -666,71 +645,41 @@ const UserManagement = () => {
                   </tbody>
                 </table>
 
-                {/* Mobile Card View */}
-                <div className="mobile-cards-view">
-                  {filteredRequests.length === 0 ? (
-                    <div className="empty-state">
-                      <p>{requestSearchTerm ? 'No requests found matching your search' : 'No registration requests available'}</p>
-                    </div>
+                <div className="um-mobile-cards-viewport">
+                  {paginatedRequests.length === 0 ? (
+                    <div className="um-empty-card-fallback">No pending requests.</div>
                   ) : (
-                    filteredRequests.map((request) => (
-                      <div key={request.id} className="user-card">
-                        <div className="user-card-header">
-                          <div className="user-card-info">
-                            <div className="user-card-label">Registration ID</div>
-                            <div className="user-card-value large">{request.reg_id}</div>
-                          </div>
+                    paginatedRequests.map((request) => (
+                      <div key={request.id} className="um-responsive-data-card">
+                        <div className="um-card-topline">
+                          <span className="um-card-code">{request.reg_id || 'Staff Dispatch'}</span>
+                          <span className={`um-role-tag um-role-tag--${request.role?.toLowerCase()}`}>{request.role}</span>
                         </div>
-                        <div className="user-card-body">
-                          <div className="user-card-row">
-                            <div className="user-card-label">Name</div>
-                            <div className="user-card-value">{request.name}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Email</div>
-                            <div className="user-card-value">{request.email}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Role</div>
-                            <div className="user-card-value">{request.role}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Department</div>
-                            <div className="user-card-value">{request.department}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Semester/Year</div>
-                            <div className="user-card-value">
-                              {request.role === 'Student' ? `Semester ${request.semester}` :
-                                request.role === 'PM' ? `Year ${request.program_year}` :
-                                  'N/A'}
-                            </div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Request Date</div>
-                            <div className="user-card-value">{new Date(request.created_at).toLocaleDateString()}</div>
-                          </div>
+                        <h4 className="um-card-heading">{request.name}</h4>
+                        <p className="um-card-email-sub">{request.email}</p>
+                        <div className="um-card-metadata-row text-xs">
+                          <p><strong>Dept:</strong> {request.department} • <strong>Placement:</strong> {request.role === 'Student' ? `Sem ${request.semester}` : request.role === 'PM' ? `Yr ${request.program_year}` : 'N/A'}</p>
+                          <p className="um-text-muted-dark font-mono">Dispatched: {new Date(request.created_at).toLocaleDateString()}</p>
                         </div>
-                        <div className="user-card-actions">
-                          <button
-                            className="button approve"
-                            onClick={() => handleApproveRequest(request.id)}
-                          >
-                            <FontAwesomeIcon icon={faUserCheck} />
-                            Approve
+                        <div className="cm-card-action-bar">
+                          <button className="cm-card-btn cm-card-btn--approve" onClick={() => handleApproveRequest(request.id)}>
+                            <FontAwesomeIcon icon={faUserCheck} /> Approve
                           </button>
-                          <button
-                            className="button reject"
-                            onClick={() => handleRejectRequest(request.id)}
-                          >
-                            <FontAwesomeIcon icon={faUserMinus} />
-                            Reject
+                          <button className="cm-card-btn cm-card-btn--delete" onClick={() => handleRejectRequest(request.id)}>
+                            <FontAwesomeIcon icon={faUserMinus} /> Reject
                           </button>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
+
+                <Pagination 
+                  currentPage={requestPage} 
+                  totalItems={filteredRequests.length} 
+                  itemsPerPage={itemsPerPage} 
+                  onPageChange={setRequestPage} 
+                />
               </div>
             )}
           </div>

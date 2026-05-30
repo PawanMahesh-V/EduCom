@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { authApi } from '../api';
 
 const AuthContext = createContext(null);
@@ -48,18 +48,18 @@ export const AuthProvider = ({ children }) => {
     const handleStorageChange = (e) => {
       if (e.key === 'userToken') {
         if (!e.newValue) {
-          // Session cleared (logout) on another tab
+          // Session cleared (logout) on another browser tab
           sessionStorage.removeItem('userToken');
           sessionStorage.removeItem('user');
           setUser(null);
         } else {
-          // Session created (login) on another tab
+          // Session created (login) on another browser tab
           const storedUser = localStorage.getItem('user');
           if (storedUser) {
             try {
               setUser(JSON.parse(storedUser));
             } catch (err) {
-              console.error('Failed to parse synchronized user:', err);
+              console.error('Failed to parse synchronized user state:', err);
             }
           }
         }
@@ -68,6 +68,7 @@ export const AuthProvider = ({ children }) => {
 
     window.addEventListener('auth:logout', handleLogoutEvent);
     window.addEventListener('storage', handleStorageChange);
+    
     return () => {
       window.removeEventListener('auth:logout', handleLogoutEvent);
       window.removeEventListener('storage', handleStorageChange);
@@ -77,13 +78,12 @@ export const AuthProvider = ({ children }) => {
   const login = async (identifier, password) => {
     try {
       const response = await authApi.login(identifier, password);
+      const { user: userData, token } = response;
       
-      const { user, token } = response;
-      
-      if (user && token) {
+      if (userData && token) {
         localStorage.setItem('userToken', token);
-        localStorage.setItem('user', JSON.stringify(user));
-        setUser(user);
+        localStorage.setItem('user', JSON.stringify(userData));
+        setUser(userData);
       }
       return response;
     } catch (error) {
@@ -93,7 +93,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = async () => {
     try {
-      // Optional: Call logout API if needed, but don't block client logout
+      // Trigger API logout without blocking client cache purge
       try {
         await authApi.logout();
       } catch (err) {
@@ -109,17 +109,22 @@ export const AuthProvider = ({ children }) => {
   };
 
   const updateUser = (userData) => {
-    const updatedUser = { ...user, ...userData };
-    if (localStorage.getItem('user')) {
-      localStorage.setItem('user', JSON.stringify(updatedUser));
-    }
-    if (sessionStorage.getItem('user')) {
-      sessionStorage.setItem('user', JSON.stringify(updatedUser));
-    }
-    setUser(updatedUser);
+    setUser((prevUser) => {
+      const updatedUser = { ...prevUser, ...userData };
+      
+      if (localStorage.getItem('user')) {
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      if (sessionStorage.getItem('user')) {
+        sessionStorage.setItem('user', JSON.stringify(updatedUser));
+      }
+      
+      return updatedUser;
+    });
   };
 
-  const value = React.useMemo(() => ({
+  // Memoizing values prevents redundant rerenders down the virtual component tree
+  const value = useMemo(() => ({
     user,
     loading,
     login,

@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTimes, faUpload } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faUpload, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import imageCompression from 'browser-image-compression';
-import '../../styles/MarketplaceModals.css';
 import api from '../../api/client';
 import API_BASE_URL from '../../config/api';
 import CustomSelect from '../Common/CustomSelect';
@@ -48,8 +47,6 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
 
     if (!isOpen) return null;
 
-
-
     const handleChange = (e) => {
         let { name, value } = e.target;
         if (name === 'quantity' && parseInt(value) > 1000) {
@@ -62,12 +59,11 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
         const file = e.target.files[0];
         if (file) {
             if (!file.type.startsWith('image/')) {
-                setError('Please select an image file');
+                setError('Please select a valid image file formatting type.');
                 return;
             }
 
             try {
-                // Compress image
                 const options = {
                     maxSizeMB: 1,
                     maxWidthOrHeight: 1024,
@@ -76,7 +72,6 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 const compressedFile = await imageCompression(file, options);
                 setImageFile(compressedFile);
                 
-                // Create preview URL
                 const reader = new FileReader();
                 reader.onloadend = () => {
                     setImagePreview(reader.result);
@@ -84,7 +79,7 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 reader.readAsDataURL(compressedFile);
             } catch (error) {
                 console.error("Error compressing image:", error);
-                setError("Failed to process image. Please try another one.");
+                setError("Failed to process image payload structure. Please try another file.");
             }
         }
     };
@@ -93,16 +88,12 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
         fileInputRef.current.click();
     };
 
-
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsSubmitting(true);
 
         try {
-            // Using fetch directly because ApiClient.post automatically JSON.stringifies 
-            // the body and sets Content-Type to application/json, which breaks multipart/form-data.
             const submitData = new FormData();
             submitData.append('title', formData.title);
             submitData.append('description', formData.description);
@@ -127,12 +118,11 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.message || 'Failed to post item');
+                throw new Error(data.message || 'Failed to deploy item node allocation mapping');
             }
 
             if (data) {
                 onSuccess(data);
-                // Reset form
                 setFormData({
                     title: '', description: '',
                     price: '', quantity: 1
@@ -142,46 +132,47 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 onClose();
             }
         } catch (err) {
-            setError(err.message || 'Failed to post item');
+            // MERGED CATCH: Handles API errors, network issues, or processing faults in one block
+            setError(err.message || 'An unexpected error occurred while processing your listing.');
+            console.error("Submission error:", err);
         } finally {
             setIsSubmitting(false);
         }
     };
 
     return (
-        <div className="modal-overlay">
-            <div className="modal-content post-item-modal">
-                <div className="modal-header">
-                    <h2>{editItem ? 'Edit Item' : 'Post an Item'}</h2>
-                    <button className="close-btn" onClick={onClose}>
+        <div className="qp-modal-overlay" onClick={(e) => e.target === e.currentTarget && !isSubmitting && onClose()}>
+            <div className="qp-modal-box fade-in">
+                
+                <div className="qp-modal-header">
+                    <h2 className="qp-modal-title">{editItem ? 'Modify Marketplace Listing' : 'Establish Product Listing'}</h2>
+                    <button className="qp-close-trigger-btn" onClick={onClose} disabled={isSubmitting} aria-label="Close modal view">
                         <FontAwesomeIcon icon={faTimes} />
                     </button>
                 </div>
                 
-                {error && <div className="modal-error">{error}</div>}
+                {error && <div className="qp-field-error-notice fade-in">{error}</div>}
 
-                <form onSubmit={handleSubmit} className="post-item-form">
-                    <div className="post-item-layout">
-                        {/* Left Side: Image Upload */}
-                        <div className="post-item-image-side">
-                            <div className="form-group">
-                                <label>Item Image</label>
-                                <div className="image-upload-zone" onClick={triggerFileInput}>
+                <form onSubmit={handleSubmit} className="qp-modal-form">
+                    <div className="qp-split-layout">
+                        
+                        <div className="qp-media-column">
+                            <div className="qp-form-group">
+                                <label className="qp-form-label">Product Visual Photo</label>
+                                <div className={`qp-upload-dropzone ${imagePreview ? 'qp-upload-dropzone--has-preview' : ''}`} onClick={triggerFileInput}>
                                     {imagePreview ? (
                                         <>
-                                            <img
-                                                src={imagePreview}
-                                                alt="Preview"
-                                                className="upload-preview-img"
-                                            />
-                                            <span className="upload-change-hint">Click to change image</span>
+                                            <img src={imagePreview} alt="Product Upload Preview" className="qp-upload-img-preview" />
+                                            <div className="qp-upload-change-overlay">
+                                                <span>Click to replace image file</span>
+                                            </div>
                                         </>
                                     ) : (
-                                        <>
-                                            <FontAwesomeIcon icon={faUpload} className="upload-icon" />
-                                            <span className="upload-title">Upload Product Photo</span>
-                                            <span className="upload-hint">PNG, JPG up to 10MB</span>
-                                        </>
+                                        <div className="qp-upload-empty-state-stack">
+                                            <FontAwesomeIcon icon={faUpload} className="qp-upload-icon-avatar" />
+                                            <span className="qp-upload-headline">Upload Product Photo</span>
+                                            <span className="qp-upload-sub-dimensions-hint">PNG, JPG formats up to 10MB</span>
+                                        </div>
                                     )}
                                     <input
                                         type="file"
@@ -189,71 +180,86 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                         onChange={handleFileChange}
                                         accept="image/*"
                                         style={{ display: 'none' }}
+                                        disabled={isSubmitting}
                                     />
                                 </div>
                             </div>
                         </div>
 
-                        {/* Right Side: Form Details */}
-                        <div className="post-item-details-side">
-                            <div className="form-group">
-                                <label>Title *</label>
+                        <div className="qp-info-column">
+                            <div className="qp-form-group">
+                                <label className="qp-form-label">Product Title *</label>
                                 <input 
                                     type="text" 
                                     name="title" 
                                     required 
-                                    placeholder="e.g., Book" 
+                                    disabled={isSubmitting}
+                                    placeholder="e.g., CS-402 Recommended Textbook" 
                                     value={formData.title} 
                                     onChange={handleChange} 
+                                    className="qp-input-field"
                                 />
                             </div>
 
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Price *</label>
+                            <div className="qp-form-row-grid">
+                                <div className="qp-form-group">
+                                    <label className="qp-form-label">Price * (PKR)</label>
                                     <input 
                                         type="number" 
                                         name="price" 
-                                        className="no-spin"
                                         required 
                                         min="0" 
-                                        placeholder="10000" 
+                                        disabled={isSubmitting}
+                                        placeholder="e.g., 1200" 
                                         value={formData.price} 
                                         onChange={handleChange} 
+                                        className="qp-input-field qp-input-field--no-spin"
                                     />
                                 </div>
-                                <div className="form-group">
-                                    <label>Quantity *</label>
+                                <div className="qp-form-group">
+                                    <label className="qp-form-label">Units Stock *</label>
                                     <input 
                                         type="number" 
                                         name="quantity" 
                                         required 
                                         min="1" 
                                         max="1000"
+                                        disabled={isSubmitting}
+                                        placeholder="1" 
                                         value={formData.quantity} 
                                         onChange={handleChange} 
+                                        className="qp-input-field"
                                     />
                                 </div>
                             </div>
 
-                            <div className="form-group">
-                                <label>Description *</label>
+                            <div className="qp-form-group">
+                                <label className="qp-form-label">Item Condition & Description *</label>
                                 <textarea 
                                     name="description" 
                                     required 
-                                    placeholder="Explain what's included..." 
+                                    disabled={isSubmitting}
+                                    placeholder="Provide details about the item's condition, meeting preferences, etc..." 
                                     rows="4" 
                                     value={formData.description} 
                                     onChange={handleChange} 
-                                ></textarea>
+                                    className="qp-textarea-field"
+                                />
                             </div>
 
-                            <div className="modal-footer">
-                                <button type="button" className="btn-secondary" onClick={onClose} disabled={isSubmitting}>
+                            <div className="qp-modal-action-footer">
+                                <button type="button" className="qp-btn-secondary" onClick={onClose} disabled={isSubmitting}>
                                     Cancel
                                 </button>
-                                <button type="submit" className="btn-primary" disabled={isSubmitting}>
-                                    {isSubmitting ? 'Processing...' : (editItem ? 'Update Listing' : 'Publish Listing')}
+                                <button type="submit" className="qp-btn-primary" disabled={isSubmitting}>
+                                    {isSubmitting ? (
+                                        <>
+                                            <FontAwesomeIcon icon={faSpinner} spin />
+                                            <span>Processing Pipeline...</span>
+                                        </>
+                                    ) : (
+                                        <span>{editItem ? 'Update Listing Matrix' : 'Publish Product Listing'}</span>
+                                    )}
                                 </button>
                             </div>
                         </div>

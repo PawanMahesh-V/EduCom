@@ -1,26 +1,30 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import { useSocket } from './SocketContext';
-import { notificationApi } from '../api';
-import { showAlert } from '../utils/alert';
-
-const NotificationContext = createContext();
-
-export const useNotifications = () => useContext(NotificationContext);
-
 import { useAuth } from './AuthContext';
+import { notificationApi } from '../api';
 
-// ...
+const NotificationContext = createContext(null);
+
+export const useNotifications = () => {
+  const context = useContext(NotificationContext);
+  if (!context) {
+    throw new Error('useNotifications must be used within a NotificationProvider');
+  }
+  return context;
+};
 
 export const NotificationProvider = ({ children }) => {
   const { socketService, isConnected } = useSocket();
-  const { user } = useAuth(); // Use centralized auth state
+  const { user } = useAuth(); // Safely accessing personalized global state
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Derive unread count dynamically
+  // Derive unread counts dynamically
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
-  // Fetch initial notifications on mount
+  /* ==========================================================================
+     1. BASE ARCHITECTURE DATA-FETCHING EFFECTS
+     ========================================================================== */
   useEffect(() => {
     const fetchNotifications = async () => {
         try {
@@ -31,10 +35,8 @@ export const NotificationProvider = ({ children }) => {
             
             setLoading(true);
             const userId = user.id || user.userId;
-            
             const data = await notificationApi.getAll(userId);
             
-            // Ensure data is an array
             if (Array.isArray(data)) {
                 setNotifications(data);
             }
@@ -48,20 +50,27 @@ export const NotificationProvider = ({ children }) => {
     fetchNotifications();
   }, [user]);
 
-  // Listen for real-time notifications
+  /* ==========================================================================
+     2. REAL-TIME EVENT STREAM SUBSCRIPTIONS
+     ========================================================================== */
   useEffect(() => {
-      if (!isConnected) return;
+      if (!isConnected || !socketService) return;
 
       const handleNewNotification = (notification) => {
           console.log('[NotificationProvider] New notification received:', notification);
           setNotifications(prev => [notification, ...prev]);
       };
+
       socketService.onNewNotification(handleNewNotification);
+      
       return () => {
           socketService.offNewNotification();
-      }
+      };
   }, [isConnected, socketService]);
 
+  /* ==========================================================================
+     3. CONTEXT PROVIDER OPERATION INTERACTION HANDLERS
+     ========================================================================== */
   const markAsRead = async (id) => {
       // Optimistic update
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
@@ -106,9 +115,21 @@ export const NotificationProvider = ({ children }) => {
       }
   };
 
+  // Memoizing operations prevents unneeded downstream tree component mutations
+  const contextValue = useMemo(() => ({
+    notifications, 
+    unreadCount, 
+    markAsRead, 
+    markAllAsRead, 
+    clearContextNotifications, 
+    loading
+  }), [notifications, unreadCount, loading, user]);
+
   return (
-      <NotificationContext.Provider value={{ notifications, unreadCount, markAsRead, markAllAsRead, clearContextNotifications, loading }}>
+      <NotificationContext.Provider value={contextValue}>
           {children}
       </NotificationContext.Provider>
   );
 };
+
+export default NotificationContext;

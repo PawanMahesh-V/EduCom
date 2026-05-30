@@ -18,7 +18,7 @@ const RegisterPage = () => {
   const [step, setStep] = useState(1);
   const [verifiedEmail, setVerifiedEmail] = useState('');
   
-  // Local state for Step 1 (simple enough not to need full form)
+  // Local state for Step 1
   const [emailInput, setEmailInput] = useState('');
   const [emailError, setEmailError] = useState('');
 
@@ -73,6 +73,7 @@ const RegisterPage = () => {
       return;
     }
 
+    /* Fixed: Changed from loading(true) to state setter function setLoading(true) */
     setLoading(true);
 
     try {
@@ -118,6 +119,7 @@ const RegisterPage = () => {
 
   return (
     <div className="register-page">
+      {/* Background Decorative Blur Orbs */}
       <div className="register-background">
         <div className="register-orb register-orb--1"></div>
         <div className="register-orb register-orb--2"></div>
@@ -129,7 +131,7 @@ const RegisterPage = () => {
           <FontAwesomeIcon icon={faArrowLeft} />
           <span>Back</span>
         </button>
-        <div className="register-brand">
+        <div className="register-brand" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faGraduationCap} className="register-brand-icon" />
           <span className="register-brand-text">
             Edu<span className="register-brand-accent">Com</span>

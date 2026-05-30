@@ -12,6 +12,7 @@ import { showSuccess, showError, showWarning } from '../../utils/alert';
 import { courseApi, communityApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import CustomSelect from '../../components/Common/CustomSelect';
+import Pagination from '../../components/Common/Pagination';
 import { useSocket } from '../../context/SocketContext';
 
 const CourseManagement = ({ initialTab }) => {
@@ -21,7 +22,7 @@ const CourseManagement = ({ initialTab }) => {
   // Socket connection
   const { socketService, isConnected } = useSocket();
 
-  const [courseTab, setCourseTab] = useState(initialTab || 'courses'); // 'courses', 'communities', or 'requests'
+  const [courseTab, setCourseTab] = useState(initialTab || 'courses'); 
 
   useEffect(() => {
     if (initialTab) {
@@ -32,12 +33,13 @@ const CourseManagement = ({ initialTab }) => {
   // Listen for real-time course updates
   useEffect(() => {
     if (isConnected && socketService && socketService.socket) {
-        socketService.socket.on('admin-course-update', () => {
-             fetchCourses();
-             if (courseTab === 'communities') fetchCommunities();
-             if (courseTab === 'requests') fetchCourseRequests();
-        });
-        return () => socketService.socket.off('admin-course-update');
+        const handleCourseUpdate = () => {
+          fetchCourses();
+          if (courseTab === 'communities') fetchCommunities();
+          if (courseTab === 'requests') fetchCourseRequests();
+        };
+        socketService.socket.on('admin-course-update', handleCourseUpdate);
+        return () => socketService.socket.off('admin-course-update', handleCourseUpdate);
     }
   }, [isConnected, socketService, courseTab]);
 
@@ -69,6 +71,12 @@ const CourseManagement = ({ initialTab }) => {
   // Course Requests states
   const [courseRequests, setCourseRequests] = useState([]);
   const [courseRequestsLoading, setCourseRequestsLoading] = useState(false);
+  const [coursePage, setCoursePage] = useState(1);
+  const [communityPage, setCommunityPage] = useState(1);
+  const [requestPage, setRequestPage] = useState(1);
+
+  // Pagination defaults
+  const itemsPerPage = 2;
 
   // Communities states
   const [communities, setCommunities] = useState([]);
@@ -102,18 +110,12 @@ const CourseManagement = ({ initialTab }) => {
   // Course filtering
   useEffect(() => {
     let filtered = courses;
-
-    // Apply department filter
     if (courseDepartmentFilter !== 'All') {
       filtered = filtered.filter(course => course.department === courseDepartmentFilter);
     }
-
-    // Apply semester filter
     if (courseSemesterFilter !== 'All') {
       filtered = filtered.filter(course => course.semester === courseSemesterFilter);
     }
-
-    // Apply search filter
     if (courseSearchTerm) {
       const searchTermLower = courseSearchTerm.toLowerCase();
       filtered = filtered.filter(course =>
@@ -123,20 +125,16 @@ const CourseManagement = ({ initialTab }) => {
         (course.semester || '').toLowerCase().includes(searchTermLower)
       );
     }
-
     setFilteredCourses(filtered);
+    setCoursePage(1);
   }, [courseSearchTerm, courseDepartmentFilter, courseSemesterFilter, courses]);
 
   // Community filtering
   useEffect(() => {
     let filtered = communities;
-
-    // Apply status filter
     if (communityStatusFilter !== 'All') {
       filtered = filtered.filter(community => community.status === communityStatusFilter);
     }
-
-    // Apply search filter
     if (communitySearchTerm) {
       const searchLower = communitySearchTerm.toLowerCase();
       filtered = filtered.filter(community =>
@@ -145,8 +143,8 @@ const CourseManagement = ({ initialTab }) => {
         (community.department || '').toLowerCase().includes(searchLower)
       );
     }
-
     setFilteredCommunities(filtered);
+    setCommunityPage(1);
   }, [communityStatusFilter, communitySearchTerm, communities]);
 
   const fetchTeachers = async () => {
@@ -249,15 +247,12 @@ const CourseManagement = ({ initialTab }) => {
       confirmText: 'Delete Course',
       onConfirm: async () => {
         setConfirmState((s) => ({ ...s, open: false }));
-        // Optimistic update - remove from UI immediately
         setCourses(prev => prev.filter(c => c.id !== courseId));
         setFilteredCourses(prev => prev.filter(c => c.id !== courseId));
-
         try {
           await courseApi.delete(courseId);
           showSuccess('Course deleted successfully');
         } catch (err) {
-          // Revert on error
           fetchCourses();
           showError(err.message || 'Failed to delete course');
         }
@@ -289,7 +284,6 @@ const CourseManagement = ({ initialTab }) => {
     setIsCourseModalOpen(false);
   };
 
-  // Community handlers
   const handleCommunityEdit = (community) => {
     setSelectedCommunity(community);
     setCommunityFormData({
@@ -341,8 +335,6 @@ const CourseManagement = ({ initialTab }) => {
         showWarning('Please enter a message');
         return;
       }
-
-      // Send message via Socket.IO with notificationOnly flag
       socketService.sendMessage({
         communityId: selectedCommunityForMessage.id,
         message: messageFormData.message,
@@ -351,7 +343,6 @@ const CourseManagement = ({ initialTab }) => {
         senderName: currentUser.name || 'Admin',
         notificationOnly: true
       });
-
       showSuccess(`Message sent to ${selectedCommunityForMessage.name} successfully!`);
       handleCloseMessageModal();
     } catch (err) {
@@ -368,123 +359,131 @@ const CourseManagement = ({ initialTab }) => {
     setIsMessageModalOpen(false);
   };
 
+  const paginatedCourses = filteredCourses.slice((coursePage - 1) * itemsPerPage, coursePage * itemsPerPage);
+  const paginatedCommunities = filteredCommunities.slice((communityPage - 1) * itemsPerPage, communityPage * itemsPerPage);
+  const paginatedRequests = courseRequests.slice((requestPage - 1) * itemsPerPage, requestPage * itemsPerPage);
+
   return (
-    <div className="course-management-wrapper">
-      <div className="dashboard-sub-nav">
-        <div className="dashboard-sub-nav-tabs">
-          <div
-            className={`sub-nav-item ${courseTab === 'courses' ? 'active' : ''}`}
+    <div className="cm-management-wrapper">
+      {/* Dynamic Sub-Navigation Bar */}
+      <div className="cm-sub-nav">
+        <div className="cm-sub-nav-tabs">
+          <button
+            className={`cm-sub-nav-item ${courseTab === 'courses' ? 'cm-sub-nav-item--active' : ''}`}
             onClick={() => setCourseTab('courses')}
           >
             Manage Courses
-          </div>
-          <div
-            className={`sub-nav-item ${courseTab === 'communities' ? 'active' : ''}`}
+          </button>
+          <button
+            className={`cm-sub-nav-item ${courseTab === 'communities' ? 'cm-sub-nav-item--active' : ''}`}
             onClick={() => setCourseTab('communities')}
           >
             Communities
-          </div>
-          <div
-            className={`sub-nav-item ${courseTab === 'requests' ? 'active' : ''}`}
+          </button>
+          <button
+            className={`cm-sub-nav-item ${courseTab === 'requests' ? 'cm-sub-nav-item--active' : ''}`}
             onClick={() => setCourseTab('requests')}
           >
             Course Requests
-          </div>
+          </button>
         </div>
       </div>
 
-      <div className="tab-content">
+      <div className="cm-tab-content-area">
+        {/* ================= COURSES VIEW TAB ================= */}
         {courseTab === 'courses' ? (
-          <div className="courses-tab-content">
-            <div className="dashboard-toolbar">
+          <div className="cm-fade-in-view">
+            <div className="cm-toolbar">
               <input
                 type="text"
-                className="dashboard-search-input"
-                placeholder="Search courses..."
+                className="cm-search-input"
+                placeholder="Search courses by code or title..."
                 value={courseSearchTerm}
                 onChange={(e) => setCourseSearchTerm(e.target.value)}
               />
               
-              <CustomSelect
-                options={[
-                  { value: 'All', label: 'All Departments' },
-                  { value: 'CS', label: 'CS' },
-                  { value: 'BBA', label: 'BBA' },
-                  { value: 'IT', label: 'IT' }
-                ]}
-                value={courseDepartmentFilter}
-                onChange={(val) => setCourseDepartmentFilter(val)}
-              />
+              <div className="cm-filter-select-group">
+                <CustomSelect
+                  options={[
+                    { value: 'All', label: 'All Departments' },
+                    { value: 'CS', label: 'CS' },
+                    { value: 'BBA', label: 'BBA' },
+                    { value: 'IT', label: 'IT' }
+                  ]}
+                  value={courseDepartmentFilter}
+                  onChange={(val) => setCourseDepartmentFilter(val)}
+                />
 
-              <CustomSelect
-                options={[
-                  { value: 'All', label: 'All Semesters' },
-                  { value: '1', label: 'Semester 1' },
-                  { value: '2', label: 'Semester 2' },
-                  { value: '3', label: 'Semester 3' },
-                  { value: '4', label: 'Semester 4' },
-                  { value: '5', label: 'Semester 5' },
-                  { value: '6', label: 'Semester 6' },
-                  { value: '7', label: 'Semester 7' },
-                  { value: '8', label: 'Semester 8' }
-                ]}
-                value={courseSemesterFilter}
-                onChange={(val) => setCourseSemesterFilter(val)}
-              />
+                <CustomSelect
+                  options={[
+                    { value: 'All', label: 'All Semesters' },
+                    { value: '1', label: 'Semester 1' },
+                    { value: '2', label: 'Semester 2' },
+                    { value: '3', label: 'Semester 3' },
+                    { value: '4', label: 'Semester 4' },
+                    { value: '5', label: 'Semester 5' },
+                    { value: '6', label: 'Semester 6' },
+                    { value: '7', label: 'Semester 7' },
+                    { value: '8', label: 'Semester 8' }
+                  ]}
+                  value={courseSemesterFilter}
+                  onChange={(val) => setCourseSemesterFilter(val)}
+                />
+              </div>
 
               <button
-                className="button primary dashboard-action-btn"
+                className="cm-btn-primary"
                 onClick={() => setIsCourseModalOpen(true)}
               >
                 <FontAwesomeIcon icon={faBook} />
-                Add Course
+                <span>Add Course</span>
               </button>
             </div>
 
-
             {coursesLoading ? (
-              <div className="loading-error">Loading...</div>
+              <div className="cm-loading-state"><div className="cm-spinner"></div><span>Loading courses...</span></div>
             ) : (
-              <div className="table-container">
-                {/* Desktop Table View */}
-                <table className="table">
+              <div className="cm-table-responsive-container">
+                <table className="cm-data-table">
                   <thead>
                     <tr>
                       <th>Course Code</th>
                       <th>Course Name</th>
                       <th>Department</th>
                       <th>Semester</th>
-                      <th>Teacher</th>
-                      <th>Actions</th>
+                      <th>Assigned Faculty</th>
+                      <th className="cm-text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCourses.length === 0 ? (
+                    {paginatedCourses.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="text-center p-4">
-                          {courseSearchTerm ? 'No courses found matching your search' : 'No courses available'}
+                        <td colSpan="6" className="cm-empty-table-cell">
+                          {courseSearchTerm ? 'No courses match your search' : 'No courses found'}
                         </td>
                       </tr>
                     ) : (
-                      filteredCourses.map((course) => (
+                      paginatedCourses.map((course) => (
                         <tr key={course.id}>
-                          <td data-label="Course Code">{course.code}</td>
-                          <td data-label="Course Name">{course.name}</td>
-                          <td data-label="Department">{course.department}</td>
-                          <td data-label="Semester">{course.semester}</td>
-                          <td data-label="Teacher">{course.teacher_name || 'No teacher assigned'}</td>
-                          <td data-label="Actions">
+                          <td className="cm-font-bold cm-text-emerald" data-label="Course Code">{course.code}</td>
+                          <td className="cm-font-semibold" data-label="Course Name">{course.name}</td>
+                          <td data-label="Department"><span className="cm-badge-tag">{course.department}</span></td>
+                          <td data-label="Semester">Semester {course.semester}</td>
+                          <td data-label="Teacher" className={!course.teacher_name ? 'cm-text-muted' : ''}>
+                            {course.teacher_name || 'Unassigned'}
+                          </td>
+                          <td data-label="Actions" className="cm-actions-cell">
                             <button
-                              className="button edit icon-button small"
+                              className="cm-icon-btn cm-icon-btn--edit"
                               onClick={() => handleCourseEdit(course)}
-                              data-tooltip="Edit Course"
+                              title="Edit Course"
                             >
                               <FontAwesomeIcon icon={faPenToSquare} />
                             </button>
-                            <button
-                              className="button delete icon-button small"
+                            <button 
+                              title="Delete Course"
+                              className="cm-icon-btn cm-icon-btn--primary"
                               onClick={() => handleCourseDelete(course.id)}
-                              data-tooltip="Delete Course"
                             >
                               <FontAwesomeIcon icon={faTrash} />
                             </button>
@@ -495,90 +494,75 @@ const CourseManagement = ({ initialTab }) => {
                   </tbody>
                 </table>
 
-                {/* Mobile Card View */}
-                <div className="mobile-cards-view">
-                  {filteredCourses.length === 0 ? (
-                    <div className="empty-state">
-                      <p>{courseSearchTerm ? 'No courses found matching your search' : 'No courses available'}</p>
-                    </div>
+                {/* Mobile Responsive Grid Flow Rendering Layout */}
+                <div className="cm-mobile-cards-viewport">
+                  {paginatedCourses.length === 0 ? (
+                    <div className="cm-empty-card-fallback">No matched courses found.</div>
                   ) : (
-                    filteredCourses.map((course) => (
-                      <div key={course.id} className="user-card">
-                        <div className="user-card-header">
-                          <div className="user-card-info">
-                            <div className="user-card-label">Course Code</div>
-                            <div className="user-card-value large">{course.code}</div>
-                          </div>
+                    paginatedCourses.map((course) => (
+                      <div key={course.id} className="cm-responsive-data-card">
+                        <div className="cm-card-topline">
+                          <span className="cm-card-code">{course.code}</span>
+                          <span className="cm-badge-tag">{course.department}</span>
                         </div>
-                        <div className="user-card-body">
-                          <div className="user-card-row">
-                            <div className="user-card-label">Course Name</div>
-                            <div className="user-card-value">{course.name}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Department</div>
-                            <div className="user-card-value">{course.department}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Semester</div>
-                            <div className="user-card-value">{course.semester}</div>
-                          </div>
-                          <div className="user-card-row">
-                            <div className="user-card-label">Teacher</div>
-                            <div className="user-card-value">{course.teacher_name || 'No teacher assigned'}</div>
-                          </div>
+                        <h4 className="cm-card-heading">{course.name}</h4>
+                        <div className="cm-card-metadata-row">
+                          <span><strong>Semester:</strong> {course.semester}</span>
+                          <span><strong>Faculty:</strong> {course.teacher_name || 'Unassigned'}</span>
                         </div>
-                        <div className="user-card-actions">
-                          <button
-                            className="button edit"
-                            onClick={() => handleCourseEdit(course)}
-                          >
-                            <FontAwesomeIcon icon={faPenToSquare} />
-                            Edit
+                        <div className="cm-card-action-bar">
+                          <button className="cm-card-btn cm-card-btn--edit" onClick={() => handleCourseEdit(course)}>
+                            <FontAwesomeIcon icon={faPenToSquare} /> Edit
                           </button>
-                          <button
-                            className="button delete"
-                            onClick={() => handleCourseDelete(course.id)}
-                          >
-                            <FontAwesomeIcon icon={faTrash} />
-                            Delete
+                          <button className="cm-card-btn cm-card-btn--delete" onClick={() => handleCourseDelete(course.id)}>
+                            <FontAwesomeIcon icon={faTrash} /> Delete
                           </button>
                         </div>
                       </div>
                     ))
                   )}
                 </div>
+
+                <Pagination 
+                  currentPage={coursePage} 
+                  totalItems={filteredCourses.length} 
+                  itemsPerPage={itemsPerPage} 
+                  onPageChange={setCoursePage} 
+                />
               </div>
             )}
 
+            {/* Course Modification Modal */}
             {isCourseModalOpen && (
-              <div className="modal">
-                <div className="modal-content modal-content-medium">
-                  <h2>{selectedCourse ? 'Edit Course' : 'Add New Course'}</h2>
-                  <form onSubmit={handleCourseSubmit}>
-                    <div className="grid-2col">
-                      <div className="form-group">
-                        <label>Course Code:</label>
+              <div className="cm-modal-overlay">
+                <div className="cm-modal-box cm-modal-box--medium fade-in">
+                  <h2>{selectedCourse ? 'Edit Course' : 'Create New Course'}</h2>
+                  <form onSubmit={handleCourseSubmit} className="cm-modal-form">
+                    <div className="cm-modal-grid-2col">
+                      <div className="cm-form-group">
+                        <label>Course Code</label>
                         <input
                           type="text"
                           name="code"
                           value={courseFormData.code}
                           onChange={handleCourseInputChange}
+                          placeholder="e.g., CSC-441"
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Course Name:</label>
+                      <div className="cm-form-group">
+                        <label>Course Name</label>
                         <input
                           type="text"
                           name="name"
                           value={courseFormData.name}
                           onChange={handleCourseInputChange}
+                          placeholder="e.g., Data Mining"
                           required
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Department:</label>
+                      <div className="cm-form-group">
+                        <label>Department Target</label>
                         <CustomSelect
                           options={[
                             { value: 'CS', label: 'CS' },
@@ -589,8 +573,8 @@ const CourseManagement = ({ initialTab }) => {
                           onChange={(val) => setCourseFormData({ ...courseFormData, department: val })}
                         />
                       </div>
-                      <div className="form-group">
-                        <label>Semester:</label>
+                      <div className="cm-form-group">
+                        <label>Academic Semester</label>
                         <CustomSelect
                           options={[
                             { value: '1', label: 'Semester 1' },
@@ -607,8 +591,8 @@ const CourseManagement = ({ initialTab }) => {
                           placeholder="Select Semester"
                         />
                       </div>
-                      <div className="form-group form-group-full">
-                        <label>Teacher:</label>
+                      <div className="cm-form-group cm-form-group--full">
+                        <label>Assigned Faculty Mentor</label>
                         <CustomSelect
                           options={teachers.map(t => ({ 
                             value: t.id, 
@@ -616,29 +600,19 @@ const CourseManagement = ({ initialTab }) => {
                           }))}
                           value={courseFormData.teacher_id}
                           onChange={(val) => setCourseFormData({ ...courseFormData, teacher_id: val })}
-                          placeholder="Select Teacher"
+                          placeholder="Link Teacher Profile"
                         />
                       </div>
                     </div>
-                    <div className="modal-actions">
-                      <button
-                        type="submit"
-                        className="button primary"
-                      >
-                        {selectedCourse ? 'Update' : 'Create Course'}
-                      </button>
-                      <button
-                        type="button"
-                        className="button secondary"
-                        onClick={handleCloseCourseModal}
-                      >
-                        Cancel
-                      </button>
+                    <div className="cm-modal-action-footer">
+                      <button type="button" className="cm-btn-secondary" onClick={handleCloseCourseModal}>Cancel</button>
+                      <button type="submit" className="cm-btn-primary">{selectedCourse ? 'Update Course' : 'Save Course'}</button>
                     </div>
                   </form>
                 </div>
               </div>
             )}
+
             <ConfirmDialog
               open={confirmState.open}
               title={confirmState.title}
@@ -650,81 +624,77 @@ const CourseManagement = ({ initialTab }) => {
             />
           </div>
         ) : courseTab === 'communities' ? (
-          <div className="communities-tab-content">
-            <div className="dashboard-toolbar">
+          /* ================= COMMUNITIES VIEW TAB ================= */
+          <div className="cm-fade-in-view">
+            <div className="cm-toolbar">
               <input
                 type="text"
-                className="dashboard-search-input"
-                placeholder="Search communities..."
+                className="cm-search-input"
+                placeholder="Search global community spaces..."
                 value={communitySearchTerm}
                 onChange={(e) => setCommunitySearchTerm(e.target.value)}
               />
               
               <CustomSelect
                 options={[
-                  { value: 'All', label: 'All Status' },
-                  { value: 'active', label: 'Active' },
-                  { value: 'inactive', label: 'Inactive' }
+                  { value: 'All', label: 'All Statuses' },
+                  { value: 'active', label: 'Active Channels' },
+                  { value: 'inactive', label: 'Deactivated Channels' }
                 ]}
                 value={communityStatusFilter}
                 onChange={(val) => setCommunityStatusFilter(val)}
               />
             </div>
 
-            <div className="table-container">
-              {/* Desktop Table View */}
-              <table className="table">
+            <div className="cm-table-responsive-container">
+              <table className="cm-data-table">
                 <thead>
                   <tr>
-                    <th>Community Name</th>
-                    <th>Course Code</th>
-                    <th>Course Name</th>
+                    <th>Community Title</th>
+                    <th>Linked Code</th>
+                    <th>Associated Course</th>
                     <th>Department</th>
-                    <th>Status</th>
-                    <th>Actions</th>
+                    <th>Ecosystem Status</th>
+                    <th className="cm-text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {communitiesLoading ? (
+                    <tr><td colSpan="6" className="cm-empty-table-cell"><div className="cm-spinner"></div></td></tr>
+                  ) : paginatedCommunities.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="text-center p-4">Loading communities...</td>
-                    </tr>
-                  ) : filteredCommunities.length === 0 ? (
-                    <tr>
-                      <td colSpan="6" className="text-center p-4">
-                        {communitySearchTerm || communityStatusFilter !== 'All'
-                          ? 'No communities found matching your filters'
-                          : 'No communities available'}
+                      <td colSpan="6" className="cm-empty-table-cell">
+                        No communities match your search
                       </td>
                     </tr>
                   ) : (
-                    filteredCommunities.map((community) => (
+                    paginatedCommunities.map((community) => (
                       <tr key={community.id}>
-                        <td data-label="Community Name">{community.name || 'N/A'}</td>
-                        <td data-label="Course Code">{community.course_code || 'N/A'}</td>
+                        <td className="cm-font-bold" data-label="Community Name">{community.name || 'N/A'}</td>
+                        <td className="cm-text-emerald cm-font-semibold" data-label="Course Code">{community.course_code || 'N/A'}</td>
                         <td data-label="Course Name">{community.course_name || 'N/A'}</td>
-                        <td data-label="Department">{community.department || 'N/A'}</td>
+                        <td data-label="Department"><span className="cm-badge-tag">{community.department || 'N/A'}</span></td>
                         <td data-label="Status">
-                          <span className={community.status === 'active' ? 'status-active' : 'status-inactive'}>
+                          <span className={`cm-status-pill ${community.status === 'active' ? 'cm-status-pill--active' : 'cm-status-pill--inactive'}`}>
                             {community.status}
                           </span>
                         </td>
-                        <td data-label="Actions">
+                        <td data-label="Actions" className="cm-actions-cell">
                           <button
-                            className="button edit icon-button small"
+                            className="cm-icon-btn cm-icon-btn--edit"
                             onClick={() => handleCommunityEdit(community)}
-                            data-tooltip="Edit Community"
+                            title="Edit Title Settings"
                           >
                             <FontAwesomeIcon icon={faPenToSquare} />
                           </button>
                           <button
-                            className="button primary icon-button small ml-2"
+                            className="cm-icon-btn cm-icon-btn--message"
                             onClick={() => {
                               setSelectedCommunityForMessage(community);
                               setIsMessageModalOpen(true);
                               setMessageFormData({ subject: '', message: '' });
                             }}
-                            data-tooltip="Send Message"
+                            title="Send Message"
                           >
                             <FontAwesomeIcon icon={faPaperPlane} />
                           </button>
@@ -735,178 +705,118 @@ const CourseManagement = ({ initialTab }) => {
                 </tbody>
               </table>
 
-              {/* Mobile Card View */}
-              <div className="mobile-cards-view">
-                {communitiesLoading ? (
-                  <div className="empty-state">
-                    <p>Loading communities...</p>
-                  </div>
-                ) : filteredCommunities.length === 0 ? (
-                  <div className="empty-state">
-                    <p>{communitySearchTerm || communityStatusFilter !== 'All'
-                      ? 'No communities found matching your filters'
-                      : 'No communities available'}</p>
-                  </div>
-                ) : (
-                  filteredCommunities.map((community) => (
-                    <div key={community.id} className="user-card">
-                      <div className="user-card-header">
-                        <div className="user-card-info">
-                          <div className="user-card-label">Community Name</div>
-                          <div className="user-card-value large">{community.name || 'N/A'}</div>
-                        </div>
-                      </div>
-                      <div className="user-card-body">
-                        <div className="user-card-row">
-                          <div className="user-card-label">Course Code</div>
-                          <div className="user-card-value">{community.course_code || 'N/A'}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Course Name</div>
-                          <div className="user-card-value">{community.course_name || 'N/A'}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Department</div>
-                          <div className="user-card-value">{community.department || 'N/A'}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Status</div>
-                          <div className="user-card-value">
-                            <span className={community.status === 'active' ? 'status-active' : 'status-inactive'}>
-                              {community.status}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="user-card-actions">
-                        <button
-                          className="button edit"
-                          onClick={() => handleCommunityEdit(community)}
-                        >
-                          <FontAwesomeIcon icon={faPenToSquare} />
-                          Edit
-                        </button>
-                        <button
-                          className="button primary"
-                          onClick={() => {
-                            setSelectedCommunityForMessage(community);
-                            setIsMessageModalOpen(true);
-                            setMessageFormData({ subject: '', message: '' });
-                          }}
-                        >
-                          <FontAwesomeIcon icon={faPaperPlane} />
-                          Send
-                        </button>
-                      </div>
+              {/* Mobile Responsive Layout Cards Grid for communities */}
+              <div className="cm-mobile-cards-viewport">
+                {paginatedCommunities.map((community) => (
+                  <div key={community.id} className="cm-responsive-data-card">
+                    <div className="cm-card-topline">
+                      <h4 className="cm-card-heading cm-margin-none">{community.name}</h4>
+                      <span className={`cm-status-pill ${community.status === 'active' ? 'cm-status-pill--active' : 'cm-status-pill--inactive'}`}>
+                        {community.status}
+                      </span>
                     </div>
-                  ))
-                )}
+                    <div className="cm-card-metadata-row cm-margin-v-sm">
+                      <span><strong>Code:</strong> {community.course_code}</span>
+                      <span><strong>Dept:</strong> {community.department}</span>
+                    </div>
+                    <div className="cm-card-action-bar">
+                      <button className="cm-card-btn cm-card-btn--edit" onClick={() => handleCommunityEdit(community)}>
+                        <FontAwesomeIcon icon={faPenToSquare} /> Edit
+                      </button>
+                      <button className="cm-card-btn cm-card-btn--message" onClick={() => {
+                        setSelectedCommunityForMessage(community);
+                        setIsMessageModalOpen(true);
+                      }}>
+                        <FontAwesomeIcon icon={faPaperPlane} /> Broadcast
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
+
+              <Pagination 
+                currentPage={communityPage} 
+                totalItems={filteredCommunities.length} 
+                itemsPerPage={itemsPerPage} 
+                onPageChange={setCommunityPage} 
+              />
             </div>
 
+            {/* Community Modification Settings Modal */}
             {isCommunityModalOpen && (
-              <div className="modal">
-                <div className="modal-content">
+              <div className="cm-modal-overlay">
+                <div className="cm-modal-box fade-in">
                   <h2>Edit Community</h2>
-                  <form onSubmit={handleCommunitySubmit}>
-                    <div className="form-group">
-                      <label htmlFor="community-name">Community Name</label>
+                  <form onSubmit={handleCommunitySubmit} className="cm-modal-form">
+                    <div className="cm-form-group">
+                      <label htmlFor="community-name">Community Label Name</label>
                       <input
                         type="text"
                         id="community-name"
                         name="name"
-                        className="input"
                         value={communityFormData.name}
                         onChange={handleCommunityInputChange}
                         required
                       />
                     </div>
-
-                    <div className="form-group">
-                      <label htmlFor="community-status">Status</label>
+                    <div className="cm-form-group">
+                      <label htmlFor="community-status">Ecosystem Routing Status</label>
                       <CustomSelect
                         id="community-status"
                         options={[
-                          { value: 'active', label: 'Active' },
-                          { value: 'inactive', label: 'Inactive' }
+                          { value: 'active', label: 'Active Channel' },
+                          { value: 'inactive', label: 'Inactive / Frozen Channel' }
                         ]}
                         value={communityFormData.status}
                         onChange={(val) => setCommunityFormData({ ...communityFormData, status: val })}
                       />
                     </div>
-                    <div className="modal-actions">
-                      <button
-                        type="submit"
-                        className="button primary"
-                      >
-                        Update Community
-                      </button>
-                      <button
-                        type="button"
-                        className="button secondary"
-                        onClick={handleCloseCommunityModal}
-                      >
-                        Cancel
-                      </button>
+                    <div className="cm-modal-action-footer">
+                      <button type="button" className="cm-btn-secondary" onClick={handleCloseCommunityModal}>Cancel</button>
+                      <button type="submit" className="cm-btn-primary">Update Community</button>
                     </div>
                   </form>
                 </div>
               </div>
             )}
 
+            {/* Broadcast Mass System Notification Message Modal */}
             {isMessageModalOpen && (
-              <div className="modal">
-                <div className="modal-content modal-content-narrow">
-                  <h2>Send Message to Community</h2>
-                  <p className="modal-description">
-                    <strong>{selectedCommunityForMessage?.name}</strong>
-                    <br />
-                    <span className="text-sm">
-                      {selectedCommunityForMessage?.code} - {selectedCommunityForMessage?.name}
-                    </span>
+              <div className="cm-modal-overlay">
+                <div className="cm-modal-box cm-modal-box--narrow fade-in">
+                  <h2>Send Notification</h2>
+                  <p className="cm-modal-description-sub">
+                    Target Community: <strong className="cm-text-emerald">{selectedCommunityForMessage?.name}</strong> Hub
                   </p>
-                  <form onSubmit={handleMessageSubmit}>
-                    <div className="form-group">
-                      <label htmlFor="message-subject">Subject</label>
+                  <form onSubmit={handleMessageSubmit} className="cm-modal-form">
+                    <div className="cm-form-group">
+                      <label htmlFor="message-subject">Notification Header Subject</label>
                       <input
                         type="text"
                         id="message-subject"
                         name="subject"
-                        className="input"
                         value={messageFormData.subject}
                         onChange={handleMessageInputChange}
-                        placeholder="Enter message subject"
+                        placeholder="e.g., Scheduled Midterm Operations Altered"
                         required
                       />
                     </div>
-
-                    <div className="form-group">
-                      <label htmlFor="message-content">Message</label>
+                    <div className="cm-form-group">
+                      <label htmlFor="message-content">Dispatch Core Content Payload</label>
                       <textarea
                         id="message-content"
                         name="message"
-                        className="input"
                         value={messageFormData.message}
                         onChange={handleMessageInputChange}
-                        placeholder="Type your message here..."
-                        rows="8"
+                        placeholder="Type out your global system warning announcement rules details..."
+                        rows="6"
                         required
                       />
                     </div>
-                    <div className="modal-actions">
-                      <button
-                        type="submit"
-                        className="button primary"
-                      >
-                        <FontAwesomeIcon icon={faPaperPlane} className="mr-1" />
-                        Send Message
-                      </button>
-                      <button
-                        type="button"
-                        className="button secondary"
-                        onClick={handleCloseMessageModal}
-                      >
-                        Cancel
+                    <div className="cm-modal-action-footer">
+                      <button type="button" className="cm-btn-secondary" onClick={handleCloseMessageModal}>Cancel</button>
+                      <button type="submit" className="cm-btn-primary">
+                        <FontAwesomeIcon icon={faPaperPlane} /> <span>Transmit Message</span>
                       </button>
                     </div>
                   </form>
@@ -915,50 +825,51 @@ const CourseManagement = ({ initialTab }) => {
             )}
           </div>
         ) : courseTab === 'requests' ? (
-          <div className="container">
-            <div className="table-container">
-              <table className="table">
+          /* ================= CURRICULUM REQUESTS VIEW TAB ================= */
+          <div className="cm-fade-in-view">
+            <div className="cm-table-responsive-container">
+              <table className="cm-data-table">
                 <thead>
                   <tr>
-                    <th>Course Code</th>
-                    <th>Course Name</th>
+                    <th>Requested Code</th>
+                    <th>Course Label Title</th>
                     <th>Department</th>
                     <th>Semester</th>
-                    <th>Teacher</th>
-                    <th>Requested By</th>
-                    <th>Actions</th>
+                    <th>Proposed Faculty</th>
+                    <th>Originated Request From</th>
+                    <th className="cm-text-center">Review Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {courseRequestsLoading ? (
+                    <tr><td colSpan="7" className="cm-empty-table-cell"><div className="cm-spinner"></div></td></tr>
+                  ) : paginatedRequests.length === 0 ? (
                     <tr>
-                      <td colSpan="7" className="text-center p-4">Loading course requests...</td>
-                    </tr>
-                  ) : courseRequests.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="text-center p-4">No pending course requests</td>
+                      <td colSpan="7" className="cm-empty-table-cell">
+                        No pending external curriculum deployment approval requests logged
+                      </td>
                     </tr>
                   ) : (
-                    courseRequests.map((request) => (
+                    paginatedRequests.map((request) => (
                       <tr key={request.id}>
-                        <td data-label="Course Code">{request.code}</td>
-                        <td data-label="Course Name">{request.name}</td>
-                        <td data-label="Department">{request.department}</td>
-                        <td data-label="Semester">{request.semester}</td>
-                        <td data-label="Teacher">{request.teacher_name || 'N/A'}</td>
-                        <td data-label="Requested By">{request.requested_by_name || 'N/A'}</td>
-                        <td data-label="Actions">
+                        <td className="cm-font-bold cm-text-emerald" data-label="Course Code">{request.code}</td>
+                        <td className="cm-font-semibold" data-label="Course Name">{request.name}</td>
+                        <td data-label="Department"><span className="cm-badge-tag">{request.department}</span></td>
+                        <td data-label="Semester">Semester {request.semester}</td>
+                        <td data-label="Teacher">{request.teacher_name || 'Unassigned'}</td>
+                        <td data-label="Requested By" className="cm-font-medium">{request.requested_by_name || 'N/A'}</td>
+                        <td data-label="Actions" className="cm-actions-cell">
                           <button
-                            className="btn-approve"
+                            className="cm-icon-btn cm-icon-btn--approve"
                             onClick={() => handleApproveCourseRequest(request.id)}
-                            title="Approve"
+                            title="Authorize & Launch Workspace"
                           >
                             <FontAwesomeIcon icon={faUserCheck} />
                           </button>
                           <button
-                            className="btn-reject ml-2"
+                            className="cm-icon-btn cm-icon-btn--delete"
                             onClick={() => handleRejectCourseRequest(request.id)}
-                            title="Reject"
+                            title="Deny Request"
                           >
                             <FontAwesomeIcon icon={faUserMinus} />
                           </button>
@@ -969,67 +880,41 @@ const CourseManagement = ({ initialTab }) => {
                 </tbody>
               </table>
 
-              {/* Mobile Card View */}
-              <div className="mobile-cards-view">
-                {courseRequestsLoading ? (
-                  <div className="empty-state">
-                    <p>Loading course requests...</p>
-                  </div>
-                ) : courseRequests.length === 0 ? (
-                  <div className="empty-state">
-                    <p>No pending course requests</p>
-                  </div>
+              {/* Mobile Request Cards layout view */}
+              <div className="cm-mobile-cards-viewport">
+                {paginatedRequests.length === 0 ? (
+                  <div className="cm-empty-card-fallback">Curriculum approval cache clear.</div>
                 ) : (
-                  courseRequests.map((request) => (
-                    <div key={request.id} className="user-card">
-                      <div className="user-card-header">
-                        <div className="user-card-info">
-                          <div className="user-card-label">Course Code</div>
-                          <div className="user-card-value large">{request.code}</div>
-                        </div>
+                  paginatedRequests.map((request) => (
+                    <div key={request.id} className="cm-responsive-data-card">
+                      <div className="cm-card-topline">
+                        <span className="cm-card-code">{request.code}</span>
+                        <span className="cm-badge-tag">{request.department}</span>
                       </div>
-                      <div className="user-card-body">
-                        <div className="user-card-row">
-                          <div className="user-card-label">Course Name</div>
-                          <div className="user-card-value">{request.name}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Department</div>
-                          <div className="user-card-value">{request.department}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Semester</div>
-                          <div className="user-card-value">{request.semester}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Teacher</div>
-                          <div className="user-card-value">{request.teacher_name || 'N/A'}</div>
-                        </div>
-                        <div className="user-card-row">
-                          <div className="user-card-label">Requested By</div>
-                          <div className="user-card-value">{request.requested_by_name || 'N/A'}</div>
-                        </div>
+                      <h4 className="cm-card-heading">{request.name}</h4>
+                      <div className="cm-card-metadata-row text-xs">
+                        <p><strong>Proposed Faculty:</strong> {request.teacher_name || 'N/A'}</p>
+                        <p><strong>Originated Via:</strong> {request.requested_by_name || 'N/A'}</p>
                       </div>
-                      <div className="user-card-actions">
-                        <button
-                          className="button approve"
-                          onClick={() => handleApproveCourseRequest(request.id)}
-                        >
-                          <FontAwesomeIcon icon={faUserCheck} />
-                          Approve
+                      <div className="cm-card-action-bar">
+                        <button className="cm-card-btn cm-card-btn--approve" onClick={() => handleApproveCourseRequest(request.id)}>
+                          <FontAwesomeIcon icon={faUserCheck} /> Approve
                         </button>
-                        <button
-                          className="button reject"
-                          onClick={() => handleRejectCourseRequest(request.id)}
-                        >
-                          <FontAwesomeIcon icon={faUserMinus} />
-                          Reject
+                        <button className="cm-card-btn cm-card-btn--delete" onClick={() => handleRejectCourseRequest(request.id)}>
+                          <FontAwesomeIcon icon={faUserMinus} /> Reject
                         </button>
                       </div>
                     </div>
                   ))
                 )}
               </div>
+
+              <Pagination 
+                currentPage={requestPage} 
+                totalItems={courseRequests.length} 
+                itemsPerPage={itemsPerPage} 
+                onPageChange={setRequestPage} 
+              />
             </div>
           </div>
         ) : null}

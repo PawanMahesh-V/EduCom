@@ -14,8 +14,8 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    // You can also log the error to an error reporting service
-    console.error("Uncaught error:", error, errorInfo);
+    // Log the caught crash data directly to system administration tools
+    console.error("Uncaught crash exception:", error, errorInfo);
     this.setState({ error, errorInfo });
   }
 
@@ -27,29 +27,33 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-          <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 text-center">
-            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FontAwesomeIcon icon={faExclamationTriangle} className="text-red-500 text-2xl" />
+        <div className="eb-screen-viewport">
+          <div className="eb-container-card fade-in">
+            {/* Visual Icon Alert Head */}
+            <div className="eb-icon-badge">
+              <FontAwesomeIcon icon={faExclamationTriangle} />
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Something went wrong</h2>
-            <p className="text-gray-600 mb-6">
-              We're sorry, but an unexpected error occurred. Please try reloading the page.
+            
+            <h2 className="eb-title">Something went wrong</h2>
+            <p className="eb-subtitle">
+              We're sorry, but an unexpected system exception occurred. Please try refreshing the portal workspace layout.
             </p>
             
+            {/* Conditional Stack Dump Rendering (Only builds during development instances) */}
             {process.env.NODE_ENV === 'development' && this.state.error && (
-              <div className="text-left bg-gray-100 p-4 rounded-lg mb-6 overflow-auto max-h-48 text-xs font-mono">
-                <p className="text-red-600 font-bold mb-1">{this.state.error.toString()}</p>
-                <p className="text-gray-500">{this.state.errorInfo?.componentStack}</p>
+              <div className="eb-stack-trace-box">
+                <p className="eb-stack-error-string">{this.state.error.toString()}</p>
+                <p className="eb-stack-component-tree">{this.state.errorInfo?.componentStack}</p>
               </div>
             )}
 
+            {/* Reload Trigger Button */}
             <button
               onClick={this.handleReset}
-              className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="eb-submit-button"
             >
               <FontAwesomeIcon icon={faRedo} />
-              Reload Page
+              <span>Reload Workspace</span>
             </button>
           </div>
         </div>

@@ -102,7 +102,10 @@ class Community {
                            AND sender_id != $1 
                            AND is_read = FALSE),
                         0
-                    ) as unread_count
+                    ) as unread_count,
+                    (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
+                     FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.community_id = c.id AND (m.status IS NULL OR m.status = 'approved') ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                    (SELECT created_at FROM messages WHERE community_id = c.id AND (status IS NULL OR status = 'approved') ORDER BY created_at DESC LIMIT 1) as last_message_time
              FROM communities c
              JOIN courses co ON c.course_id = co.id
              JOIN enrollments e ON co.id = e.course_id
@@ -124,7 +127,10 @@ class Community {
                            AND sender_id != $1 
                            AND is_read = FALSE),
                         0
-                    ) as unread_count
+                    ) as unread_count,
+                    (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
+                     FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.community_id = c.id AND (m.status IS NULL OR m.status = 'approved') ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                    (SELECT created_at FROM messages WHERE community_id = c.id AND (status IS NULL OR status = 'approved') ORDER BY created_at DESC LIMIT 1) as last_message_time
              FROM communities c
              JOIN courses co ON c.course_id = co.id
              WHERE co.teacher_id = $1
@@ -145,7 +151,10 @@ class Community {
                            AND sender_id != $1 
                            AND is_read = FALSE),
                         0
-                    ) as unread_count
+                    ) as unread_count,
+                    (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
+                     FROM messages m JOIN users u ON m.sender_id = u.id WHERE m.community_id = c.id AND (m.status IS NULL OR m.status = 'approved') ORDER BY m.created_at DESC LIMIT 1) as last_message,
+                    (SELECT created_at FROM messages WHERE community_id = c.id AND (status IS NULL OR status = 'approved') ORDER BY created_at DESC LIMIT 1) as last_message_time
              FROM communities c
              JOIN courses co ON c.course_id = co.id
              WHERE co.department = $2

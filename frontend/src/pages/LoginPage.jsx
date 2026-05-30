@@ -29,7 +29,6 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
-    // Check if we have both user object AND token in storage
     const token = localStorage.getItem('userToken');
     
     if (user && token) {
@@ -48,12 +47,6 @@ const LoginPage = () => {
         default:
           navigate('/', { replace: true });
       }
-    } else if (user && !token) {
-      // Logic gap: Context has user but storage doesn't (likely cleared by 401 interceptor)
-      // Force context reset to stop loop
-      // We can't easily call logout() here if it's async or complex, but cleaner to just not redirect
-      // Or explicitly clear user
-      // logout(); // Only if available from useAuth and doesn't cause issues
     }
   }, [user, navigate]);
 
@@ -63,7 +56,6 @@ const LoginPage = () => {
       ...prev,
       [name]: value
     }));
-    // Clear field error when user starts typing
     if (fieldErrors[name]) {
       setFieldErrors(prev => ({
         ...prev,
@@ -81,14 +73,13 @@ const LoginPage = () => {
     let hasError = false;
     const errors = { identifier: '', password: '' };
     
-    // Validate fields using utility
     const emailError = getEmailError(formData.identifier);
     if (emailError) {
       if (!formData.identifier.trim()) {
          errors.identifier = 'Please fill in this field.';
          hasError = true;
       } else if (!isValidEmail(formData.identifier)) {
-         errors.identifier = emailError; // This will return the specific domain error or generic valid error
+         errors.identifier = emailError;
          hasError = true;
       }
     }
@@ -107,7 +98,6 @@ const LoginPage = () => {
     
     try {
       await login(formData.identifier, formData.password);
-      // Navigation handled by useEffect on user change
     } catch (err) {
       setError(err.message || 'Failed to login. Please check your credentials.');
       setLoading(false);
@@ -116,6 +106,7 @@ const LoginPage = () => {
 
   return (
     <div className="login-page">
+      {/* Background Decorative Blur Orbs */}
       <div className="login-background">
         <div className="login-orb login-orb--1"></div>
         <div className="login-orb login-orb--2"></div>
@@ -127,7 +118,7 @@ const LoginPage = () => {
           <FontAwesomeIcon icon={faArrowLeft} />
           <span>Back</span>
         </button>
-        <div className="login-brand">
+        <div className="login-brand" onClick={() => navigate('/')}>
           <FontAwesomeIcon icon={faGraduationCap} className="login-brand-icon" />
           <span className="login-brand-text">
             Edu<span className="login-brand-accent">Com</span>
@@ -143,11 +134,12 @@ const LoginPage = () => {
           </div>
 
           <form className="login-form" onSubmit={handleSubmit}>
+            {/* Input Identifier Block */}
             <div className="login-form-group">
               <label className="login-label" htmlFor="identifier">
                 Email or Registration ID
               </label>
-              <div className="login-input-wrapper">
+              <div className={`login-input-wrapper ${fieldErrors.identifier ? 'login-input-wrapper--error' : ''}`}>
                 <div className="login-input-icon">
                   <FontAwesomeIcon icon={faEnvelope} />
                 </div>
@@ -163,21 +155,22 @@ const LoginPage = () => {
                 />
               </div>
               {fieldErrors.identifier && (
-                <div className="login-error-message fade-in mt-2">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <div className="login-error-message fade-in">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  {fieldErrors.identifier}
+                  <span>{fieldErrors.identifier}</span>
                 </div>
               )}
             </div>
 
+            {/* Input Password Block */}
             <div className="login-form-group">
               <div className="login-label-row">
                 <label className="login-label" htmlFor="password">Password</label>
                 <Link to="/forgot-password" className="login-forgot-link">Forgot password?</Link>
               </div>
-              <div className="login-input-wrapper">
+              <div className={`login-input-wrapper ${fieldErrors.password ? 'login-input-wrapper--error' : ''}`}>
                 <div className="login-input-icon">
                   <FontAwesomeIcon icon={faLock} />
                 </div>
@@ -201,21 +194,22 @@ const LoginPage = () => {
                 </button>
               </div>
               {fieldErrors.password && (
-                <div className="login-error-message fade-in mt-2">
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <div className="login-error-message fade-in">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                   </svg>
-                  {fieldErrors.password}
+                  <span>{fieldErrors.password}</span>
                 </div>
               )}
             </div>
 
+            {/* General Submission Error Notification */}
             {error && (
-              <div className="login-error-message fade-in">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+              <div className="login-error-message login-error-message--general fade-in">
+                <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
-                {error}
+                <span>{error}</span>
               </div>
             )}
             
@@ -226,11 +220,11 @@ const LoginPage = () => {
             >
               {loading ? (
                 <>
-                  <div className="spinner-small"></div>
-                  Signing In...
+                  <div className="login-spinner"></div>
+                  <span>Signing In...</span>
                 </>
               ) : (
-                'Continue'
+                <span>Continue</span>
               )}
             </button>
 
