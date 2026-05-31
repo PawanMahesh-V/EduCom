@@ -9,41 +9,68 @@ class Order {
         try {
             await client.query('BEGIN');
             
-            const orderQuery = `
-                INSERT INTO marketplace_orders (
-                    buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, delivery_otp, status
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                RETURNING id;
-            `;
+            const paymentId = 'pay_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
             
-            const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
+            // 1. Fetch seller_ids for all items
+            const itemIds = items.map(item => item.id);
+            const itemsInfoQuery = `SELECT id, seller_id FROM marketplace_items WHERE id = ANY($1)`;
+            const { rows: itemsInfoRows } = await client.query(itemsInfoQuery, [itemIds]);
             
-            const { rows } = await client.query(orderQuery, [
-                buyer_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, deliveryOtp, status
-            ]);
+            const itemSellerMap = {};
+            for (const row of itemsInfoRows) {
+                itemSellerMap[row.id] = row.seller_id;
+            }
             
-            const orderId = rows[0].id;
-            
+            // 2. Group items by seller_id
+            const sellerGroups = {};
             for (const item of items) {
-                const itemQuery = `
-                    INSERT INTO marketplace_order_items (
-                        order_id, item_id, title, price, quantity
-                    ) VALUES ($1, $2, $3, $4, $5)
-                `;
-                await client.query(itemQuery, [orderId, item.id, item.title, item.price, item.qty || 1]);
+                const seller_id = itemSellerMap[item.id];
+                if (!seller_id) throw new Error(`Item ${item.id} not found`);
+                if (!sellerGroups[seller_id]) {
+                    sellerGroups[seller_id] = { items: [], subtotal: 0 };
+                }
+                sellerGroups[seller_id].items.push(item);
+                sellerGroups[seller_id].subtotal += (item.price * (item.qty || 1));
+            }
+            
+            // 3. Create an order for each seller
+            for (const seller_id of Object.keys(sellerGroups)) {
+                const group = sellerGroups[seller_id];
+                const deliveryOtp = Math.floor(100000 + Math.random() * 900000).toString();
                 
-                // Decrement quantity in marketplace_items
-                const updateItemQuery = `
-                    UPDATE marketplace_items
-                    SET quantity = quantity - $1,
-                        status = CASE WHEN quantity - $1 <= 0 THEN 'out_of_stock' ELSE status END
-                    WHERE id = $2
+                const orderQuery = `
+                    INSERT INTO marketplace_orders (
+                        buyer_id, seller_id, payment_id, full_name, email, phone, campus, pickup_note, payment_method, total_amount, delivery_otp, status
+                    ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+                    RETURNING id;
                 `;
-                await client.query(updateItemQuery, [item.qty || 1, item.id]);
+                
+                const { rows } = await client.query(orderQuery, [
+                    buyer_id, seller_id, paymentId, full_name, email, phone, campus, pickup_note, payment_method, group.subtotal, deliveryOtp, status
+                ]);
+                
+                const orderId = rows[0].id;
+                
+                for (const item of group.items) {
+                    const itemQuery = `
+                        INSERT INTO marketplace_order_items (
+                            order_id, item_id, title, price, quantity
+                        ) VALUES ($1, $2, $3, $4, $5)
+                    `;
+                    await client.query(itemQuery, [orderId, item.id, item.title, item.price, item.qty || 1]);
+                    
+                    const updateItemQuery = `
+                        UPDATE marketplace_items
+                        SET quantity = quantity - $1,
+                            status = CASE WHEN quantity - $1 <= 0 THEN 'out_of_stock' ELSE status END
+                        WHERE id = $2
+                    `;
+                    await client.query(updateItemQuery, [item.qty || 1, item.id]);
+                }
             }
             
             await client.query('COMMIT');
-            return orderId;
+            return paymentId;
         } catch (error) {
             await client.query('ROLLBACK');
             console.error('Error creating order:', error);
@@ -65,9 +92,9 @@ class Order {
                    )) as items
             FROM marketplace_orders o
             LEFT JOIN marketplace_order_items oi ON o.id = oi.order_id
-            WHERE o.buyer_id = $1
+            WHERE o.buyer_id = $1 AND o.status != 'pending_payment'
             GROUP BY o.id
-            ORDER BY o.created_at DESC;
+            ORDER BY o.created_at DESC, o.id DESC;
         `;
         try {
             const { rows } = await pool.query(query, [buyerId]);
@@ -92,11 +119,12 @@ class Order {
                    )) as items
             FROM marketplace_orders o
             JOIN marketplace_order_items oi ON o.id = oi.order_id
-            JOIN marketplace_items mi ON oi.item_id = mi.id
+            LEFT JOIN marketplace_items mi ON oi.item_id = mi.id
             JOIN users u ON o.buyer_id = u.id
-            WHERE mi.seller_id = $1
+            WHERE (o.seller_id = $1 OR (o.seller_id IS NULL AND mi.seller_id = $1))
+              AND o.status != 'pending_payment'
             GROUP BY o.id, u.id
-            ORDER BY o.created_at DESC;
+            ORDER BY o.created_at DESC, o.id DESC;
         `;
         try {
             const { rows } = await pool.query(query, [sellerId]);
@@ -122,7 +150,7 @@ class Order {
             JOIN marketplace_order_items oi ON o.id = oi.order_id
             JOIN users u ON o.buyer_id = u.id
             GROUP BY o.id, u.id
-            ORDER BY o.created_at DESC;
+            ORDER BY o.created_at DESC, o.id DESC;
         `;
         try {
             const { rows } = await pool.query(query);
@@ -156,6 +184,22 @@ class Order {
             return rows[0];
         } catch (error) {
             console.error('Error updating order status:', error);
+            throw error;
+        }
+    }
+
+    static async updateStatusByPaymentId(paymentId, status) {
+        const query = `
+            UPDATE marketplace_orders
+            SET status = $1
+            WHERE payment_id = $2
+            RETURNING *;
+        `;
+        try {
+            const { rows } = await pool.query(query, [status, paymentId]);
+            return rows;
+        } catch (error) {
+            console.error('Error updating order status by payment ID:', error);
             throw error;
         }
     }

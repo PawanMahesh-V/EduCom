@@ -231,7 +231,7 @@ const marketplaceController = {
             };
 
             // 1. Persist order so we have an ID before redirecting
-            const orderId = await Order.create(orderData);
+            const paymentId = await Order.create(orderData);
 
             const merchantId  = process.env.PAYFAST_MERCHANT_ID || '14833';
             const merchantKey = process.env.PAYFAST_SECURE_KEY || 'rPcy4T7GQkSCFsHBLdn26s';
@@ -245,7 +245,7 @@ const marketplaceController = {
             const tokenParams = new URLSearchParams({
                 MERCHANT_ID: merchantId,
                 SECURED_KEY: merchantKey,
-                BASKET_ID: orderId.toString(),
+                BASKET_ID: paymentId.toString(),
                 TXNAMT: parseFloat(orderData.total_amount).toFixed(2),
                 CURRENCY_CODE: 'PKR'
             });
@@ -286,10 +286,10 @@ const marketplaceController = {
                 CUSTOMER_EMAIL_ADDRESS:  orderData.email || 'customer@example.com',
                 SIGNATURE:               'educomsignature',
                 VERSION:                 'MERCHANTCART-0.1',
-                TXNDESC:                 `EduCom Order #${orderId}`,
+                TXNDESC:                 `EduCom Order #${paymentId}`,
                 SUCCESS_URL:             `${frontendUrl}/payment/callback`,
                 FAILURE_URL:             `${frontendUrl}/payment/callback`,
-                BASKET_ID:               orderId.toString(),
+                BASKET_ID:               paymentId.toString(),
                 ORDER_DATE:              new Date().toISOString().split('T')[0], // YYYY-MM-DD
                 CHECKOUT_URL:            (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1') || backendUrl.includes('0.0.0.0')) 
                                          ? 'https://httpbin.org/anything' 
@@ -302,7 +302,7 @@ const marketplaceController = {
             return res.status(200).json({
                 success:    true,
                 mode:       'redirect',
-                orderId,
+                orderId:    paymentId,
                 paymentUrl: redirectUrl,
                 payload:    pfPayload,
             });
@@ -358,11 +358,11 @@ const marketplaceController = {
 
             if (errCode === '000') {
                 // Payment was successful! Update order to 'pending'
-                await Order.updateStatus(orderId, 'pending');
+                await Order.updateStatusByPaymentId(orderId, 'pending');
 
                 // Clear buyer's cart
                 const result = await pool.query(
-                    'SELECT buyer_id FROM marketplace_orders WHERE id = $1', [orderId]
+                    'SELECT buyer_id FROM marketplace_orders WHERE payment_id = $1 LIMIT 1', [orderId]
                 );
                 if (result.rows.length > 0) {
                     await Cart.clearCart(result.rows[0].buyer_id);
@@ -376,11 +376,11 @@ const marketplaceController = {
                 console.warn(`[PayFast IPN] Payment failed/cancelled for Order #${orderId}. Reason: ${errMsg}`);
                 
                 // Update order to 'cancelled'
-                await Order.updateStatus(orderId, 'cancelled');
+                await Order.updateStatusByPaymentId(orderId, 'cancelled');
 
                 // Restock items
                 const itemsResult = await pool.query(
-                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id = $1',
+                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id IN (SELECT id FROM marketplace_orders WHERE payment_id = $1)',
                     [orderId]
                 );
                 for (const item of itemsResult.rows) {
@@ -421,7 +421,7 @@ const marketplaceController = {
             }
 
             // 1. Check order status in DB first to handle idempotency (e.g. if webhook already processed it)
-            const orderQuery = await pool.query('SELECT status, buyer_id FROM marketplace_orders WHERE id = $1', [orderId]);
+            const orderQuery = await pool.query('SELECT status, buyer_id FROM marketplace_orders WHERE payment_id = $1 LIMIT 1', [orderId]);
             if (orderQuery.rows.length === 0) {
                 return res.status(404).json({ success: false, message: 'Order not found' });
             }
@@ -464,7 +464,7 @@ const marketplaceController = {
 
             if (errCode === '000') {
                 // Payment was successful! Update order to 'pending'
-                await Order.updateStatus(orderId, 'pending');
+                await Order.updateStatusByPaymentId(orderId, 'pending');
 
                 // Clear buyer's cart
                 await Cart.clearCart(buyerId);
@@ -478,11 +478,11 @@ const marketplaceController = {
                 console.warn(`[PayFast Verify] Payment failed/cancelled for Order #${orderId}. Reason: ${errMsg}`);
                 
                 // Update order to 'cancelled'
-                await Order.updateStatus(orderId, 'cancelled');
+                await Order.updateStatusByPaymentId(orderId, 'cancelled');
 
                 // Restock items
                 const itemsResult = await pool.query(
-                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id = $1',
+                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id IN (SELECT id FROM marketplace_orders WHERE payment_id = $1)',
                     [orderId]
                 );
                 for (const item of itemsResult.rows) {
@@ -518,18 +518,11 @@ const marketplaceController = {
         }
     },
 
-    // Get orders received by the seller (or all orders for Admins)
+    // Get orders received by the seller
     getReceivedOrders: async (req, res) => {
         try {
             const userId = req.user.userId;
-            const userRole = req.user.role;
-
-            let orders;
-            if (userRole === 'Admin') {
-                orders = await Order.findAll();
-            } else {
-                orders = await Order.findBySellerId(userId);
-            }
+            const orders = await Order.findBySellerId(userId);
             res.status(200).json(orders);
         } catch (error) {
             console.error('Error fetching received orders:', error);
