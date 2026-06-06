@@ -179,8 +179,9 @@ const Marketplace = ({ onMessageSeller }) => {
   };
 
   return (
-    <div className="mp-portal-layout">
-      {/* Sub Navigation Bar Context */}
+    <>
+      <div className="mp-portal-layout">
+        {/* Sub Navigation Bar Context */}
       <div className="mp-sub-nav">
         <div className="mp-sub-nav-tabs">
           <button
@@ -469,68 +470,70 @@ const Marketplace = ({ onMessageSeller }) => {
       )}
 
       {/* Global Context Control Modals Portals Initialization Hooks */}
-      <QuickPostModal
-        isOpen={isPostModalOpen}
-        onClose={() => { setIsPostModalOpen(false); setItemToEdit(null); }}
-        onSuccess={handlePostSuccess}
-        editItem={itemToEdit}
-      />
-
-      <ItemDetailsModal
-        item={selectedItem}
-        isOpen={!!selectedItem}
-        onClose={() => setSelectedItem(null)}
-        onMessageSeller={onMessageSeller}
-        onAddToCart={(item) => { handleAddToCart(null, item); setSelectedItem(null); }}
-        currentUserId={currentUserId}
-      />
-
-      <CheckoutModal
-        isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
-        cartItems={cartItems}
-        cartTotal={cartTotal}
-        currentUser={user}
-        onOrderPlaced={async () => {
-          try { await api.delete(`${API_BASE_URL}/marketplace/cart`); } catch (e) { console.error(e); }
-          setCartItems([]);
-          setHasLoaded(prev => ({ ...prev, items: false, orders: false, cart: false }));
-          setActiveTab('orders');
-        }}
-      />
-
-      <OTPModal 
-        isOpen={isOTPModalOpen}
-        onClose={() => setIsOTPModalOpen(false)}
-        onVerify={(id, otp) => handleUpdateStatus(id, 'completed', otp)}
-        orderId={otpOrderId}
-      />
-
-      <TransactionHistoryModal
-        isOpen={isTransactionHistoryOpen}
-        onClose={() => setIsTransactionHistoryOpen(false)}
-        orders={receivedOrders}
-      />
-
-      <ConfirmDialog
-        open={confirmState.open}
-        title={confirmState.title}
-        message={confirmState.message}
-        confirmText={confirmState.confirmText}
-        onCancel={() => setConfirmState(prev => ({ ...prev, open: false }))}
-        onConfirm={confirmState.onConfirm}
-        variant="danger"
-      />
-
-      <SellerProfileModal
-        sellerId={selectedSeller}
-        isOpen={!!selectedSeller}
-        onClose={() => setSelectedSeller(null)}
-        onAddToCart={(item) => { handleAddToCart(null, item); }}
-        currentUserId={currentUserId}
-      />
     </div>
-  );
+    
+    <QuickPostModal
+      isOpen={isPostModalOpen}
+      onClose={() => { setIsPostModalOpen(false); setItemToEdit(null); }}
+      onSuccess={handlePostSuccess}
+      editItem={itemToEdit}
+    />
+
+    <ItemDetailsModal
+      item={selectedItem}
+      isOpen={!!selectedItem}
+      onClose={() => setSelectedItem(null)}
+      onMessageSeller={onMessageSeller}
+      onAddToCart={(item) => { handleAddToCart(null, item); setSelectedItem(null); }}
+      currentUserId={currentUserId}
+    />
+
+    <CheckoutModal
+      isOpen={isCheckoutOpen}
+      onClose={() => setIsCheckoutOpen(false)}
+      cartItems={cartItems}
+      cartTotal={cartTotal}
+      currentUser={user}
+      onOrderPlaced={async () => {
+        try { await api.delete(`${API_BASE_URL}/marketplace/cart`); } catch (e) { console.error(e); }
+        setCartItems([]);
+        setHasLoaded(prev => ({ ...prev, items: false, orders: false, cart: false }));
+        setActiveTab('orders');
+      }}
+    />
+
+    <OTPModal 
+      isOpen={isOTPModalOpen}
+      onClose={() => setIsOTPModalOpen(false)}
+      onVerify={(id, otp) => handleUpdateStatus(id, 'completed', otp)}
+      orderId={otpOrderId}
+    />
+
+    <TransactionHistoryModal
+      isOpen={isTransactionHistoryOpen}
+      onClose={() => setIsTransactionHistoryOpen(false)}
+      orders={receivedOrders}
+    />
+
+    <ConfirmDialog
+      open={confirmState.open}
+      title={confirmState.title}
+      message={confirmState.message}
+      confirmText={confirmState.confirmText}
+      onCancel={() => setConfirmState(prev => ({ ...prev, open: false }))}
+      onConfirm={confirmState.onConfirm}
+      variant="danger"
+    />
+
+    <SellerProfileModal
+      sellerId={selectedSeller}
+      isOpen={!!selectedSeller}
+      onClose={() => setSelectedSeller(null)}
+      onAddToCart={(item) => { handleAddToCart(null, item); }}
+      currentUserId={currentUserId}
+    />
+  </>
+);
 };
 
 export default Marketplace;

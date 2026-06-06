@@ -167,29 +167,27 @@ export const useChatSocket = ({
     socketService.socket.on('new-notification', handleNewNotification);
 
     return () => {
-        socketService.socket.off('new-message', handleNewMessage);
-        socketService.socket.off('new-direct-message', handleNewDirectMessage);
-        socketService.socket.off('direct-message-sent', handleNewDirectMessage);
-        socketService.socket.off('user-typing', handleTyping);
-        socketService.socket.off('dm-user-typing', handleDMTyping);
-        socketService.socket.off('message-delivered', handleMessageDelivered);
-        socketService.socket.off('message-read', handleMessageRead);
-        socketService.socket.off('message-blocked', handleMessageBlocked);
-        socketService.socket.off('chat-banned', handleChatBanned);
-        socketService.socket.off('chat-unbanned', handleChatUnbanned);
-        socketService.socket.off('new-notification', handleNewNotification);
+        if (socketService?.socket) {
+            socketService.socket.off('new-message', handleNewMessage);
+            socketService.socket.off('new-direct-message', handleNewDirectMessage);
+            socketService.socket.off('direct-message-sent', handleNewDirectMessage);
+            socketService.socket.off('user-typing', handleTyping);
+            socketService.socket.off('dm-user-typing', handleDMTyping);
+            socketService.socket.off('message-delivered', handleMessageDelivered);
+            socketService.socket.off('message-read', handleMessageRead);
+            socketService.socket.off('message-blocked', handleMessageBlocked);
+            socketService.socket.off('chat-banned', handleChatBanned);
+            socketService.socket.off('chat-unbanned', handleChatUnbanned);
+            socketService.socket.off('new-notification', handleNewNotification);
+        }
     };
   }, [socketService, queryClient, userId, selectedItem, mode, userName]);
 
   useEffect(() => {
     if (mode === 'community' && selectedItem?.id && socketService?.socket) {
-      socketService.socket.emit('join-community', {
-        communityId: selectedItem.id,
-        userId,
-        userName
-      });
+      socketService.joinCommunity(selectedItem.id, userId, userName);
       return () => {
-        socketService.socket.emit('leave-community', selectedItem.id);
+        socketService.leaveCommunity(selectedItem.id);
       };
     }
   }, [mode, selectedItem?.id, socketService, userId, userName]);

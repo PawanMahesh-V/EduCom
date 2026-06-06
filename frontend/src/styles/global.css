@@ -8614,8 +8614,8 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(15, 23, 42, 0.3);
-  backdrop-filter: blur(8px);
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -8625,16 +8625,16 @@ body {
 }
 
 .qp-modal-box {
-  background-color: #ffffff;
+  background: white;
   width: 100%;
-  max-width: 780px; /* Expansive grid width supporting parallel column form architectures */
-  border-radius: 28px;
-  padding: 36px;
-  box-shadow: 0 30px 60px rgba(15, 23, 42, 0.12);
-  border: 1px solid #e2e8f0;
+  max-width: 780px;
+  padding: 32px;
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   max-height: calc(100vh - 48px);
   overflow-y: auto;
   box-sizing: border-box;
+  animation: login-fadeIn 0.3s ease-out forwards;
 }
 
 .qp-close-trigger-btn {
@@ -9153,6 +9153,7 @@ body {
 }
 .pc-icon-shell--success { color: #10b981; }
 .pc-icon-shell--error { color: #ef4444; }
+.pc-icon-shell--warning { color: #f59e0b; }
 
 .pc-status-title { font-size: 1.8rem; font-weight: 800; color: #0f172a; margin-bottom: 16px; }
 .pc-status-desc { font-size: 1rem; color: #64748b; margin-bottom: 32px; line-height: 1.6; }

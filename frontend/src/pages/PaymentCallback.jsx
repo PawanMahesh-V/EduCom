@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faTimesCircle, faArrowLeft, faShoppingBag, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faTimesCircle, faArrowLeft, faShoppingBag, faSpinner, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
 import api from '../api/client';
 import API_BASE_URL from '../config/api';
 import { useAuth } from '../context/AuthContext';
@@ -83,31 +83,98 @@ const PaymentCallback = () => {
     );
   }
 
+  const getStatusInfo = () => {
+    if (isSuccess) {
+      return {
+        icon: faCheckCircle,
+        iconClass: 'pc-icon-shell--success',
+        title: 'Payment Successful!',
+        desc: (
+          <>
+            Thank you for your purchase! Your order <strong>#{orderId}</strong> has been finalized.
+            {simulated && <span className="pc-simulated-note">(Simulated transaction for presentation)</span>}
+          </>
+        )
+      };
+    }
+
+    const upperMsg = errorMessage ? errorMessage.toUpperCase() : '';
+    const err = searchParams.get('err_code') || '';
+    
+    if (upperMsg.includes('CANCELLED') || err === 'CANCELLED' || err === '99') {
+      return {
+        icon: faTimesCircle,
+        iconClass: 'pc-icon-shell--error',
+        title: 'Authentication Cancelled',
+        desc: 'You cancelled the authentication challenge. The transaction could not be completed.'
+      };
+    }
+
+    if (err === 'N' || upperMsg.includes('TRANSACTION DENIED') || upperMsg.includes('NOT VERIFIED')) {
+      return {
+        icon: faTimesCircle,
+        iconClass: 'pc-icon-shell--error',
+        title: 'Transaction Denied',
+        desc: 'Not Authenticated / Account Not Verified. Your transaction has been declined.'
+      };
+    }
+    
+    if (err === 'U' || upperMsg.includes('NOT AVAILABLE')) {
+      return {
+        icon: faExclamationTriangle,
+        iconClass: 'pc-icon-shell--warning',
+        title: 'Authentication Not Available',
+        desc: 'Authentication could not be performed due to technical issues or your issuer not participating. Please try again later.'
+      };
+    }
+
+    if (err === 'R' || upperMsg.includes('REJECTED')) {
+      return {
+        icon: faTimesCircle,
+        iconClass: 'pc-icon-shell--error',
+        title: 'Authentication Rejected',
+        desc: 'Your card issuer explicitly rejected the authentication request.'
+      };
+    }
+
+    if (err === 'E' || upperMsg.includes('SERVER ERROR')) {
+      return {
+        icon: faExclamationTriangle,
+        iconClass: 'pc-icon-shell--warning',
+        title: 'Authentication Server Error',
+        desc: 'A server-side error occurred during authentication. Please try again.'
+      };
+    }
+
+    if (err === 'AI' || upperMsg.includes('ASM POLICY')) {
+      return {
+        icon: faTimesCircle,
+        iconClass: 'pc-icon-shell--error',
+        title: 'API Gateway Policy Error',
+        desc: 'Internal testing error related to API Gateway security/policy rules.'
+      };
+    }
+
+    return {
+      icon: faTimesCircle,
+      iconClass: 'pc-icon-shell--error',
+      title: 'Payment Failed',
+      desc: errorMessage || "We couldn't process your payment. Please try again or choose a different payment method."
+    };
+  };
+
+  const statusInfo = getStatusInfo();
+
   return (
     <div className="pc-viewport-wrapper">
       <div className="pc-status-card fade-in">
-        {isSuccess ? (
-          <>
-            <div className="pc-icon-shell pc-icon-shell--success">
-              <FontAwesomeIcon icon={faCheckCircle} />
-            </div>
-            <h1 className="pc-status-title">Payment Successful!</h1>
-            <p className="pc-status-desc">
-              Thank you for your purchase! Your order <strong>#{orderId}</strong> has been finalized.
-              {simulated && <span className="pc-simulated-note">(Simulated transaction for presentation)</span>}
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="pc-icon-shell pc-icon-shell--error">
-              <FontAwesomeIcon icon={faTimesCircle} />
-            </div>
-            <h1 className="pc-status-title">Payment Failed</h1>
-            <p className="pc-status-desc">
-              {errorMessage || "We couldn't process your payment. Please try again or choose a different payment method."}
-            </p>
-          </>
-        )}
+        <div className={`pc-icon-shell ${statusInfo.iconClass}`}>
+          <FontAwesomeIcon icon={statusInfo.icon} />
+        </div>
+        <h1 className="pc-status-title">{statusInfo.title}</h1>
+        <p className="pc-status-desc">
+          {statusInfo.desc}
+        </p>
 
         <div className="pc-action-cluster">
           <button 
