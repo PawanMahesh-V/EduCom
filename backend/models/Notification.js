@@ -73,35 +73,6 @@ class Notification {
         return result.rows[0];
     }
 
-    static async createForMultiple(users, data) {
-        const { title, message, type = 'info' } = data;
-        const insertPromises = users.map(user =>
-            pool.query(
-                `INSERT INTO notifications (id, user_id, title, message, type) 
-                 VALUES ($1, $2, $3, $4, $5)`,
-                [user.id, user.id, title, message, type] // Note: ID generation needs to be consistent. 
-                // Original code assumed client passed ID for single, generated for multiple?
-                // Actually the original code had `id` in body for single post.
-                // For broadcast, let's assume auto-increment or UUID if table supports it.
-                // If table "id" is SERIAL or UUID DEFAULT, we don't need to pass it.
-                // Checking original broadcast: `VALUES ($1, $2, $3, $4)` -> user.id passed as ID?
-                // The original code passed `user.id` as the Notification ID... that seems like a bug or bad design if multiple notifs.
-                // Assuming "id" column is primary key. One user can have multiple notifications.
-                // If the original uses user.id as notification id, then a user can satisfy PK only once?
-                // Looking at original: `VALUES ($1, $2, $3, $4)`. Params: `[user.id, title, message, type]`.
-                // Column order in INSERT: `id, title, message, type`. 
-                // So yes, it was trying to reuse user.id as notification.id. This likely crashes on second notification.
-                // Correct approach: Let DB handle ID (omit ID column), or generate UUID.
-                // I will try to OMIT id if possible, or pass NULL/DEFAULT.
-            )
-        );
-        // Wait, look at `INSERT INTO notifications (id, ..)`
-        // If I change it to `INSERT INTO notifications (user_id, ...)` and let DB auto-gen ID?
-        // Let's assume the schema has auto-gen ID if not provided, or we should use UUID.
-        // SAFE FIX: Use `uuid` generator if package exists, or random string.
-        // Actually, let's look at `create` above. It takes `id`.
-    }
-
     // Improved broadcast method that doesn't rely on buggy ID assignment
     static async broadcast(users, data) {
         const { title, message, type = 'info' } = data;
@@ -113,7 +84,7 @@ class Notification {
         const insertPromises = users.map(user =>
             pool.query(
                 `INSERT INTO notifications (user_id, title, message, type) 
-                  VALUES ($1, $2, $3, $4)`,
+                  VALUES ($1, $2, $3, $4) RETURNING *`,
                 [user.id, title, message, type]
             )
         );

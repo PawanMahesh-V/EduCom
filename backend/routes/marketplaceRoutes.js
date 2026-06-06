@@ -19,13 +19,14 @@ router.get('/', marketplaceController.getAllItems);
 // Get current user's items
 router.get('/my-items', marketplaceController.getMyItems);
 
-// Cart routes
-router.get('/cart', marketplaceController.getCart);
-router.post('/cart', marketplaceController.addToCart);
-router.put('/cart/:itemId', marketplaceController.updateCartQuantity);
-router.delete('/cart/:itemId', marketplaceController.removeFromCart);
-router.delete('/cart', marketplaceController.clearCart);
+const cartController = require('../controllers/CartController');
 
+// Cart routes
+router.get('/cart', cartController.getCart);
+router.post('/cart', cartController.addToCart);
+router.put('/cart/:itemId', cartController.updateCartQuantity);
+router.delete('/cart/:itemId', cartController.removeFromCart);
+router.delete('/cart', cartController.clearCart);
 // Order routes
 router.get('/orders/me', marketplaceController.getMyOrders);
 router.get('/orders/received', marketplaceController.getReceivedOrders);

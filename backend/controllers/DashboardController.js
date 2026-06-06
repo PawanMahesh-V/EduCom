@@ -1,7 +1,5 @@
 const pool = require('../config/database');
-const User = require('../models/User');
-const Course = require('../models/Course');
-const Community = require('../models/Community');
+
 
 class DashboardController {
     static async getAdminStats(req, res, next) {

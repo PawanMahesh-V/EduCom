@@ -97,10 +97,11 @@ class Community {
                     co.name as course_name, co.code as course_code,
                     COALESCE(
                         (SELECT COUNT(*)::integer 
-                         FROM messages 
-                         WHERE community_id = c.id 
-                           AND sender_id != $1 
-                           AND is_read = FALSE),
+                         FROM messages m2
+                         LEFT JOIN community_read_receipts crr ON crr.community_id = c.id AND crr.user_id = $1
+                         WHERE m2.community_id = c.id 
+                           AND m2.sender_id != $1 
+                           AND (crr.last_read_at IS NULL OR m2.created_at > crr.last_read_at)),
                         0
                     ) as unread_count,
                     (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
@@ -122,10 +123,11 @@ class Community {
                     co.name as course_name, co.code as course_code,
                     COALESCE(
                         (SELECT COUNT(*)::integer 
-                         FROM messages 
-                         WHERE community_id = c.id 
-                           AND sender_id != $1 
-                           AND is_read = FALSE),
+                         FROM messages m2
+                         LEFT JOIN community_read_receipts crr ON crr.community_id = c.id AND crr.user_id = $1
+                         WHERE m2.community_id = c.id 
+                           AND m2.sender_id != $1 
+                           AND (crr.last_read_at IS NULL OR m2.created_at > crr.last_read_at)),
                         0
                     ) as unread_count,
                     (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
@@ -146,10 +148,11 @@ class Community {
                     co.name as course_name, co.code as course_code,
                     COALESCE(
                         (SELECT COUNT(*)::integer 
-                         FROM messages 
-                         WHERE community_id = c.id 
-                           AND sender_id != $1 
-                           AND is_read = FALSE),
+                         FROM messages m2
+                         LEFT JOIN community_read_receipts crr ON crr.community_id = c.id AND crr.user_id = $1
+                         WHERE m2.community_id = c.id 
+                           AND m2.sender_id != $1 
+                           AND (crr.last_read_at IS NULL OR m2.created_at > crr.last_read_at)),
                         0
                     ) as unread_count,
                     (SELECT CASE WHEN m.sender_id = $1 THEN 'You: ' || m.content WHEN m.is_anonymous THEN 'Anonymous: ' || m.content ELSE u.name || ': ' || m.content END 
@@ -199,11 +202,10 @@ class Community {
 
     static async updateMessagesRead(communityId, userId) {
         await pool.query(
-            `UPDATE messages 
-             SET is_read = TRUE 
-             WHERE community_id = $1 
-               AND sender_id != $2 
-               AND is_read = FALSE`,
+            `INSERT INTO community_read_receipts (community_id, user_id, last_read_at)
+             VALUES ($1, $2, CURRENT_TIMESTAMP)
+             ON CONFLICT (community_id, user_id) 
+             DO UPDATE SET last_read_at = CURRENT_TIMESTAMP`,
             [communityId, userId]
         );
     }
@@ -236,15 +238,26 @@ class Community {
         return result.rows[0];
     }
 
-    static async deleteMultipleMessages(messageIds, senderId, communityId) {
-        const result = await pool.query(
-            `DELETE FROM messages 
-             WHERE id = ANY($1) 
-               AND sender_id = $2
-               AND community_id = $3
-             RETURNING id`,
-            [messageIds, senderId, communityId]
-        );
+    static async deleteMultipleMessages(messageIds, senderId, communityId, userRole) {
+        let query;
+        let params;
+        
+        if (userRole === 'Admin') {
+            query = `DELETE FROM messages 
+                     WHERE id = ANY($1) 
+                       AND community_id = $2
+                     RETURNING id`;
+            params = [messageIds, communityId];
+        } else {
+            query = `DELETE FROM messages 
+                     WHERE id = ANY($1) 
+                       AND sender_id = $2
+                       AND community_id = $3
+                     RETURNING id`;
+            params = [messageIds, senderId, communityId];
+        }
+        
+        const result = await pool.query(query, params);
         return result;
     }
 

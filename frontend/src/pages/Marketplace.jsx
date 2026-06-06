@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStar, faShoppingCart, faPlus, faUserGraduate, faBoxOpen, faTrash, faBox, faChartLine, faWallet } from '@fortawesome/free-solid-svg-icons';
+import { faShoppingCart, faBox, faChartLine, faWallet, faTrash } from '@fortawesome/free-solid-svg-icons';
 import QuickPostModal from '../components/Marketplace/QuickPostModal';
 import ItemDetailsModal from '../components/Marketplace/ItemDetailsModal';
 import CheckoutModal from '../components/Marketplace/CheckoutModal';
@@ -9,13 +9,16 @@ import OTPModal from '../components/Marketplace/OTPModal';
 import TransactionHistoryModal from '../components/Marketplace/TransactionHistoryModal';
 import ConfirmDialog from '../components/ConfirmDialog';
 import SellerProfileModal from '../components/Marketplace/SellerProfileModal';
-import api from '../api/client';
-import API_BASE_URL from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import CustomSelect from '../components/Common/CustomSelect';
-import { showSuccess, showError } from '../utils/alert';
 import Pagination from '../components/Common/Pagination';
+import MarketplaceFilters from '../components/MarketplaceFilters';
+import ItemCard from '../components/Marketplace/ItemCard';
+import { useMarketplaceItems } from '../hooks/useMarketplaceItems';
+import { useCart } from '../hooks/useCart';
+import api from '../api/client';
+import API_BASE_URL from '../config/api';
 
 const Marketplace = ({ onMessageSeller }) => {
   const { user } = useAuth();
@@ -39,29 +42,35 @@ const Marketplace = ({ onMessageSeller }) => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('All Roles');
-  const [items, setItems] = useState([]);
   const [page, setPage] = useState(1);
-  const itemsPerPage = 1;
-  
-  const [orders, setOrders] = useState([]);
-  const [receivedOrders, setReceivedOrders] = useState([]);
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [hasLoaded, setHasLoaded] = useState({ items: false, orders: false, sales: false, cart: false });
+  const itemsPerPage = 5;
 
   const { socket } = useSocket();
 
-  // Listen for inventory updates
-  useEffect(() => {
-      if (!socket) return;
-      const handleInventoryUpdate = () => {
-          fetchItems(true);
-      };
-      socket.on('inventory_updated', handleInventoryUpdate);
-      return () => {
-          socket.off('inventory_updated', handleInventoryUpdate);
-      };
-  }, [socket, activeTab, searchQuery, roleFilter]);
+  const {
+    items,
+    orders,
+    receivedOrders,
+    loading,
+    hasLoaded,
+    fetchItems,
+    handleDeleteItem,
+    handleUpdateStatus,
+    handleCancelOrder,
+    totalEarnings,
+    setHasLoaded
+  } = useMarketplaceItems(socket, activeTab, searchQuery, roleFilter);
+
+  const {
+    cartItems,
+    hasLoadedCart,
+    fetchCart,
+    handleAddToCart,
+    handleUpdateCartQuantity,
+    handleRemoveFromCart,
+    cartTotal,
+    setCartItems
+  } = useCart();
 
   // Modals state
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
@@ -81,80 +90,19 @@ const Marketplace = ({ onMessageSeller }) => {
 
   const [selectedSeller, setSelectedSeller] = useState(null);
 
-  const fetchCart = async () => {
-    try {
-      const response = await api.get(`${API_BASE_URL}/marketplace/cart`);
-      setCartItems(response || []);
-      setHasLoaded(prev => ({ ...prev, cart: true }));
-    } catch (error) {
-      console.error('Failed to fetch cart:', error);
-      setCartItems([]);
-    }
-  };
 
-  const fetchSales = async () => {
-    try {
-      const response = await api.get(`${API_BASE_URL}/marketplace/orders/received`);
-      setReceivedOrders(response || []);
-      setHasLoaded(prev => ({ ...prev, sales: true }));
-    } catch (error) {
-      console.error('Failed to fetch sales:', error);
-      setReceivedOrders([]);
-    }
-  };
-
-  const fetchItems = async (isBackground = false, currentPage = 1) => {
-    try {
-      if (!isBackground) setLoading(true);
-      if (activeTab === 'orders') {
-        const response = await api.get(`${API_BASE_URL}/marketplace/orders/me`);
-        setOrders(response || []);
-        setHasLoaded(prev => ({ ...prev, orders: true }));
-      } else if (activeTab === 'sales') {
-        const response = await api.get(`${API_BASE_URL}/marketplace/orders/received`);
-        setReceivedOrders(response || []);
-        setHasLoaded(prev => ({ ...prev, sales: true }));
-      } else if (activeTab === 'cart') {
-        const response = await api.get(`${API_BASE_URL}/marketplace/cart`);
-        setCartItems(response || []);
-        setHasLoaded(prev => ({ ...prev, cart: true }));
-      } else {
-        const endpoint = '/marketplace';
-        const params = new URLSearchParams();
-
-        if (activeTab === 'items') {
-          if (searchQuery) params.append('search', searchQuery);
-          if (roleFilter !== 'All Roles') params.append('role', roleFilter);
-          params.append('page', 1);
-          params.append('limit', 1000); // Fetch all items for client-side pagination
-        }
-
-        const response = await api.get(`${API_BASE_URL}${endpoint}${params.toString() ? '?' + params.toString() : ''}`);
-        
-        setItems(response?.items || []);
-        setHasLoaded(prev => ({ ...prev, items: true }));
-      }
-    } catch (error) {
-      console.error('Failed to fetch marketplace data:', error);
-      if (activeTab === 'orders') setOrders([]);
-      else if (activeTab === 'sales') setReceivedOrders([]);
-      else if (activeTab === 'cart') setCartItems([]);
-      else setItems([]);
-    } finally {
-      if (!isBackground) setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    if (!hasLoaded.cart) fetchCart();
-    if (!hasLoaded.sales) fetchSales();
+    if (!hasLoadedCart) fetchCart();
   }, []);
 
   useEffect(() => {
-    const needsLoading = !hasLoaded[activeTab];
+    const needsLoading = activeTab === 'cart' ? !hasLoadedCart : !hasLoaded[activeTab];
     if (activeTab === 'items') {
       fetchItems(!needsLoading);
       setPage(1);
+    } else if (activeTab === 'cart') {
+      if (needsLoading) fetchCart();
     } else {
       fetchItems(!needsLoading);
     }
@@ -177,6 +125,8 @@ const Marketplace = ({ onMessageSeller }) => {
       if (tabName === 'items') {
         fetchItems(false);
         setPage(1);
+      } else if (tabName === 'cart') {
+        fetchCart();
       } else {
         fetchItems(false);
       }
@@ -202,7 +152,7 @@ const Marketplace = ({ onMessageSeller }) => {
     setIsPostModalOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDeleteLocal = (id) => {
     setConfirmState({
       open: true,
       title: 'Delete Listing',
@@ -210,79 +160,12 @@ const Marketplace = ({ onMessageSeller }) => {
       confirmText: 'Delete Post',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, open: false }));
-        try {
-          await api.delete(`${API_BASE_URL}/marketplace/${id}`);
-          fetchItems();
-        } catch (error) {
-          console.error('Failed to delete item:', error);
-          showError('Failed to delete item');
-        }
+        await handleDeleteItem(id);
       }
     });
   };
 
-  const handleAddToCart = async (e, item) => {
-    if (e) e.stopPropagation();
-    try {
-      await api.post(`${API_BASE_URL}/marketplace/cart`, { item_id: item.id, quantity: 1 });
-      await fetchCart(); 
-      showSuccess(`${item.title} added to cart!`);
-    } catch (error) {
-      console.error('Failed to add to cart:', error);
-      showError('Failed to add to cart');
-    }
-  };
-
-  const handleUpdateCartQuantity = async (e, item, delta) => {
-    if (e) e.stopPropagation();
-    try {
-      const cartItem = cartItems.find(c => c.id === item.id);
-      const newQuantity = (cartItem ? cartItem.qty : 0) + delta;
-      
-      if (newQuantity <= 0) {
-        await api.delete(`${API_BASE_URL}/marketplace/cart/${item.id}`);
-      } else {
-        await api.put(`${API_BASE_URL}/marketplace/cart/${item.id}`, { quantity: newQuantity });
-      }
-      await fetchCart();
-    } catch (error) {
-      console.error('Failed to update cart quantity:', error);
-      showError('Failed to update quantity');
-    }
-  };
-
-  const handleRemoveFromCart = async (id) => {
-    try {
-      await api.delete(`${API_BASE_URL}/marketplace/cart/${id}`);
-      await fetchCart(); 
-    } catch (error) {
-      console.error('Failed to remove from cart:', error);
-      showError('Failed to remove item');
-    }
-  };
-
-  const cartTotal = cartItems.reduce((sum, c) => sum + parseFloat(c.price || 0) * (c.qty || 1), 0);
-
-  const totalEarnings = receivedOrders.reduce((total, order) => {
-    if (order.status !== 'cancelled' && order.status !== 'cancelled_by_buyer' && order.status !== 'refunded') {
-      const orderEarned = order.items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-      return total + orderEarned;
-    }
-    return total;
-  }, 0);
-
-  const handleUpdateStatus = async (orderId, newStatus, otp = null) => {
-    try {
-      await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/status`, { status: newStatus, otp });
-      setHasLoaded(prev => ({ ...prev, orders: false, sales: false })); 
-      fetchItems();
-    } catch (error) {
-      console.error('Failed to update order status:', error);
-      throw error;
-    }
-  };
-
-  const handleCancelOrder = (orderId) => {
+  const handleCancelOrderLocal = (orderId) => {
     setConfirmState({
       open: true,
       title: 'Cancel Order',
@@ -290,14 +173,7 @@ const Marketplace = ({ onMessageSeller }) => {
       confirmText: 'Yes, Cancel Order',
       onConfirm: async () => {
         setConfirmState(prev => ({ ...prev, open: false }));
-        try {
-          await api.put(`${API_BASE_URL}/marketplace/orders/${orderId}/cancel`);
-          setHasLoaded({ items: false, orders: false, sales: false }); 
-          fetchItems();
-        } catch (error) {
-          console.error('Failed to cancel order:', error);
-          showError(error.response?.data?.message || 'Failed to cancel order');
-        }
+        await handleCancelOrder(orderId);
       }
     });
   };
@@ -340,36 +216,13 @@ const Marketplace = ({ onMessageSeller }) => {
 
       {/* Core Toolbar Controls Sub-Grid */}
       {activeTab === 'items' && (
-        <div className="mp-toolbar">
-          <input
-            className="mp-search-input"
-            type="text"
-            placeholder="Search textbook name, items or course resources..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          <div className="mp-toolbar-filter-group">
-            <CustomSelect
-              options={[
-                { value: 'All Roles', label: 'All Roles' },
-                { value: 'Student', label: 'Student' },
-                { value: 'Teacher', label: 'Teacher' },
-                { value: 'Admin', label: 'Admin' },
-                { value: 'HOD', label: 'HOD' },
-                { value: 'PM', label: 'PM' }
-              ]}
-              value={roleFilter}
-              onChange={(val) => setRoleFilter(val)}
-            />
-          </div>
-          <button
-            className="mp-btn-primary"
-            onClick={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
-          >
-            <FontAwesomeIcon icon={faPlus} />
-            <span>Create Listing</span>
-          </button>
-        </div>
+        <MarketplaceFilters
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          roleFilter={roleFilter}
+          setRoleFilter={setRoleFilter}
+          onOpenPostModal={() => { setItemToEdit(null); setIsPostModalOpen(true); }}
+        />
       )}
 
       {/* =================== THE PUBLIC ITEMS CATALOG MARKETPLACE MATRIX =================== */}
@@ -384,87 +237,20 @@ const Marketplace = ({ onMessageSeller }) => {
             <div className="mp-empty-state-banner">No items match your search. Be the first to list an item!</div>
           ) : (
             <div className="mp-catalog-grid">
-              {paginatedItems.map(item => {
-                const parsedPrice = parseFloat(item.price);
-                const isOutOfStock = item.status === 'out_of_stock' || item.quantity === 0;
-                const isOwner = item.seller_id === currentUserId;
-                const cartItem = cartItems.find(c => c.id === item.id);
-                return (
-                  <div
-                    key={item.id}
-                    className={`mp-product-card ${isOwner ? 'mp-product-card--manageable' : ''}`}
-                    onClick={() => handleItemClick(item)}
-                  >
-                    <div className="mp-card-media-wrapper">
-                      {item.category === 'Tutoring' ? (
-                        <div className="mp-tutor-avatar-placeholder">
-                          <img src={item.image_url || '/assets/marketplace/tutor.png'} alt={item.title} className="mp-tutor-img" />
-                          <div className="mp-star-badge"><FontAwesomeIcon icon={faStar} /></div>
-                          <div className="mp-tutor-title">{item.seller_name || 'Tutor Profile'}</div>
-                          <div className="mp-tutor-slots">{item.quantity} slots left</div>
-                        </div>
-                      ) : (
-                        <div className="mp-item-img-frame">
-                          <img src={item.image_url || '/assets/marketplace/textbook.png'} alt={item.title} className="mp-product-image" />
-                          {isOutOfStock && <div className="mp-out-of-stock-tag">Sold Out</div>}
-                        </div>
-                      )}
-                      
-                      {/* Managed Overrides Overlay for Owners */}
-                      {isOwner && (
-                        <div className="mp-owner-management-overlay" onClick={(e) => e.stopPropagation()}>
-                          <button className="mp-overlay-action-btn mp-overlay-action-btn--edit" onClick={() => handleEdit(item)}>
-                            Edit Listing
-                          </button>
-                          <button className="mp-overlay-action-btn mp-overlay-action-btn--delete" onClick={() => handleDelete(item.id)}>
-                            Delete Post
-                          </button>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mp-card-body-details">
-                      <h3 className="mp-card-item-title">{item.title}</h3>
-                      <div className="mp-card-item-price">Rs. {!isNaN(parsedPrice) ? parsedPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2}) : '0.00'}</div>
-                      
-                      {item.category !== 'Tutoring' && (
-                        <div className="mp-seller-attribution-line" onClick={(e) => { e.stopPropagation(); setSelectedSeller(item.seller_id); }}>
-                          <span>Seller: <strong>{item.seller_name || 'User'}</strong></span>
-                        </div>
-                      )}
-                      
-                      <div className="mp-seller-role-row">
-                        <FontAwesomeIcon icon={faUserGraduate} className="mp-role-mini-icon" />
-                        <span>{item.seller_role || 'User'}</span>
-                      </div>
-                      
-                      {/* Multi-staged Cart State Integration Blocks Toggle */}
-                      {cartItem && !isOwner && !isOutOfStock ? (
-                        <div className="mp-quantity-stepper-control" onClick={(e) => e.stopPropagation()}>
-                          <button className="mp-stepper-btn" onClick={(e) => handleUpdateCartQuantity(e, item, -1)}>-</button>
-                          <span className="mp-stepper-display">{cartItem.qty}</span>
-                          <button className="mp-stepper-btn" onClick={(e) => handleUpdateCartQuantity(e, item, 1)} disabled={cartItem.qty >= item.quantity}>+</button>
-                        </div>
-                      ) : (
-                        <button
-                          className={`mp-card-action-trigger ${isOutOfStock ? 'mp-card-action-trigger--disabled' : (isOwner ? 'mp-card-action-trigger--owner' : '')}`}
-                          disabled={isOutOfStock}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (isOwner) {
-                              handleItemClick(item);
-                            } else {
-                              handleAddToCart(e, item);
-                            }
-                          }}
-                        >
-                          {isOutOfStock ? 'Sold Out' : (isOwner ? 'View Details' : 'Add to Cart')}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {paginatedItems.map(item => (
+                <ItemCard
+                  key={item.id}
+                  item={item}
+                  currentUserId={currentUserId}
+                  cartItems={cartItems}
+                  onItemClick={handleItemClick}
+                  onEdit={handleEdit}
+                  onDelete={handleDeleteLocal}
+                  onAddToCart={handleAddToCart}
+                  onUpdateCartQuantity={handleUpdateCartQuantity}
+                  onSellerClick={setSelectedSeller}
+                />
+              ))}
             </div>
           )}
           
@@ -526,7 +312,7 @@ const Marketplace = ({ onMessageSeller }) => {
                       </div>
                       <div className="mp-action-btn-cluster">
                         {order.status === 'pending' && (
-                          <button className="mp-action-trigger-link mp-action-trigger-link--danger" onClick={() => handleCancelOrder(order.id)}>
+                          <button className="mp-action-trigger-link mp-action-trigger-link--danger" onClick={() => handleCancelOrderLocal(order.id)}>
                             Cancel Order
                           </button>
                         )}

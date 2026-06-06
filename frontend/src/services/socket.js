@@ -116,14 +116,22 @@ class SocketService {
     }
   }
   // Notification methods
-  sendNotification(data) {
+  sendNotification(data, callback) {
     if (this.socket) {
-      this.socket.emit('send-notification', data);
+      if (typeof callback === 'function') {
+        this.socket.emit('send-notification', data, callback);
+      } else {
+        this.socket.emit('send-notification', data);
+      }
     }
   }
-  broadcastNotification(data) {
+  broadcastNotification(data, callback) {
     if (this.socket) {
-      this.socket.emit('broadcast-notification', data);
+      if (typeof callback === 'function') {
+        this.socket.emit('broadcast-notification', data, callback);
+      } else {
+        this.socket.emit('broadcast-notification', data);
+      }
     }
   }
   onNewNotification(callback) {

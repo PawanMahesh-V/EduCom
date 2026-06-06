@@ -50,7 +50,10 @@ export const useCommunities = (role, userId) => {
             if (role === 'Student') return await communityApi.getStudentCommunities(userId);
             if (role === 'Teacher' || role === 'PM') return await communityApi.getTeacherCommunities(userId);
             if (role === 'HOD') return await communityApi.getHodCommunities(userId);
-            if (role === 'Admin') return await communityApi.getAll();
+            if (role === 'Admin') {
+                const res = await communityApi.getAll();
+                return res?.communities || res || [];
+            }
             return [];
         },
         enabled: !!role && !!userId,

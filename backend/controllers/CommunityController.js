@@ -257,7 +257,9 @@ class CommunityController {
                 return res.status(404).json({ message: 'Message not found' });
             }
 
-            if (message.sender_id !== userId) {
+            const userRole = req.user.role;
+
+            if (message.sender_id !== userId && userRole !== 'Admin') {
                 return res.status(403).json({ message: 'You can only delete your own messages' });
             }
 
@@ -274,8 +276,12 @@ class CommunityController {
             const { communityId } = req.params;
             const { messageIds } = req.body;
             const userId = req.user.userId;
+            const userRole = req.user.role;
 
-            const result = await Community.deleteMultipleMessages(messageIds, userId, communityId);
+            // Notice: The underlying Community model method needs to handle the Admin role,
+            // or we must check roles here. Assuming the model handles the DB query, we should
+            // update the model or just pass userRole. Let's look at what the model does.
+            const result = await Community.deleteMultipleMessages(messageIds, userId, communityId, userRole);
 
             res.json({
                 message: 'Messages deleted successfully',

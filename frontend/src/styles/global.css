@@ -1538,6 +1538,37 @@ body {
   transform: translateY(-2px);
 }
 
+/* =========================================
+   SUCCESS STEP (Step 3) STYLES
+========================================= */
+.register-success-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.register-success-icon {
+  font-size: 5rem;
+  color: #1282A2;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.register-container p.register-success-note {
+  background: rgba(18, 130, 162, 0.08);
+  border: 1px solid rgba(18, 130, 162, 0.2);
+  padding: 18px 24px;
+  border-radius: 16px;
+  color: #333;
+  font-size: 0.95rem;
+  margin-bottom: 36px;
+  text-align: center;
+}
+
 .fade-in {
   animation: register-fadeIn 0.3s ease forwards;
 }
@@ -9234,15 +9265,21 @@ body {
 
 
 /* Modals */
-.mc-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.mc-modal-box { background: white; padding: 24px; border-radius: 16px; width: 400px; }
+.mc-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 1000; animation: login-fadeIn 0.2s ease-out forwards; }
+.mc-modal-box { background: white; padding: 32px; border-radius: 24px; width: 420px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25); transform: translateY(0); animation: login-fadeIn 0.3s ease-out forwards; }
+.mc-modal-box h3 { font-size: 1.5rem; font-weight: 700; color: #191919; margin: 0 0 24px 0; letter-spacing: -0.5px; }
+.mc-modal-box form { display: flex; flex-direction: column; gap: 16px; }
 .mc-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
 .mc-modal-close { background: transparent; border: none; outline: none; color: #94a3b8; font-size: 1.2rem; cursor: pointer; padding: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; border-radius: 50%; }
 .mc-modal-close:hover { color: #dc2626; background-color: #f1f5f9; }
-.mc-join-input { width: 100%; padding: 12px; border: 1px solid #e2e8f0; border-radius: 8px; box-sizing: border-box; font-size: 1rem; }
-.mc-modal-footer { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
-.mc-btn-primary { background: #1282A2; color: white; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
-.mc-btn-secondary { background: #e2e8f0; border: none; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+.mc-join-input { width: 100%; padding: 14px 16px; border: 1px solid #e2e8f0; border-radius: 12px; box-sizing: border-box; font-size: 1rem; color: #191919; transition: all 0.2s ease; }
+.mc-join-input:focus { outline: none; border-color: #1282A2; box-shadow: 0 0 0 3px rgba(18, 130, 162, 0.15); }
+.mc-join-input::placeholder { color: #94a3b8; }
+.mc-modal-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 32px; }
+.mc-btn-primary { background: #1282A2; color: white; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; box-shadow: 0 4px 6px rgba(18, 130, 162, 0.2); }
+.mc-btn-primary:hover { background: #0e6680; transform: translateY(-1px); box-shadow: 0 6px 12px rgba(18, 130, 162, 0.25); }
+.mc-btn-secondary { background: #f1f5f9; color: #475569; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; }
+.mc-btn-secondary:hover { background: #e2e8f0; color: #1e293b; }
 .mc-state-message {
   display: flex;
   flex-direction: column;

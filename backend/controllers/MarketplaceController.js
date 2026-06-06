@@ -4,6 +4,7 @@ const Cart = require('../models/Cart');
 const pool = require('../config/database');
 const crypto = require('crypto');
 const axios = require('axios');
+const ModerationService = require('../services/ModerationService');
 
 const marketplaceController = {
     // Get all items
@@ -50,13 +51,25 @@ const marketplaceController = {
             // Handle image URL if uploaded
             let image_url = null;
             if (req.file) {
-                // Return the public path to the uploaded file
-                image_url = `${process.env.API_URL || 'http://localhost:5000'}/uploads/marketplace/${req.file.filename}`;
+                // Convert buffer to Base64 data URI
+                const base64Str = req.file.buffer.toString('base64');
+                image_url = `data:${req.file.mimetype};base64,${base64Str}`;
             }
 
             // Basic validation
             if (!title || !price) {
                 return res.status(400).json({ message: 'Title and price are required' });
+            }
+
+            // Moderation check
+            const textToModerate = `${title} ${description || ''}`;
+            const moderation = await ModerationService.moderateText(textToModerate);
+            if (moderation.toxic) {
+                return res.status(400).json({ 
+                    message: 'Item creation blocked: can not use inappropriate words.',
+                    toxic: true,
+                    confidence: moderation.confidence 
+                });
             }
 
             // Convert tags to array if it's a string, or handle empty
@@ -140,9 +153,21 @@ const marketplaceController = {
                 return res.status(403).json({ message: 'Unauthorized to update this item' });
             }
 
+            // Moderation check
+            const textToModerate = `${title} ${description || ''}`;
+            const moderation = await ModerationService.moderateText(textToModerate);
+            if (moderation.toxic) {
+                return res.status(400).json({ 
+                    message: 'Item update blocked: Content flagged by moderation system.',
+                    toxic: true,
+                    confidence: moderation.confidence 
+                });
+            }
+
             let image_url = null;
             if (req.file) {
-                image_url = `${process.env.API_URL || 'http://localhost:5000'}/uploads/marketplace/${req.file.filename}`;
+                const base64Str = req.file.buffer.toString('base64');
+                image_url = `data:${req.file.mimetype};base64,${base64Str}`;
             }
 
             let parsedTags = [];
@@ -230,74 +255,11 @@ const marketplaceController = {
                 status: 'pending_payment',
             };
 
-            // 1. Persist order so we have an ID before redirecting
-            const paymentId = await Order.create(orderData);
-
-            const merchantId  = process.env.PAYFAST_MERCHANT_ID || '14833';
-            const merchantKey = process.env.PAYFAST_SECURE_KEY || 'rPcy4T7GQkSCFsHBLdn26s';
-            const tokenUrl    = process.env.PAYFAST_TOKEN_URL || 'https://ipguat.apps.net.pk/Ecommerce/api/Transaction/GetAccessToken';
-            const redirectUrl = process.env.PAYFAST_REDIRECT_URL || 'https://ipguat.apps.net.pk/Ecommerce/api/Transaction/PostTransaction';
-
             const frontendUrl = req.headers.origin || 'http://localhost:5173';
             const backendUrl  = process.env.API_URL  || `${req.protocol}://${req.get('host')}`;
 
-            // 2. Fetch Access Token from PayFast Pakistan
-            const tokenParams = new URLSearchParams({
-                MERCHANT_ID: merchantId,
-                SECURED_KEY: merchantKey,
-                BASKET_ID: paymentId.toString(),
-                TXNAMT: parseFloat(orderData.total_amount).toFixed(2),
-                CURRENCY_CODE: 'PKR'
-            });
-
-            console.log('[PayFast] Requesting access token from:', tokenUrl, 'with params:', tokenParams.toString());
-
-            let accessToken = null;
-            try {
-                const tokenResponse = await axios.post(
-                    tokenUrl,
-                    tokenParams.toString(),
-                    {
-                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                        timeout: 10000
-                    }
-                );
-
-                console.log('[PayFast] Access token response:', tokenResponse.data);
-                accessToken = tokenResponse.data && tokenResponse.data.ACCESS_TOKEN;
-            } catch (tokenErr) {
-                console.error('[PayFast] Token fetch error:', tokenErr.message);
-                throw new Error(`Failed to authenticate with PayFast: ${tokenErr.message}`);
-            }
-
-            if (!accessToken) {
-                throw new Error('No ACCESS_TOKEN returned from PayFast token API');
-            }
-
-            // 3. Build UAT form parameters for POST redirection
-            const cleanPhone = orderData.phone ? orderData.phone.replace(/\D/g, '') : '03001234567';
-            const pfPayload = {
-                MERCHANT_ID:             merchantId,
-                MERCHANT_NAME:           'EduCom',
-                TOKEN:                   accessToken,
-                PROCCODE:                '00',
-                TXNAMT:                  parseFloat(orderData.total_amount).toFixed(2),
-                CUSTOMER_MOBILE_NO:      cleanPhone,
-                CUSTOMER_EMAIL_ADDRESS:  orderData.email || 'customer@example.com',
-                SIGNATURE:               'educomsignature',
-                VERSION:                 'MERCHANTCART-0.1',
-                TXNDESC:                 `EduCom Order #${paymentId}`,
-                SUCCESS_URL:             `${frontendUrl}/payment/callback`,
-                FAILURE_URL:             `${frontendUrl}/payment/callback`,
-                BASKET_ID:               paymentId.toString(),
-                ORDER_DATE:              new Date().toISOString().split('T')[0], // YYYY-MM-DD
-                CHECKOUT_URL:            (backendUrl.includes('localhost') || backendUrl.includes('127.0.0.1') || backendUrl.includes('0.0.0.0')) 
-                                         ? 'https://httpbin.org/anything' 
-                                         : `${backendUrl}/api/marketplace/orders/payfast/webhook`,
-                CURRENCY_CODE:           'PKR',
-                TRAN_TYPE:               'ECOMM_PURCHASE',
-                CUSTOMER_NAME:           orderData.full_name || 'Customer'
-            };
+            const PayFastService = require('../services/PayFastService');
+            const { paymentId, redirectUrl, pfPayload } = await PayFastService.initiatePayment(orderData, frontendUrl, backendUrl);
 
             return res.status(200).json({
                 success:    true,
@@ -316,7 +278,6 @@ const marketplaceController = {
     // ─── PayFast IPN Webhook (notify_url callback from GoPayFast servers) ───
     payFastWebhook: async (req, res) => {
         try {
-            // Support both GET query parameters and POST body parameters
             const params = { ...req.query, ...req.body };
             console.log('[PayFast IPN] Received parameters:', params);
 
@@ -331,67 +292,24 @@ const marketplaceController = {
                 return res.status(400).send('basket_id missing');
             }
 
-            // Verify the validation_hash
-            const merchantId  = process.env.PAYFAST_MERCHANT_ID || '14833';
-            const secureKey   = process.env.PAYFAST_SECURE_KEY || 'rPcy4T7GQkSCFsHBLdn26s';
+            const PayFastService = require('../services/PayFastService');
+            const isValid = PayFastService.validateHash(orderId, errCode, validationHash);
 
-            if (validationHash) {
-                // String sequence: “your_basket_id|your_merchant_secret_key|your_merchant_id|payasft_err_code”
-                const stringToHash = `${orderId}|${secureKey}|${merchantId}|${errCode}`;
-                const calculatedHash = crypto.createHash('sha256').update(stringToHash).digest('hex');
-
-                if (calculatedHash !== validationHash.toLowerCase()) {
-                    console.error('[PayFast IPN] Hash validation failed. Calculated:', calculatedHash, 'Received:', validationHash);
-                    if (merchantId === '14833' || merchantId === '103') {
-                        console.warn('[PayFast IPN] WARNING: Bypassing signature hash mismatch because we are in UAT sandbox mode.');
-                    } else {
-                        return res.status(400).send('Invalid signature hash');
-                    }
-                } else {
-                    console.log('[PayFast IPN] Hash validation successful.');
-                }
-            } else {
-                console.warn('[PayFast IPN] No validation_hash provided in the webhook payload.');
+            if (!isValid) {
+                console.error('[PayFast IPN] Hash validation failed.');
+                return res.status(400).send('Invalid signature hash');
             }
 
             console.log(`[PayFast IPN] Order #${orderId} - Status Code: ${errCode} - Msg: ${errMsg} - Txn ID: ${transactionId}`);
 
             if (errCode === '000') {
-                // Payment was successful! Update order to 'pending'
-                await Order.updateStatusByPaymentId(orderId, 'pending');
-
-                // Clear buyer's cart
-                const result = await pool.query(
-                    'SELECT buyer_id FROM marketplace_orders WHERE payment_id = $1 LIMIT 1', [orderId]
-                );
-                if (result.rows.length > 0) {
-                    await Cart.clearCart(result.rows[0].buyer_id);
-                }
-
+                await PayFastService.handlePaymentSuccess(orderId);
                 const io = req.app.get('io');
                 if (io) io.emit('inventory_updated');
-
                 console.log(`[PayFast IPN] Order #${orderId} successfully processed and paid.`);
             } else {
                 console.warn(`[PayFast IPN] Payment failed/cancelled for Order #${orderId}. Reason: ${errMsg}`);
-                
-                // Update order to 'cancelled'
-                await Order.updateStatusByPaymentId(orderId, 'cancelled');
-
-                // Restock items
-                const itemsResult = await pool.query(
-                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id IN (SELECT id FROM marketplace_orders WHERE payment_id = $1)',
-                    [orderId]
-                );
-                for (const item of itemsResult.rows) {
-                    if (item.item_id) {
-                        await pool.query(
-                            `UPDATE marketplace_items SET quantity = quantity + $1, status = 'available' WHERE id = $2`,
-                            [item.quantity, item.item_id]
-                        );
-                    }
-                }
-
+                await PayFastService.handlePaymentFailure(orderId);
                 const io = req.app.get('io');
                 if (io) io.emit('inventory_updated');
             }
@@ -420,83 +338,40 @@ const marketplaceController = {
                 return res.status(400).json({ success: false, message: 'basket_id/order_id missing' });
             }
 
-            // 1. Check order status in DB first to handle idempotency (e.g. if webhook already processed it)
             const orderQuery = await pool.query('SELECT status, buyer_id FROM marketplace_orders WHERE payment_id = $1 LIMIT 1', [orderId]);
             if (orderQuery.rows.length === 0) {
                 return res.status(404).json({ success: false, message: 'Order not found' });
             }
 
             const currentStatus = orderQuery.rows[0].status;
-            const buyerId = orderQuery.rows[0].buyer_id;
 
             if (currentStatus === 'pending') {
-                console.log(`[PayFast Verify] Order #${orderId} is already paid (status: pending). Returning success.`);
                 return res.status(200).json({ success: true, orderId, status: 'pending' });
             }
 
             if (currentStatus === 'cancelled' || currentStatus === 'cancelled_by_buyer') {
-                console.log(`[PayFast Verify] Order #${orderId} is already cancelled (status: ${currentStatus}). Returning failure.`);
                 return res.status(200).json({ success: false, orderId, status: currentStatus });
             }
 
-            // Verify the validation_hash
-            const merchantId  = process.env.PAYFAST_MERCHANT_ID || '14833';
-            const secureKey   = process.env.PAYFAST_SECURE_KEY || 'rPcy4T7GQkSCFsHBLdn26s';
+            const PayFastService = require('../services/PayFastService');
+            const isValid = PayFastService.validateHash(orderId, errCode, validationHash);
 
-            if (validationHash) {
-                const stringToHash = `${orderId}|${secureKey}|${merchantId}|${errCode}`;
-                const calculatedHash = crypto.createHash('sha256').update(stringToHash).digest('hex');
-
-                if (calculatedHash !== validationHash.toLowerCase()) {
-                    console.error('[PayFast Verify] Hash validation failed. Calculated:', calculatedHash, 'Received:', validationHash);
-                    if (merchantId === '14833' || merchantId === '103') {
-                        console.warn('[PayFast Verify] WARNING: Bypassing signature hash mismatch because we are in UAT sandbox mode.');
-                    } else {
-                        return res.status(400).json({ success: false, message: 'Invalid signature hash' });
-                    }
-                } else {
-                    console.log('[PayFast Verify] Hash validation successful.');
-                }
-            } else {
-                console.warn('[PayFast Verify] No validation_hash provided. Rejecting verification.');
-                return res.status(400).json({ success: false, message: 'No validation hash provided' });
+            if (!isValid) {
+                console.error('[PayFast Verify] Hash validation failed.');
+                return res.status(400).json({ success: false, message: 'Invalid signature hash' });
             }
 
             if (errCode === '000') {
-                // Payment was successful! Update order to 'pending'
-                await Order.updateStatusByPaymentId(orderId, 'pending');
-
-                // Clear buyer's cart
-                await Cart.clearCart(buyerId);
-
+                await PayFastService.handlePaymentSuccess(orderId);
                 const io = req.app.get('io');
                 if (io) io.emit('inventory_updated');
-
                 console.log(`[PayFast Verify] Order #${orderId} successfully verified and paid.`);
                 return res.status(200).json({ success: true, orderId, status: 'pending' });
             } else {
                 console.warn(`[PayFast Verify] Payment failed/cancelled for Order #${orderId}. Reason: ${errMsg}`);
-                
-                // Update order to 'cancelled'
-                await Order.updateStatusByPaymentId(orderId, 'cancelled');
-
-                // Restock items
-                const itemsResult = await pool.query(
-                    'SELECT item_id, quantity FROM marketplace_order_items WHERE order_id IN (SELECT id FROM marketplace_orders WHERE payment_id = $1)',
-                    [orderId]
-                );
-                for (const item of itemsResult.rows) {
-                    if (item.item_id) {
-                        await pool.query(
-                            `UPDATE marketplace_items SET quantity = quantity + $1, status = 'available' WHERE id = $2`,
-                            [item.quantity, item.item_id]
-                        );
-                    }
-                }
-
+                await PayFastService.handlePaymentFailure(orderId);
                 const io = req.app.get('io');
                 if (io) io.emit('inventory_updated');
-
                 return res.status(200).json({ success: false, orderId, status: 'cancelled', message: errMsg });
             }
         } catch (error) {
@@ -578,65 +453,7 @@ const marketplaceController = {
         }
     },
 
-    // ================= CART =================
-    getCart: async (req, res) => {
-        try {
-            const cartItems = await Cart.getCart(req.user.userId);
-            res.status(200).json(cartItems);
-        } catch (error) {
-            console.error('Error fetching cart:', error);
-            res.status(500).json({ message: 'Server error fetching cart' });
-        }
-    },
 
-    addToCart: async (req, res) => {
-        try {
-            const { item_id, quantity } = req.body;
-            const item = await Cart.addItem(req.user.userId, item_id, quantity);
-            res.status(200).json(item);
-        } catch (error) {
-            console.error('Error adding to cart:', error);
-            res.status(500).json({ message: 'Server error adding to cart' });
-        }
-    },
-
-    removeFromCart: async (req, res) => {
-        try {
-            const { itemId } = req.params;
-            await Cart.removeItem(req.user.userId, itemId);
-            res.status(200).json({ message: 'Item removed from cart' });
-        } catch (error) {
-            console.error('Error removing from cart:', error);
-            res.status(500).json({ message: 'Server error removing from cart' });
-        }
-    },
-
-    updateCartQuantity: async (req, res) => {
-        try {
-            const { itemId } = req.params;
-            const { quantity } = req.body;
-            
-            if (quantity === undefined) {
-                return res.status(400).json({ message: 'Quantity is required' });
-            }
-
-            const updatedItem = await Cart.updateQuantity(req.user.userId, itemId, parseInt(quantity, 10));
-            res.status(200).json(updatedItem || { message: 'Item removed from cart' });
-        } catch (error) {
-            console.error('Error updating cart quantity:', error);
-            res.status(500).json({ message: 'Server error updating cart quantity' });
-        }
-    },
-
-    clearCart: async (req, res) => {
-        try {
-            await Cart.clearCart(req.user.userId);
-            res.status(200).json({ message: 'Cart cleared' });
-        } catch (error) {
-            console.error('Error clearing cart:', error);
-            res.status(500).json({ message: 'Server error clearing cart' });
-        }
-    },
 
 
 

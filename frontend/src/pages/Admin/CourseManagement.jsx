@@ -13,7 +13,9 @@ import { courseApi, communityApi, userApi } from '../../api';
 import ConfirmDialog from '../../components/ConfirmDialog';
 import CustomSelect from '../../components/Common/CustomSelect';
 import Pagination from '../../components/Common/Pagination';
+import CourseForm from '../../components/CourseForm';
 import { useSocket } from '../../context/SocketContext';
+import { useCourses } from '../../hooks/useCourses';
 
 const CourseManagement = ({ initialTab }) => {
   const raw = localStorage.getItem('user') || sessionStorage.getItem('user');
@@ -39,204 +41,74 @@ const CourseManagement = ({ initialTab }) => {
           if (courseTab === 'requests') fetchCourseRequests();
         };
         socketService.socket.on('admin-course-update', handleCourseUpdate);
-        return () => socketService.socket.off('admin-course-update', handleCourseUpdate);
+        return () => {
+          if (socketService?.socket) {
+            socketService.socket.off('admin-course-update', handleCourseUpdate);
+          }
+        };
     }
   }, [isConnected, socketService, courseTab]);
 
-  // Course Management states
-  const [courses, setCourses] = useState([]);
-  const [filteredCourses, setFilteredCourses] = useState([]);
-  const [courseSearchTerm, setCourseSearchTerm] = useState('');
-  const [courseDepartmentFilter, setCourseDepartmentFilter] = useState('All');
-  const [courseSemesterFilter, setCourseSemesterFilter] = useState('All');
-  const [coursesLoading, setCoursesLoading] = useState(true);
-  const [teachers, setTeachers] = useState([]);
+  // Custom hook for core data logic
+  const {
+    filteredCourses,
+    courseSearchTerm, setCourseSearchTerm,
+    courseDepartmentFilter, setCourseDepartmentFilter,
+    courseSemesterFilter, setCourseSemesterFilter,
+    coursesLoading,
+    teachers,
+    courseRequests,
+    courseRequestsLoading,
+    filteredCommunities,
+    communityStatusFilter, setCommunityStatusFilter,
+    communitySearchTerm, setCommunitySearchTerm,
+    communitiesLoading,
+    handleApproveCourseRequest,
+    handleRejectCourseRequest,
+    handleCourseSubmit: apiCourseSubmit,
+    handleCourseDelete: apiCourseDelete,
+    handleCommunitySubmit: apiCommunitySubmit
+  } = useCourses(courseTab, socketService, isConnected);
+
+  // Local UI states
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [isCourseModalOpen, setIsCourseModalOpen] = useState(false);
   const [confirmState, setConfirmState] = useState({
-    open: false,
-    title: '',
-    message: '',
-    confirmText: 'Delete',
-    onConfirm: null,
+    open: false, title: '', message: '', confirmText: 'Delete', onConfirm: null
   });
   const [courseFormData, setCourseFormData] = useState({
-    code: '',
-    name: '',
-    department: 'CS',
-    semester: '',
-    teacher_id: ''
+    code: '', name: '', department: 'CS', semester: '', teacher_id: ''
   });
 
-  // Course Requests states
-  const [courseRequests, setCourseRequests] = useState([]);
-  const [courseRequestsLoading, setCourseRequestsLoading] = useState(false);
   const [coursePage, setCoursePage] = useState(1);
   const [communityPage, setCommunityPage] = useState(1);
   const [requestPage, setRequestPage] = useState(1);
-
-  // Pagination defaults
   const itemsPerPage = 2;
 
-  // Communities states
-  const [communities, setCommunities] = useState([]);
-  const [filteredCommunities, setFilteredCommunities] = useState([]);
-  const [communityStatusFilter, setCommunityStatusFilter] = useState('All');
-  const [communitySearchTerm, setCommunitySearchTerm] = useState('');
-  const [communitiesLoading, setCommunitiesLoading] = useState(true);
   const [selectedCommunity, setSelectedCommunity] = useState(null);
   const [isCommunityModalOpen, setIsCommunityModalOpen] = useState(false);
   const [communityFormData, setCommunityFormData] = useState({
-    name: '',
-    status: 'active'
+    name: '', status: 'active'
   });
   const [isMessageModalOpen, setIsMessageModalOpen] = useState(false);
   const [selectedCommunityForMessage, setSelectedCommunityForMessage] = useState(null);
   const [messageFormData, setMessageFormData] = useState({
-    subject: '',
-    message: ''
+    subject: '', message: ''
   });
 
-  useEffect(() => {
-    fetchCourses();
-    fetchTeachers();
-    if (courseTab === 'communities') {
-      fetchCommunities();
-    } else if (courseTab === 'requests') {
-      fetchCourseRequests();
-    }
-  }, [courseTab]);
-
-  // Course filtering
-  useEffect(() => {
-    let filtered = courses;
-    if (courseDepartmentFilter !== 'All') {
-      filtered = filtered.filter(course => course.department === courseDepartmentFilter);
-    }
-    if (courseSemesterFilter !== 'All') {
-      filtered = filtered.filter(course => course.semester === courseSemesterFilter);
-    }
-    if (courseSearchTerm) {
-      const searchTermLower = courseSearchTerm.toLowerCase();
-      filtered = filtered.filter(course =>
-        (course.code || '').toLowerCase().includes(searchTermLower) ||
-        (course.name || '').toLowerCase().includes(searchTermLower) ||
-        (course.department || '').toLowerCase().includes(searchTermLower) ||
-        (course.semester || '').toLowerCase().includes(searchTermLower)
-      );
-    }
-    setFilteredCourses(filtered);
-    setCoursePage(1);
-  }, [courseSearchTerm, courseDepartmentFilter, courseSemesterFilter, courses]);
-
-  // Community filtering
-  useEffect(() => {
-    let filtered = communities;
-    if (communityStatusFilter !== 'All') {
-      filtered = filtered.filter(community => community.status === communityStatusFilter);
-    }
-    if (communitySearchTerm) {
-      const searchLower = communitySearchTerm.toLowerCase();
-      filtered = filtered.filter(community =>
-        (community.name || '').toLowerCase().includes(searchLower) ||
-        (community.code || '').toLowerCase().includes(searchLower) ||
-        (community.department || '').toLowerCase().includes(searchLower)
-      );
-    }
-    setFilteredCommunities(filtered);
-    setCommunityPage(1);
-  }, [communityStatusFilter, communitySearchTerm, communities]);
-
-  const fetchTeachers = async () => {
-    try {
-      const data = await userApi.getTeachers();
-      setTeachers((data.teachers || data || []).map(t => ({ ...t })));
-    } catch (err) {
-      showError(err.message);
-    }
-  };
-
-  const fetchCourses = async () => {
-    try {
-      const data = await courseApi.getAll();
-      setCourses(data.courses || data || []);
-      setCoursesLoading(false);
-    } catch (err) {
-      showError(err.message);
-      setCoursesLoading(false);
-      setCourses([]);
-    }
-  };
-
-  const fetchCommunities = async () => {
-    try {
-      const data = await communityApi.getAll();
-      setCommunities(data.communities || data || []);
-      setFilteredCommunities(data.communities || data || []);
-      setCommunitiesLoading(false);
-    } catch (err) {
-      showError(err.message);
-      setCommunitiesLoading(false);
-      setCommunities([]);
-      setFilteredCommunities([]);
-    }
-  };
-
-  const fetchCourseRequests = async () => {
-    try {
-      setCourseRequestsLoading(true);
-      const response = await courseApi.getCourseRequests();
-      setCourseRequests(response.requests || []);
-      setCourseRequestsLoading(false);
-    } catch (err) {
-      showError('Failed to fetch course requests');
-      setCourseRequestsLoading(false);
-    }
-  };
-
-  const handleApproveCourseRequest = async (requestId) => {
-    try {
-      await courseApi.approveCourseRequest(requestId);
-      showSuccess('Course request approved and course created successfully!');
-      fetchCourseRequests();
-      fetchCourses();
-    } catch (err) {
-      showError(err.message || 'Failed to approve course request');
-    }
-  };
-
-  const handleRejectCourseRequest = async (requestId) => {
-    try {
-      await courseApi.rejectCourseRequest(requestId);
-      showSuccess('Course request rejected');
-      fetchCourseRequests();
-    } catch (err) {
-      showError(err.message || 'Failed to reject course request');
-    }
-  };
+  // Reset pagination when data changes
+  useEffect(() => setCoursePage(1), [filteredCourses]);
+  useEffect(() => setCommunityPage(1), [filteredCommunities]);
+  useEffect(() => setRequestPage(1), [courseRequests]);
 
   const handleCourseInputChange = (e) => {
-    setCourseFormData({
-      ...courseFormData,
-      [e.target.name]: e.target.value
-    });
+    setCourseFormData({ ...courseFormData, [e.target.name]: e.target.value });
   };
 
   const handleCourseSubmit = async (e) => {
     e.preventDefault();
-    try {
-      if (selectedCourse) {
-        await courseApi.update(selectedCourse.id, courseFormData);
-        showSuccess('Course updated successfully!');
-      } else {
-        await courseApi.create(courseFormData);
-        showSuccess('Course created successfully!');
-      }
-      await fetchCourses();
-      handleCloseCourseModal();
-    } catch (err) {
-      showError(err.message);
-    }
+    const success = await apiCourseSubmit(courseFormData, selectedCourse);
+    if (success) handleCloseCourseModal();
   };
 
   const handleCourseDelete = (courseId) => {
@@ -247,15 +119,7 @@ const CourseManagement = ({ initialTab }) => {
       confirmText: 'Delete Course',
       onConfirm: async () => {
         setConfirmState((s) => ({ ...s, open: false }));
-        setCourses(prev => prev.filter(c => c.id !== courseId));
-        setFilteredCourses(prev => prev.filter(c => c.id !== courseId));
-        try {
-          await courseApi.delete(courseId);
-          showSuccess('Course deleted successfully');
-        } catch (err) {
-          fetchCourses();
-          showError(err.message || 'Failed to delete course');
-        }
+        await apiCourseDelete(courseId);
       }
     });
   };
@@ -302,14 +166,8 @@ const CourseManagement = ({ initialTab }) => {
 
   const handleCommunitySubmit = async (e) => {
     e.preventDefault();
-    try {
-      await communityApi.update(selectedCommunity.id, communityFormData);
-      await fetchCommunities();
-      handleCloseCommunityModal();
-      showSuccess('Community updated successfully!');
-    } catch (err) {
-      showError(err.message || 'Failed to update community');
-    }
+    const success = await apiCommunitySubmit(communityFormData, selectedCommunity);
+    if (success) handleCloseCommunityModal();
   };
 
   const handleCloseCommunityModal = () => {
@@ -342,9 +200,17 @@ const CourseManagement = ({ initialTab }) => {
         senderId: currentUser.id,
         senderName: currentUser.name || 'Admin',
         notificationOnly: true
+      }, (response) => {
+        if (!response.success) {
+          showError(response.error || 'Failed to send message');
+        } else if (response.blocked) {
+          showWarning('Message is pending review due to policy violation');
+          handleCloseMessageModal();
+        } else {
+          showSuccess(`Message sent to ${selectedCommunityForMessage.name} successfully!`);
+          handleCloseMessageModal();
+        }
       });
-      showSuccess(`Message sent to ${selectedCommunityForMessage.name} successfully!`);
-      handleCloseMessageModal();
     } catch (err) {
       showError(err.message || 'Failed to send message');
     }
@@ -533,85 +399,16 @@ const CourseManagement = ({ initialTab }) => {
             )}
 
             {/* Course Modification Modal */}
-            {isCourseModalOpen && (
-              <div className="cm-modal-overlay">
-                <div className="cm-modal-box cm-modal-box--medium fade-in">
-                  <h2>{selectedCourse ? 'Edit Course' : 'Create New Course'}</h2>
-                  <form onSubmit={handleCourseSubmit} className="cm-modal-form">
-                    <div className="cm-modal-grid-2col">
-                      <div className="cm-form-group">
-                        <label>Course Code</label>
-                        <input
-                          type="text"
-                          name="code"
-                          value={courseFormData.code}
-                          onChange={handleCourseInputChange}
-                          placeholder="e.g., CSC-441"
-                          required
-                        />
-                      </div>
-                      <div className="cm-form-group">
-                        <label>Course Name</label>
-                        <input
-                          type="text"
-                          name="name"
-                          value={courseFormData.name}
-                          onChange={handleCourseInputChange}
-                          placeholder="e.g., Data Mining"
-                          required
-                        />
-                      </div>
-                      <div className="cm-form-group">
-                        <label>Department Target</label>
-                        <CustomSelect
-                          options={[
-                            { value: 'CS', label: 'CS' },
-                            { value: 'BBA', label: 'BBA' },
-                            { value: 'IT', label: 'IT' }
-                          ]}
-                          value={courseFormData.department}
-                          onChange={(val) => setCourseFormData({ ...courseFormData, department: val })}
-                        />
-                      </div>
-                      <div className="cm-form-group">
-                        <label>Academic Semester</label>
-                        <CustomSelect
-                          options={[
-                            { value: '1', label: 'Semester 1' },
-                            { value: '2', label: 'Semester 2' },
-                            { value: '3', label: 'Semester 3' },
-                            { value: '4', label: 'Semester 4' },
-                            { value: '5', label: 'Semester 5' },
-                            { value: '6', label: 'Semester 6' },
-                            { value: '7', label: 'Semester 7' },
-                            { value: '8', label: 'Semester 8' }
-                          ]}
-                          value={courseFormData.semester}
-                          onChange={(val) => setCourseFormData({ ...courseFormData, semester: val })}
-                          placeholder="Select Semester"
-                        />
-                      </div>
-                      <div className="cm-form-group cm-form-group--full">
-                        <label>Assigned Faculty Mentor</label>
-                        <CustomSelect
-                          options={teachers.map(t => ({ 
-                            value: t.id, 
-                            label: `${t.name} ${t.role ? `(${t.role})` : ''}` 
-                          }))}
-                          value={courseFormData.teacher_id}
-                          onChange={(val) => setCourseFormData({ ...courseFormData, teacher_id: val })}
-                          placeholder="Link Teacher Profile"
-                        />
-                      </div>
-                    </div>
-                    <div className="cm-modal-action-footer">
-                      <button type="button" className="cm-btn-secondary" onClick={handleCloseCourseModal}>Cancel</button>
-                      <button type="submit" className="cm-btn-primary">{selectedCourse ? 'Update Course' : 'Save Course'}</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-            )}
+            <CourseForm
+              isOpen={isCourseModalOpen}
+              isEditMode={!!selectedCourse}
+              formData={courseFormData}
+              teachers={teachers}
+              onInputChange={handleCourseInputChange}
+              onSelectChange={(name, value) => setCourseFormData({ ...courseFormData, [name]: value })}
+              onSubmit={handleCourseSubmit}
+              onClose={handleCloseCourseModal}
+            />
 
             <ConfirmDialog
               open={confirmState.open}

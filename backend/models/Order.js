@@ -135,32 +135,6 @@ class Order {
         }
     }
 
-    static async findAll() {
-        const query = `
-            SELECT o.*, 
-                   u.name as buyer_name,
-                   json_agg(json_build_object(
-                       'id', oi.id,
-                       'item_id', oi.item_id,
-                       'title', oi.title,
-                       'price', oi.price,
-                       'quantity', oi.quantity
-                   )) as items
-            FROM marketplace_orders o
-            JOIN marketplace_order_items oi ON o.id = oi.order_id
-            JOIN users u ON o.buyer_id = u.id
-            GROUP BY o.id, u.id
-            ORDER BY o.created_at DESC, o.id DESC;
-        `;
-        try {
-            const { rows } = await pool.query(query);
-            return rows;
-        } catch (error) {
-            console.error('Error fetching all orders:', error);
-            throw error;
-        }
-    }
-
     static async verifyOTP(id, otp) {
         const query = `SELECT * FROM marketplace_orders WHERE id = $1 AND delivery_otp = $2`;
         try {

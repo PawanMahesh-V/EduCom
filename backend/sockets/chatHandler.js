@@ -1,19 +1,17 @@
-const pool = require('../config/database');
 const { TEACHING_ROLES } = require('../config/constants');
 const ModerationService = require('../services/ModerationService');
+const MessageService = require('../services/MessageService');
 
 module.exports = (io, socket, connectedUsers) => {
 
     // Join a community/course room
     socket.on('join-community', async (data) => {
-        // Support both old format (just communityId) and new format ({communityId, userId, userName})
         const communityId = typeof data === 'object' ? data.communityId : data;
         const userId = typeof data === 'object' ? data.userId : null;
         const userName = typeof data === 'object' ? data.userName : null;
 
         socket.join(`community-${communityId}`);
 
-        // Broadcast join notification to OTHER members (not the joiner)
         if (userId && userName) {
             socket.to(`community-${communityId}`).emit('user-joined-community', {
                 communityId,
@@ -34,9 +32,7 @@ module.exports = (io, socket, connectedUsers) => {
         const { communityId, message, senderId, senderName, notificationOnly, subject, clientMessageId } = data;
 
         try {
-            // Check if user is banned from chatting
-            const userCheck = await pool.query('SELECT is_active FROM users WHERE id = $1', [senderId]);
-            if (userCheck.rows.length > 0 && userCheck.rows[0].is_active === false) {
+            if (await MessageService.isUserChatBanned(senderId)) {
                 socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
                 socket.emit('message-blocked', { 
                     client_message_id: clientMessageId,
@@ -45,22 +41,16 @@ module.exports = (io, socket, connectedUsers) => {
                     content: message,
                     error: 'You are banned from chatting and can only view messages.'
                 });
+                if (typeof callback === 'function') {
+                    callback({ success: false, error: 'You are banned from chatting and can only view messages.' });
+                }
                 return;
             }
 
-            const senderRole = await pool.query(
-                'SELECT role FROM users WHERE id = $1',
-                [senderId]
-            );
-            const isAdmin = senderRole.rows.length > 0 && senderRole.rows[0].role === 'Admin';
+            const senderRole = await MessageService.getUserRole(senderId);
+            const isAdmin = senderRole === 'Admin';
 
-            // Check community status
-            const communityStatus = await pool.query(
-                'SELECT status FROM communities WHERE id = $1',
-                [communityId]
-            );
-
-            if (communityStatus.rows.length > 0 && communityStatus.rows[0].status === 'inactive' && !isAdmin) {
+            if (await MessageService.isCommunityInactive(communityId) && !isAdmin) {
                 socket.emit('message-error', { error: 'This community is inactive. You cannot send messages.' });
                 if (typeof callback === 'function') {
                     callback({ success: false, error: 'Community is inactive.' });
@@ -68,18 +58,12 @@ module.exports = (io, socket, connectedUsers) => {
                 return;
             }
 
-            // If notificationOnly flag is set (from admin modal), skip saving to chat
-            if (!notificationOnly) {
-                const moderation = await ModerationService.moderateText(message);
-                if (moderation.toxic) {
-                    // Save message as pending review
-                    const result = await pool.query(
-                        `INSERT INTO messages (community_id, sender_id, content, status)
-                         VALUES ($1, $2, $3, 'pending_review')
-                         RETURNING id, community_id, sender_id, content, status, created_at`,
-                        [communityId, senderId, message]
-                    );
-                    const reportedMessage = result.rows[0];
+            const textToModerate = subject ? `${subject} ${message}` : message;
+            const moderation = await ModerationService.moderateText(textToModerate);
+            
+            if (moderation.toxic) {
+                if (!notificationOnly) {
+                    const reportedMessage = await MessageService.saveCommunityMessage(communityId, senderId, message, 'pending_review');
 
                     socket.emit('message-blocked', {
                         id: reportedMessage.id,
@@ -93,32 +77,32 @@ module.exports = (io, socket, connectedUsers) => {
                         blocked_reason: 'pending_review',
                         confidence: moderation.confidence
                     });
-                    
-                    socket.emit('message-error', {
-                        error: 'Message pending admin review due to policy violation',
-                        toxic: true,
+                } else {
+                    socket.emit('message-blocked', {
+                        client_message_id: clientMessageId,
+                        moderation_blocked: true,
+                        blocked_reason: 'pending_review',
+                        content: message,
                         confidence: moderation.confidence
                     });
-                    
-                    // Notify admins
-                    io.emit('new-reported-message');
-                    if (typeof callback === 'function') {
-                        callback({ success: true, message: reportedMessage, blocked: true });
-                    }
-                    return;
                 }
+                
+                socket.emit('message-error', {
+                    error: 'Content pending admin review due to policy violation',
+                    toxic: true,
+                    confidence: moderation.confidence
+                });
+                
+                io.emit('new-reported-message');
+                if (typeof callback === 'function') {
+                    callback({ success: true, blocked: true });
+                }
+                return;
+            }
 
-                // Save message to database and broadcast to chat (normal chat behavior)
-                const result = await pool.query(
-                    `INSERT INTO messages (community_id, sender_id, content, status)
-                     VALUES ($1, $2, $3, 'approved')
-                     RETURNING id, community_id, sender_id, content, status, created_at`,
-                    [communityId, senderId, message]
-                );
+            if (!notificationOnly) {
+                const newMessage = await MessageService.saveCommunityMessage(communityId, senderId, message, 'approved');
 
-                const newMessage = result.rows[0];
-
-                // Broadcast to all users in the community
                 io.to(`community-${communityId}`).emit('new-message', {
                     ...newMessage,
                     sender_name: senderName
@@ -126,69 +110,38 @@ module.exports = (io, socket, connectedUsers) => {
 
                 if (typeof callback === 'function') {
                     callback({ success: true, message: newMessage });
+                    callback = null; 
                 }
             }
 
-            // Create notifications if admin or notificationOnly flag
-            // Delegate back to notification handler via event or direct call? 
-            // Better to keep logic here if it's tightly coupled or trigger a local event.
-            // For now, I will keep the notification logic duplication or extraction here as in original server.js
-            // Ideally, this should be in a Service. I'll rely on the existing logic flow.
+            if (notificationOnly) {
+                const community = await MessageService.getCommunityDetails(communityId);
 
-            // ── Send notifications to all other community members ────────
-            const communityDetails = await pool.query(
-                `SELECT c.name, co.name as course_name, co.code as course_code, co.id as course_id
-                 FROM communities c
-                 JOIN courses co ON c.course_id = co.id
-                 WHERE c.id = $1`,
-                [communityId]
-            );
+                if (community) {
+                    const allRecipients = await MessageService.getCommunityNotificationRecipients(communityId, senderId);
 
-            if (communityDetails.rows.length > 0) {
-                const community = communityDetails.rows[0];
+                    const notifTitle = subject
+                        ? `${subject} (${community.course_code})`
+                        : `New message in ${community.course_code}`;
+                    const notifMessage = `${senderName}: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`;
 
-                const enrolledStudents = await pool.query(
-                    `SELECT DISTINCT e.student_id as user_id
-                     FROM enrollments e
-                     JOIN communities c ON e.course_id = c.course_id
-                     WHERE c.id = $1 AND e.student_id != $2`,
-                    [communityId, senderId]
-                );
-                const courseTeacher = await pool.query(
-                    `SELECT teacher_id as user_id
-                     FROM courses
-                     WHERE id = (SELECT course_id FROM communities WHERE id = $1)
-                     AND teacher_id IS NOT NULL
-                     AND teacher_id != $2`,
-                    [communityId, senderId]
-                );
-
-                const allRecipients = [
-                    ...enrolledStudents.rows,
-                    ...courseTeacher.rows
-                ].filter(r => r.user_id);
-
-                const notifTitle = subject
-                    ? `${subject} (${community.course_code})`
-                    : `New message in ${community.course_code}`;
-                const notifMessage = `${senderName}: "${message.substring(0, 100)}${message.length > 100 ? '...' : ''}"`;
-
-                const notificationPromises = allRecipients.map(recipient => {
-                    return pool.query(
-                        `INSERT INTO notifications (user_id, sender_id, title, message, type, is_read, course_id)
-                         VALUES ($1, $2, $3, $4, 'info', false, $5)
-                         RETURNING id, user_id, sender_id, title, message, type, is_read, created_at`,
-                        [recipient.user_id, senderId, notifTitle, notifMessage, community.course_id]
-                    ).then(notifResult => {
-                        const notification = notifResult.rows[0];
+                    const notificationPromises = allRecipients.map(async recipient => {
+                        const notification = await MessageService.createNotification(
+                            recipient.user_id, senderId, notifTitle, notifMessage, community.course_id
+                        );
+                        
                         const targetSocketId = connectedUsers.get(recipient.user_id);
                         if (targetSocketId) {
                             io.to(targetSocketId).emit('new-notification', notification);
                         }
                         return notification;
                     });
-                });
-                await Promise.all(notificationPromises);
+                    
+                    await Promise.all(notificationPromises);
+                    if (typeof callback === 'function') {
+                        callback({ success: true });
+                    }
+                } 
             }
 
         } catch (error) {
@@ -203,7 +156,7 @@ module.exports = (io, socket, connectedUsers) => {
     socket.on('delete-message', async (data) => {
         const { messageId, communityId } = data;
         try {
-            await pool.query('DELETE FROM messages WHERE id = $1', [messageId]);
+            await MessageService.deleteMessage(messageId);
             io.to(`community-${communityId}`).emit('message-deleted', { messageId });
         } catch (error) {
             console.error('Delete message error:', error);
@@ -224,11 +177,9 @@ module.exports = (io, socket, connectedUsers) => {
         const { senderId, receiverId, message, senderName, isAnonymous = false, clientMessageId } = data;
 
         try {
-            // Check if user is banned from chatting
-            const userCheck = await pool.query('SELECT is_active FROM users WHERE id = $1', [senderId]);
-            if (userCheck.rows.length > 0 && userCheck.rows[0].is_active === false) {
-                const receiverRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
-                const isReceiverAdmin = receiverRoleCheck.rows.length > 0 && receiverRoleCheck.rows[0].role === 'Admin';
+            if (await MessageService.isUserChatBanned(senderId)) {
+                const receiverRole = await MessageService.getUserRole(receiverId);
+                const isReceiverAdmin = receiverRole === 'Admin';
                 
                 if (!isReceiverAdmin) {
                     socket.emit('message-error', { error: 'You are banned from chatting and can only view messages.' });
@@ -245,17 +196,14 @@ module.exports = (io, socket, connectedUsers) => {
             }
 
             if (isAnonymous) {
-                const senderResult = await pool.query('SELECT role FROM users WHERE id = $1', [senderId]);
-                const receiverResult = await pool.query('SELECT role FROM users WHERE id = $1', [receiverId]);
+                const senderRole = await MessageService.getUserRole(senderId);
+                const receiverRole = await MessageService.getUserRole(receiverId);
 
-                if (senderResult.rows.length === 0 || receiverResult.rows.length === 0) {
+                if (!senderRole || !receiverRole) {
                     socket.emit('message-error', { error: 'User not found' });
                     if (typeof callback === 'function') callback({ success: false, error: 'User not found' });
                     return;
                 }
-
-                const senderRole = senderResult.rows[0].role;
-                const receiverRole = receiverResult.rows[0].role;
 
                 if (senderRole !== 'Student' || !TEACHING_ROLES.includes(receiverRole)) {
                     socket.emit('message-error', { error: 'Anonymous messaging is only available for students messaging teachers, HODs, or PMs' });
@@ -268,14 +216,7 @@ module.exports = (io, socket, connectedUsers) => {
 
             const moderation = await ModerationService.moderateText(message);
             if (moderation.toxic) {
-                // Save message as pending review
-                const result = await pool.query(
-                    `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
-                     VALUES ($1, $2, $3, false, $4, NULL, 'pending_review')
-                     RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at, status`,
-                    [senderId, receiverId, message, isAnonymous]
-                );
-                const reportedMessage = result.rows[0];
+                const reportedMessage = await MessageService.saveDirectMessage(senderId, receiverId, message, isAnonymous, 'pending_review');
 
                 socket.emit('message-blocked', {
                     id: reportedMessage.id,
@@ -297,7 +238,6 @@ module.exports = (io, socket, connectedUsers) => {
                     confidence: moderation.confidence
                 });
                 
-                // Notify admins
                 io.emit('new-reported-message');
                 if (typeof callback === 'function') {
                     callback({ success: true, message: reportedMessage, blocked: true });
@@ -305,30 +245,20 @@ module.exports = (io, socket, connectedUsers) => {
                 return;
             }
 
-            const result = await pool.query(
-                `INSERT INTO messages (sender_id, receiver_id, content, is_read, is_anonymous, community_id, status)
-                 VALUES ($1, $2, $3, false, $4, NULL, 'approved')
-                 RETURNING id, sender_id, receiver_id, content, is_read, is_anonymous, created_at, delivered_at, read_at`,
-                [senderId, receiverId, message, isAnonymous]
-            );
-
-            const newMessage = result.rows[0];
+            let newMessage = await MessageService.saveDirectMessage(senderId, receiverId, message, isAnonymous, 'approved');
             const receiverSocketId = connectedUsers.get(parseInt(receiverId));
 
             if (receiverSocketId) {
-                // Mark as delivered since receiver is online
-                await pool.query(
-                    'UPDATE messages SET delivered_at = CURRENT_TIMESTAMP WHERE id = $1',
-                    [newMessage.id]
-                );
-                newMessage.delivered_at = new Date();
+                const deliveredMsg = await MessageService.markMessageDelivered(newMessage.id);
+                if (deliveredMsg) {
+                    newMessage.delivered_at = deliveredMsg.delivered_at;
+                }
 
                 io.to(receiverSocketId).emit('new-direct-message', {
                     ...newMessage,
                     sender_name: isAnonymous ? 'Anonymous Student' : senderName
                 });
 
-                // Notify sender that message was delivered
                 socket.emit('message-delivered', {
                     messageId: newMessage.id,
                     delivered_at: newMessage.delivered_at
@@ -364,25 +294,17 @@ module.exports = (io, socket, connectedUsers) => {
         }
     });
 
-    // Mark direct message as delivered (when user's socket connects and fetches messages)
+    // Mark direct message as delivered
     socket.on('mark-message-delivered', async (data) => {
         const { messageId } = data;
         try {
-            const result = await pool.query(
-                `UPDATE messages 
-                 SET delivered_at = CURRENT_TIMESTAMP 
-                 WHERE id = $1 AND delivered_at IS NULL
-                 RETURNING id, sender_id, delivered_at`,
-                [messageId]
-            );
-
-            if (result.rows.length > 0) {
-                const { sender_id, delivered_at } = result.rows[0];
-                const senderSocketId = connectedUsers.get(parseInt(sender_id));
+            const deliveredData = await MessageService.markMessageDelivered(messageId);
+            if (deliveredData) {
+                const senderSocketId = connectedUsers.get(parseInt(deliveredData.sender_id));
                 if (senderSocketId) {
                     io.to(senderSocketId).emit('message-delivered', {
                         messageId,
-                        delivered_at
+                        delivered_at: deliveredData.delivered_at
                     });
                 }
             }
@@ -395,21 +317,13 @@ module.exports = (io, socket, connectedUsers) => {
     socket.on('mark-message-read', async (data) => {
         const { messageId, userId } = data;
         try {
-            const result = await pool.query(
-                `UPDATE messages 
-                 SET is_read = true, read_at = CURRENT_TIMESTAMP 
-                 WHERE id = $1 AND receiver_id = $2 AND is_read = false
-                 RETURNING id, sender_id, read_at`,
-                [messageId, userId]
-            );
-
-            if (result.rows.length > 0) {
-                const { sender_id, read_at } = result.rows[0];
-                const senderSocketId = connectedUsers.get(parseInt(sender_id));
+            const readData = await MessageService.markMessageRead(messageId, userId);
+            if (readData) {
+                const senderSocketId = connectedUsers.get(parseInt(readData.sender_id));
                 if (senderSocketId) {
                     io.to(senderSocketId).emit('message-read', {
                         messageId,
-                        read_at
+                        read_at: readData.read_at
                     });
                 }
             }
@@ -421,20 +335,11 @@ module.exports = (io, socket, connectedUsers) => {
     // Mark multiple messages as read (for conversation view)
     socket.on('mark-messages-read', async (data) => {
         const { messageIds, userId } = data;
-        if (!messageIds || messageIds.length === 0) return;
-
         try {
-            const result = await pool.query(
-                `UPDATE messages 
-                 SET is_read = true, read_at = CURRENT_TIMESTAMP 
-                 WHERE id = ANY($1) AND receiver_id = $2 AND is_read = false
-                 RETURNING id, sender_id, read_at`,
-                [messageIds, userId]
-            );
-
-            // Group by sender and notify
+            const updatedRows = await MessageService.markMultipleMessagesRead(messageIds, userId);
+            
             const senderMap = {};
-            result.rows.forEach(row => {
+            updatedRows.forEach(row => {
                 if (!senderMap[row.sender_id]) {
                     senderMap[row.sender_id] = [];
                 }

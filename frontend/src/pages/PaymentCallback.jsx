@@ -40,25 +40,25 @@ const PaymentCallback = () => {
           return;
         }
 
-        const validationHash = searchParams.get('validation_hash');
-
-        if (validationHash) {
-          const queryParams = searchParams.toString();
-          const response = await api.get(`${API_BASE_URL}/marketplace/orders/payfast/verify?${queryParams}`);
-          
-          if (response && response.success) {
-            setIsSuccess(true);
-          } else {
-            setIsSuccess(false);
-            setErrorMessage(response.message || 'Payment verification failed.');
-          }
+        const queryParams = searchParams.toString();
+        const response = await api.get(`${API_BASE_URL}/marketplace/orders/payfast/verify?${queryParams}`);
+        
+        const payfastErrorMap = {
+          '017': 'Invalid Card Details or Card Not Supported.',
+          '024': 'Transaction declined by issuer. Please check your balance.',
+          '90': 'Payment Gateway Error (System Malfunction). The PayFast sandbox may be temporarily unavailable or rejecting this amount.',
+          '99': 'Transaction Cancelled by User.'
+        };
+        
+        if (response && response.success) {
+          setIsSuccess(true);
         } else {
-          if (statusParam === 'success' || errCode === '000') {
-            setIsSuccess(true);
-          } else {
-            setIsSuccess(false);
-            setErrorMessage('Payment failed or cancelled.');
+          setIsSuccess(false);
+          let finalMsg = response.message || searchParams.get('err_msg');
+          if (!finalMsg || finalMsg.trim() === '' || finalMsg === 'No error message') {
+            finalMsg = payfastErrorMap[errCode] || 'Payment failed or was cancelled.';
           }
+          setErrorMessage(finalMsg);
         }
       } catch (error) {
         setIsSuccess(false);

@@ -37,9 +37,8 @@ export const NotificationProvider = ({ children }) => {
             const userId = user.id || user.userId;
             const data = await notificationApi.getAll(userId);
             
-            if (Array.isArray(data)) {
-                setNotifications(data);
-            }
+            const notificationArray = Array.isArray(data) ? data : (data.notifications || []);
+            setNotifications(notificationArray);
         } catch (err) {
             console.error("[NotificationProvider] Failed to fetch notifications", err);
         } finally {

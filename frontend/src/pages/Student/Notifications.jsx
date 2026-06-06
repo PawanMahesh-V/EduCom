@@ -10,7 +10,7 @@ const Notifications = () => {
     <div className="nt-viewport">
       <div className="nt-header">
         <h1 className="nt-title">Notification Feed</h1>
-        <p className="nt-subtitle">Stay synchronized with your latest course activities and system updates</p>
+        <p className="nt-subtitle">Stay updated with the latest news</p>
       </div>
       
       {loading ? (

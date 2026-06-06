@@ -431,9 +431,9 @@ class CourseController {
             await Course.updateRequestStatus(id, 'approved', client);
 
             // Notify Teacher (Raw SQL for notification as no Notification model yet)
-            await client.query(
+            const notifResult = await client.query(
                 `INSERT INTO notifications (user_id, title, message, type, sender_id)
-                 VALUES ($1, $2, $3, $4, $5)`,
+                 VALUES ($1, $2, $3, $4, $5) RETURNING *`,
                 [
                     request.teacher_id,
                     'Course Request Approved',
@@ -451,6 +451,11 @@ class CourseController {
                     course: newCourse,
                     teacherId: request.teacher_id
                 });
+                
+                const notification = notifResult.rows[0];
+                if (notification) {
+                    io.to(`user-${request.teacher_id}`).emit('new-notification', notification);
+                }
             }
 
             res.json({

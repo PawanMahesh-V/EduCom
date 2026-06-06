@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faUsers, faBook, faComments, faStore, faUserGraduate, faChalkboardTeacher,
+  faUsers, faBook, faComments, faStore,
   faExclamationTriangle, faShieldHalved, faBan, faArrowRight, faClock
 } from '@fortawesome/free-solid-svg-icons';
 import { dashboardApi } from '../../api';
@@ -229,8 +229,7 @@ const Overview = ({ onNavigate }) => {
           {/* Trending Communities Feed Card */}
           <div className="ov-bento-card ov-timeline-card">
               <div className="ov-bento-header">
-                  <h3>Trending Communities</h3>
-                  <span className="ov-bento-badge ov-badge-hot">Hot</span>
+                  <h3>Trending Communities</h3> 
               </div>
               <div className="ov-timeline-feed">
                   {stats?.trendingCommunities && stats.trendingCommunities.length > 0 ? (
@@ -272,7 +271,6 @@ const Overview = ({ onNavigate }) => {
           <div className="ov-bento-card ov-timeline-card">
               <div className="ov-bento-header">
                   <h3>Security Logs</h3>
-                  <span className="ov-bento-badge ov-badge-secure">Active</span>
               </div>
               <div className="ov-timeline-feed">
                   <div className="ov-timeline-item">

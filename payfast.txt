@@ -1,6 +1,45 @@
+------------------------------------------
+Card No: 5123-4500-0000-0008
+Expiry: 01/39
+CVV: 100
+
+Merchant ID: 102 
+Secured Key : zWHjBp2AlttNu1sK
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------------------------------------
+Bank Name: Demo Bank
+Account No: 12353940226802034243
+NIC number: 4210131315089
+OTP: 123456
+
+Merchant ID: 14833
+Secured Key: rPcy4T7GQkSCFsHBLdn26s     
+
+
+------------------------------------------
 Card No: 2223000000000007
 Expiry: 01/39
 CVV: 100
 
 Merchant ID: 103
 Secured Key: PzPx6ut-SVay7tCUMqG
+

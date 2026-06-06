@@ -1,65 +1,22 @@
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcrypt');
 const User = require('../models/User');
-const pool = require('../config/database');
-const EmailService = require('../services/EmailService');
+const AuthService = require('../services/AuthService');
 
 class AuthController {
     static async login(req, res, next) {
         try {
             let { identifier, password } = req.body;
             identifier = identifier ? identifier.trim() : identifier;
-            const user = await User.findByIdentifier(identifier);
-
-            if (!user) {
-                return res.status(401).json({ message: 'Invalid email or User not found' });
-            }
-            if (!user.password) {
-                return res.status(401).json({ message: 'Invalid Password or User not found' });
-            }
-
-            try {
-                const storedHash = typeof user.password === 'string'
-                    ? user.password
-                    : user.password.toString();
-                const isValidPassword = await bcrypt.compare(password, storedHash);
-
-                if (!isValidPassword) {
-                    return res.status(401).json({ message: 'Invalid credentials or User not found' });
-                }
-            } catch (hashError) {
-                return res.status(401).json({ message: 'Invalid credentials or User not found' });
-            }
-
-            const jwtSecret = process.env.JWT_SECRET;
-            if (!jwtSecret) {
-                throw new Error('JWT_SECRET is not properly configured');
-            }
-
-            const payload = {
-                userId: user.id,
-                email: user.email,
-                role: user.role
-            };
-            const token = jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
-
-            const userResponse = {
-                id: user.id,
-                reg_id: user.reg_id,
-                email: user.email,
-                name: user.name,
-                role: user.role,
-                department: user.department,
-                is_active: user.is_active
-            };
-
+            
+            const result = await AuthService.login(identifier, password);
             res.json({
                 message: 'Login successful',
-                user: userResponse,
-                token
+                user: result.user,
+                token: result.token
             });
-
         } catch (err) {
+            if (err.message.includes('Invalid credentials') || err.message.includes('not found')) {
+                return res.status(401).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -67,58 +24,19 @@ class AuthController {
     static async verifyLogin(req, res, next) {
         try {
             const { email, code } = req.body;
-
             if (!email || !code) {
                 return res.status(400).json({ message: 'Email and code are required' });
             }
 
-            const result = await pool.query(
-                `SELECT * FROM login_verification_codes 
-                 WHERE email = $1 AND code = $2 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
-                 ORDER BY created_at DESC LIMIT 1`,
-                [email.trim(), code.trim()]
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(400).json({ message: 'Invalid or expired verification code' });
-            }
-
-            await pool.query(
-                `UPDATE login_verification_codes SET used = TRUE WHERE id = $1`,
-                [result.rows[0].id]
-            );
-
-            const user = await User.findByIdentifier(email);
-            if (!user) {
-                return res.status(404).json({ message: 'User not found' });
-            }
-
-            const jwtSecret = process.env.JWT_SECRET;
-            if (!jwtSecret) {
-                throw new Error('JWT_SECRET is not properly configured');
-            }
-
-            const payload = {
-                userId: user.id,
-                email: user.email,
-                role: user.role
-            };
-            const token = jwt.sign(payload, jwtSecret, { expiresIn: '24h' });
-
-            res.json({
-                user: {
-                    id: user.id,
-                    reg_id: user.reg_id,
-                    email: user.email,
-                    name: user.name,
-                    role: user.role,
-                    department: user.department,
-                    is_active: user.is_active
-                },
-                token
-            });
-
+            const result = await AuthService.verifyLogin(email, code);
+            res.json(result);
         } catch (err) {
+            if (err.message.includes('Invalid or expired')) {
+                return res.status(400).json({ message: err.message });
+            }
+            if (err.message.includes('not found')) {
+                return res.status(404).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -159,49 +77,19 @@ class AuthController {
     static async forgotPassword(req, res, next) {
         try {
             const { email } = req.body;
-
             if (!email) {
                 return res.status(400).json({ message: 'Email is required' });
             }
 
-            const user = await User.findByIdentifier(email.trim());
-
-            if (!user) {
-                return res.status(404).json({
-                    message: 'No account found with this email address.'
-                });
-            }
-
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-            // Log verification code to terminal
-            console.log('\n=================================');
-            console.log('🔑 PASSWORD RESET VERIFICATION CODE');
-            console.log('=================================');
-            console.log(`Email: ${user.email}`);
-            console.log(`Code: ${verificationCode}`);
-            console.log(`Expires: ${expiresAt.toLocaleString()}`);
-            console.log('=================================\n');
-
-            await pool.query(
-                `INSERT INTO password_reset_codes (email, code, expires_at) 
-                 VALUES ($1, $2, $3)`,
-                [user.email, verificationCode, expiresAt]
-            );
-
-            try {
-                await EmailService.sendVerificationCode(user.email, verificationCode, 'password-reset');
-            } catch (emailError) {
-                console.error('Error sending reset email', emailError);
-            }
-
+            const verificationCode = await AuthService.forgotPassword(email);
             res.json({
                 message: 'If an account exists with this email, you will receive a verification code.',
                 devCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined
             });
-
         } catch (err) {
+            if (err.message.includes('No account found')) {
+                return res.status(404).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -209,39 +97,19 @@ class AuthController {
     static async verifyResetCode(req, res, next) {
         try {
             const { email, code } = req.body;
-
             if (!email || !code) {
                 return res.status(400).json({ message: 'Email and code are required' });
             }
 
-            const result = await pool.query(
-                `SELECT * FROM password_reset_codes 
-                 WHERE email = $1 AND code = $2 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
-                 ORDER BY created_at DESC LIMIT 1`,
-                [email.trim(), code.trim()]
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(400).json({ message: 'Invalid or expired verification code' });
-            }
-
-            await pool.query(
-                `UPDATE password_reset_codes SET used = TRUE WHERE id = $1`,
-                [result.rows[0].id]
-            );
-
-            const resetToken = jwt.sign(
-                { email: email.trim(), purpose: 'password-reset' },
-                process.env.JWT_SECRET,
-                { expiresIn: '15m' }
-            );
-
+            const resetToken = await AuthService.verifyResetCode(email, code);
             res.json({
                 message: 'Code verified successfully',
                 resetToken
             });
-
         } catch (err) {
+            if (err.message.includes('Invalid or expired')) {
+                return res.status(400).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -249,36 +117,22 @@ class AuthController {
     static async resetPassword(req, res, next) {
         try {
             const { resetToken, newPassword } = req.body;
-
             if (!resetToken || !newPassword) {
                 return res.status(400).json({ message: 'Reset token and new password are required' });
             }
-
             if (newPassword.length < 6) {
                 return res.status(400).json({ message: 'Password must be at least 6 characters long' });
             }
 
-            let decoded;
-            try {
-                decoded = jwt.verify(resetToken, process.env.JWT_SECRET);
-                if (decoded.purpose !== 'password-reset') {
-                    throw new Error('Invalid token purpose');
-                }
-            } catch (err) {
-                return res.status(400).json({ message: 'Invalid or expired reset token' });
-            }
-
-            const user = await User.findByIdentifier(decoded.email);
-            if (!user) {
-                return res.status(404).json({ message: 'User not found' });
-            }
-
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            await User.updatePassword(user.id, hashedPassword);
-
+            await AuthService.resetPassword(resetToken, newPassword);
             res.json({ message: 'Password reset successfully' });
-
         } catch (err) {
+            if (err.message.includes('Invalid or expired')) {
+                return res.status(400).json({ message: err.message });
+            }
+            if (err.message.includes('not found')) {
+                return res.status(404).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -286,31 +140,12 @@ class AuthController {
     static async checkEmail(req, res, next) {
         try {
             const { email } = req.body;
-
             if (!email) {
                 return res.status(400).json({ message: 'Email is required' });
             }
 
-            const existingUser = await pool.query(
-                'SELECT id FROM users WHERE email = $1',
-                [email.toLowerCase()]
-            );
-
-            if (existingUser.rows.length > 0) {
-                return res.json({ exists: true, pending: false });
-            }
-
-            const pendingRequest = await pool.query(
-                'SELECT id FROM registration_requests WHERE email = $1 AND status = $2',
-                [email.toLowerCase(), 'pending']
-            );
-
-            if (pendingRequest.rows.length > 0) {
-                return res.json({ exists: false, pending: true });
-            }
-
-            return res.json({ exists: false, pending: false });
-
+            const status = await AuthService.checkEmail(email);
+            return res.json(status);
         } catch (err) {
             next(err);
         }
@@ -319,7 +154,6 @@ class AuthController {
     static async sendRegistrationCode(req, res, next) {
         try {
             const { email } = req.body;
-
             if (!email) {
                 return res.status(400).json({ message: 'Email is required' });
             }
@@ -330,57 +164,20 @@ class AuthController {
                 return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
-            const existingUser = await pool.query(
-                'SELECT id FROM users WHERE email = $1',
-                [lowerEmail]
-            );
-
-            if (existingUser.rows.length > 0) {
+            const existingStatus = await AuthService.checkEmail(lowerEmail);
+            if (existingStatus.exists) {
                 return res.status(400).json({ message: 'This email is already registered' });
             }
-
-            const pendingRequest = await pool.query(
-                'SELECT id FROM registration_requests WHERE email = $1 AND status = $2',
-                [lowerEmail, 'pending']
-            );
-
-            if (pendingRequest.rows.length > 0) {
+            if (existingStatus.pending) {
                 return res.status(400).json({ message: 'A registration request is already pending for this email' });
             }
 
-            const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-            const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
-
-            // Log verification code to terminal
-            console.log('\n=================================');
-            console.log('📧 REGISTRATION VERIFICATION CODE');
-            console.log('=================================');
-            console.log(`Email: ${lowerEmail}`);
-            console.log(`Code: ${verificationCode}`);
-            console.log(`Expires: ${expiresAt.toLocaleString()}`);
-            console.log('=================================\n');
-
-            // Save code to database first
-            await pool.query(
-                `INSERT INTO login_verification_codes (email, code, expires_at) 
-                 VALUES ($1, $2, $3)`,
-                [lowerEmail, verificationCode, expiresAt]
-            );
-
-            // Try to send email (but don't fail if it doesn't work)
-            try {
-                await EmailService.sendVerificationCode(lowerEmail, verificationCode, 'registration');
-            } catch (emailError) {
-                console.error('Error sending registration email:', emailError.message);
-                // Still continue - code is saved and logged to console
-            }
-
+            const verificationCode = await AuthService.sendRegistrationCode(lowerEmail);
             res.json({
                 message: 'Verification code sent to your email',
                 email: lowerEmail,
                 devCode: process.env.NODE_ENV === 'development' ? verificationCode : undefined
             });
-
         } catch (err) {
             next(err);
         }
@@ -389,87 +186,51 @@ class AuthController {
     static async verifyRegistrationCode(req, res, next) {
         try {
             const { email, code } = req.body;
-
             if (!email || !code) {
                 return res.status(400).json({ message: 'Email and code are required' });
             }
 
-            const result = await pool.query(
-                `SELECT * FROM login_verification_codes 
-                 WHERE email = $1 AND code = $2 AND used = FALSE AND expires_at > CURRENT_TIMESTAMP
-                 ORDER BY created_at DESC LIMIT 1`,
-                [email.toLowerCase().trim(), code.trim()]
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(400).json({ message: 'Invalid or expired verification code' });
-            }
-
-            await pool.query(
-                `UPDATE login_verification_codes SET used = TRUE WHERE id = $1`,
-                [result.rows[0].id]
-            );
-
+            await AuthService.verifyRegistrationCode(email, code);
             res.json({
                 message: 'Email verified successfully',
                 verified: true
             });
-
         } catch (err) {
+            if (err.message.includes('Invalid or expired')) {
+                return res.status(400).json({ message: err.message });
+            }
             next(err);
         }
     }
 
     static async register(req, res, next) {
         try {
-            const { reg_id, name, email, password, role, department, semester, program_year } = req.body;
+            const { reg_id, name, email, password, role, department } = req.body;
 
             if (!name || !email || !password || !role || !department) {
                 return res.status(400).json({ message: 'All required fields must be provided' });
             }
-
-            let finalRegId = reg_id;
-            if (['Teacher', 'HOD', 'PM'].includes(role)) {
-                finalRegId = await User.generateNextRegId(role);
-            } else {
-                if (!reg_id) return res.status(400).json({ message: 'Registration ID is required' });
-            }
-
+            
             const lowerEmail = email.toLowerCase();
             const allowedDomain = lowerEmail.endsWith('@szabist.pk') || lowerEmail.endsWith('@szabist.edu.pk');
             if (!allowedDomain) {
                 return res.status(400).json({ message: 'Only @szabist.pk or @szabist.edu.pk email addresses are allowed' });
             }
 
-            const existingUser = await pool.query(
-                'SELECT id FROM users WHERE email = $1 OR reg_id = $2',
-                [lowerEmail, finalRegId]
-            );
-
-            if (existingUser.rows.length > 0) {
-                return res.status(400).json({ message: 'User with this email or registration ID already exists' });
+            if (!['Teacher', 'HOD', 'PM'].includes(role) && !reg_id) {
+                return res.status(400).json({ message: 'Registration ID is required' });
             }
 
-            const existingRequest = await pool.query(
-                'SELECT id FROM registration_requests WHERE (email = $1 OR reg_id = $2) AND status = $3',
-                [lowerEmail, finalRegId, 'pending']
-            );
-
-            if (existingRequest.rows.length > 0) {
-                return res.status(400).json({ message: 'A registration request is already pending for this email or ID' });
+            const existingStatus = await AuthService.checkEmail(lowerEmail);
+            if (existingStatus.exists) {
+                return res.status(400).json({ message: 'User with this email already exists' });
+            }
+            if (existingStatus.pending) {
+                return res.status(400).json({ message: 'A registration request is already pending for this email' });
             }
 
-            const hashedPassword = await bcrypt.hash(password, 10);
-
-            await pool.query(
-                `INSERT INTO registration_requests 
-                 (reg_id, name, email, password, role, department, semester, program_year, status, created_at) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'pending', CURRENT_TIMESTAMP)`,
-                [finalRegId, name, lowerEmail, hashedPassword, role, department, semester || null, program_year || null]
-            );
-
+            await AuthService.register(req.body);
             res.status(201).json({ message: 'Registration request submitted successfully. Please wait for admin approval.' });
-
         } catch (err) {
             next(err);
         }
@@ -477,14 +238,8 @@ class AuthController {
 
     static async getRegistrationRequests(req, res, next) {
         try {
-            const result = await pool.query(
-                `SELECT id, reg_id, name, email, role, department, semester, program_year, status, created_at 
-                 FROM registration_requests 
-                 WHERE status = 'pending'
-                 ORDER BY created_at DESC`
-            );
-
-            res.json({ requests: result.rows });
+            const requests = await AuthService.getRegistrationRequests();
+            res.json({ requests });
         } catch (err) {
             next(err);
         }
@@ -493,38 +248,12 @@ class AuthController {
     static async approveRegistration(req, res, next) {
         try {
             const { requestId } = req.params;
-
-            const request = await pool.query(
-                'SELECT * FROM registration_requests WHERE id = $1 AND status = $2',
-                [requestId, 'pending']
-            );
-
-            if (request.rows.length === 0) {
-                return res.status(404).json({ message: 'Registration request not found' });
-            }
-
-            const reqData = request.rows[0];
-
-            await pool.query(
-                `INSERT INTO users (reg_id, name, email, password, role, department, semester, program_year, created_at) 
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, CURRENT_TIMESTAMP)`,
-                [reqData.reg_id, reqData.name, reqData.email, reqData.password, reqData.role, reqData.department, reqData.semester, reqData.program_year]
-            );
-
-            await pool.query(
-                'UPDATE registration_requests SET status = $1 WHERE id = $2',
-                ['approved', requestId]
-            );
-
+            await AuthService.approveRegistration(requestId);
             res.json({ message: 'Registration approved successfully' });
-
-            EmailService.sendRegistrationApprovalEmail(reqData.email, reqData.name)
-                .then(() => EmailService.sendWelcomeEmail(reqData.email, reqData.name, reqData.role))
-                .catch(emailError => {
-                    console.error('Error sending emails in background:', emailError);
-                });
-
         } catch (err) {
+            if (err.message.includes('not found')) {
+                return res.status(404).json({ message: err.message });
+            }
             next(err);
         }
     }
@@ -532,23 +261,15 @@ class AuthController {
     static async rejectRegistration(req, res, next) {
         try {
             const { requestId } = req.params;
-
-            const result = await pool.query(
-                'UPDATE registration_requests SET status = $1 WHERE id = $2 AND status = $3 RETURNING id',
-                ['rejected', requestId, 'pending']
-            );
-
-            if (result.rows.length === 0) {
-                return res.status(404).json({ message: 'Registration request not found' });
-            }
-
+            await AuthService.rejectRegistration(requestId);
             res.json({ message: 'Registration rejected' });
-
         } catch (err) {
+            if (err.message.includes('not found')) {
+                return res.status(404).json({ message: err.message });
+            }
             next(err);
         }
     }
 }
 
 module.exports = AuthController;
-

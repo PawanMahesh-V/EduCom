@@ -16,7 +16,8 @@ const MessageBubble = ({
   isSelected, 
   onToggleSelection, 
   onContextMenu,
-  onReport,        
+  onReport,
+  userRole,
 }) => {
   const senderId = msg.sender_id ?? msg.senderId;
   const isOwnMessage = Number(senderId) === Number(userId);
@@ -71,8 +72,8 @@ const MessageBubble = ({
   return (
     <div 
       id={`message-${msg.id}`}
-      className={`mb-message-row ${isOwnMessage ? 'mb-message-row--sent' : 'mb-message-row--received'} ${isSelected ? 'mb-message-row--selected' : ''} ${isSelectionMode && isOwnMessage ? 'mb-message-row--selectable' : ''} ${canReport ? 'mb-message-row--reportable' : ''}`}
-      onClick={isSelectionMode && isOwnMessage ? (e) => { e.stopPropagation(); onToggleSelection(msg.id); } : undefined}
+      className={`mb-message-row ${isOwnMessage ? 'mb-message-row--sent' : 'mb-message-row--received'} ${isSelected ? 'mb-message-row--selected' : ''} ${isSelectionMode && (isOwnMessage || userRole === 'Admin') ? 'mb-message-row--selectable' : ''} ${canReport ? 'mb-message-row--reportable' : ''}`}
+      onClick={isSelectionMode && (isOwnMessage || userRole === 'Admin') ? (e) => { e.stopPropagation(); onToggleSelection(msg.id); } : undefined}
       onContextMenu={(e) => onContextMenu && onContextMenu(e, msg)}
     >
       {/* Moderation Block Banner Notice */}
@@ -85,7 +86,7 @@ const MessageBubble = ({
       {/* Bubble Wrapper for positioning elements beside the message */}
       <div className="mb-bubble-wrapper">
         {/* Checkbox Overlay for Selection Mode */}
-        {isSelectionMode && isOwnMessage && (
+        {isSelectionMode && (isOwnMessage || userRole === 'Admin') && (
           <div className="mb-action-checkbox-wrapper" onClick={(e) => e.stopPropagation()}>
             <input 
               type="checkbox" 

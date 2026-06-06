@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { showSuccess } from '../../utils/alert';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faIdCard, faUser, faLock, faEye, faEyeSlash, 
@@ -19,6 +20,10 @@ const StepDetails = ({
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  useEffect(() => {
+    showSuccess('Email Verified Successfully');
+  }, []);
+
   // Watch the role field to conditionally render other fields
   const currentRole = watch('role');
 
@@ -33,12 +38,8 @@ const StepDetails = ({
 
   return (
     <>
-      {/* Welcome & Verification Badge Section */}
+      {/* Welcome Section */}
       <div className="register-welcome">
-        <div className="register-verified-badge fade-in">
-          <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Email Verified Successfully</span>
-        </div>
         <h1 className="register-title">Complete Your Profile</h1>
         <p className="register-subtitle">
           Please fill in your remaining institutional details. For Faculty, HOD, or PM accounts, your Registration ID will be automatically configured.

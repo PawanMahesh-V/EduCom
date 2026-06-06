@@ -1,4 +1,5 @@
 const Notification = require('../models/Notification');
+const ModerationService = require('../services/ModerationService');
 
 class NotificationController {
     static async getUserNotifications(req, res, next) {
@@ -82,6 +83,11 @@ class NotificationController {
                 return res.status(403).json({ message: 'Not authorized' });
             }
 
+            const moderation = await ModerationService.moderateText(message);
+            if (moderation.toxic) {
+                return res.status(400).json({ message: 'Notification blocked due to policy violation' });
+            }
+
             // Note: Current logic assumes explicit ID from client? 
             // If client sends ID, use it. If not, don't pass it to SQL is better.
             // But model supports it.
@@ -100,8 +106,23 @@ class NotificationController {
                 return res.status(403).json({ message: 'Not authorized' });
             }
 
+            const moderation = await ModerationService.moderateText(message);
+            if (moderation.toxic) {
+                return res.status(400).json({ message: 'Notification blocked due to policy violation' });
+            }
+
             const users = await Notification.getUsersByRole(role_filter);
-            await Notification.broadcast(users, { title, message, type });
+            const insertResults = await Notification.broadcast(users, { title, message, type });
+
+            const io = req.app.get('io');
+            if (io) {
+                insertResults.forEach(result => {
+                    const notification = result.rows[0];
+                    if (notification) {
+                        io.to(`user-${notification.user_id}`).emit('new-notification', notification);
+                    }
+                });
+            }
 
             res.status(201).json({
                 message: 'Notifications sent successfully',
