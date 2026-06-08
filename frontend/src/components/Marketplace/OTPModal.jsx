@@ -109,12 +109,7 @@ const OTPModal = ({ isOpen, onClose, onVerify, orderId }) => {
             )}
           </button>
         </form>
-
-        <div className="om-modal-footer">
-          <FontAwesomeIcon icon={faCheckCircle} />
-          <span>Secure escrow handshake token verification active</span>
-        </div>
-      </div>
+     </div>
     </div>
   );
 };

@@ -9604,6 +9604,8 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   font-family: inherit;
+  background-color: #1282A2; 
+  color: #ffffff;
 }
 
 .custom-alert-button.success { background-color: #1282A2; color: #ffffff; }
