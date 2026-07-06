@@ -1,7 +1,3 @@
-/**
- * Middleware to check for required fields in req.body
- * @param {string[]} fields - Array of required field names
- */
 const validate = (fields) => {
     return (req, res, next) => {
         const missing = [];

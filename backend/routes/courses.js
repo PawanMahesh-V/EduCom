@@ -3,8 +3,6 @@ const router = express.Router();
 const auth = require('../middleware/auth');
 const CourseController = require('../controllers/CourseController');
 
-// --- Specific Routes (Must come before /:id) ---
-
 // Get all courses
 router.get('/', auth, CourseController.getAllCourses);
 

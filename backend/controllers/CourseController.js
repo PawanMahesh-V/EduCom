@@ -179,11 +179,6 @@ class CourseController {
 
             await Community.deleteByCourseId(id, client);
 
-            // Delete enrollments and notifications - handled by raw queries in model or here?
-            // To maintain parity with previous routes, we need to delete these.
-            // Ideally should be in Course.delete cascade or Model methods.
-            // For now, executing raw queries here to replicate 'routes/courses.js' logic exacty
-
             // Delete enrollments for this course
             await client.query('DELETE FROM enrollments WHERE course_id = $1', [id]);
             // Delete notifications
@@ -476,10 +471,8 @@ class CourseController {
         try {
             const { id } = req.params;
             // Check first?
-            const result = await Course.updateRequestStatus(id, 'rejected'); // Warning: this updates request even if it was not pending.. wait, route said AND status='pending'
-
-            // My implementation of updateRequestStatus doesn't check 'pending'.
-            // To be safe and identical to original route logic:
+            const result = await Course.updateRequestStatus(id, 'rejected'); 
+         
             const request = await Course.findRequestById(id);
             if (!request || request.status !== 'pending') {
                 return res.status(404).json({ message: 'Request not found or already processed' });

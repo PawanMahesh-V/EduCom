@@ -473,7 +473,7 @@ const CheckoutModal = ({ isOpen, onClose, cartItems, cartTotal, onOrderPlaced, c
                   ) : paymentMethod === 'payfast' ? (
                     <>
                       <FontAwesomeIcon icon={faLock} />
-                      <span>Authorize PayFast Gateway</span>
+                      <span>PayFast</span>
                     </>
                   ) : (
                     <span>Confirm & Place Order</span>

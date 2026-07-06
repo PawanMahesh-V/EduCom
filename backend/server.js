@@ -40,7 +40,7 @@ const compression = require('compression');
 const path = require('path');
 
 app.use(helmet({
-    crossOriginResourcePolicy: false, // Allow loading images from different origins
+    crossOriginResourcePolicy: false,
 }));
 app.use(compression());
 
@@ -63,7 +63,7 @@ app.use('/api/direct-messages', directMessageRoutes);
 app.use('/api/moderation', moderationRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 
-// Error Handling Middleware (Must be last)
+// Error Handling Middleware
 const errorHandler = require('./middleware/errorHandler');
 app.use(errorHandler);
 

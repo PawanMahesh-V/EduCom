@@ -56,9 +56,21 @@ const marketplaceController = {
                 image_url = `data:${req.file.mimetype};base64,${base64Str}`;
             }
 
-            // Basic validation
-            if (!title || !price) {
-                return res.status(400).json({ message: 'Title and price are required' });
+            // Enhanced Backend Validation
+            if (!title || title.trim() === '') {
+                return res.status(400).json({ message: 'Item title is required.' });
+            }
+
+            if (!price || parseFloat(price) <= 0) {
+                return res.status(400).json({ message: 'A valid price greater than 0 is required.' });
+            }
+
+            if (!description || description.trim() === '') {
+                return res.status(400).json({ message: 'Item description is required.' });
+            }
+
+            if (!quantity || parseInt(quantity, 10) < 1) {
+                return res.status(400).json({ message: 'Quantity must be at least 1.' });
             }
 
             // Moderation check
@@ -151,6 +163,23 @@ const marketplaceController = {
 
             if (item.seller_id !== req.user.userId && req.user.role !== 'admin') {
                 return res.status(403).json({ message: 'Unauthorized to update this item' });
+            }
+
+            // Enhanced Backend Validation
+            if (!title || title.trim() === '') {
+                return res.status(400).json({ message: 'Item title is required.' });
+            }
+
+            if (!price || parseFloat(price) <= 0) {
+                return res.status(400).json({ message: 'A valid price greater than 0 is required.' });
+            }
+
+            if (!description || description.trim() === '') {
+                return res.status(400).json({ message: 'Item description is required.' });
+            }
+
+            if (quantity !== undefined && parseInt(quantity, 10) < 1) {
+                return res.status(400).json({ message: 'Quantity must be at least 1.' });
             }
 
             // Moderation check

@@ -274,7 +274,7 @@ const CourseManagement = ({ initialTab }) => {
                     { value: 'All', label: 'All Departments' },
                     { value: 'CS', label: 'CS' },
                     { value: 'BBA', label: 'BBA' },
-                    { value: 'IT', label: 'IT' }
+                    // { value: 'IT', label: 'IT' }
                   ]}
                   value={courseDepartmentFilter}
                   onChange={(val) => setCourseDepartmentFilter(val)}
@@ -348,7 +348,7 @@ const CourseManagement = ({ initialTab }) => {
                             </button>
                             <button 
                               title="Delete Course"
-                              className="cm-icon-btn cm-icon-btn--primary"
+                              className="cm-icon-btn cm-icon-btn--delete"
                               onClick={() => handleCourseDelete(course.id)}
                             >
                               <FontAwesomeIcon icon={faTrash} />
@@ -447,11 +447,11 @@ const CourseManagement = ({ initialTab }) => {
               <table className="cm-data-table">
                 <thead>
                   <tr>
-                    <th>Community Title</th>
-                    <th>Linked Code</th>
-                    <th>Associated Course</th>
+                    <th>Community Name</th>
+                    <th>Section</th>
+                    <th>Course Name</th>
                     <th>Department</th>
-                    <th>Ecosystem Status</th>
+                    <th>Status</th>
                     <th className="cm-text-center">Actions</th>
                   </tr>
                 </thead>
@@ -628,13 +628,13 @@ const CourseManagement = ({ initialTab }) => {
               <table className="cm-data-table">
                 <thead>
                   <tr>
-                    <th>Requested Code</th>
-                    <th>Course Label Title</th>
+                    <th>Course Code</th>
+                    <th>Course Name</th>
                     <th>Department</th>
                     <th>Semester</th>
-                    <th>Proposed Faculty</th>
-                    <th>Originated Request From</th>
-                    <th className="cm-text-center">Review Actions</th>
+                    {/* <th>Proposed Faculty</th> */}
+                    <th>Request By</th>
+                    <th className="cm-text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -653,7 +653,7 @@ const CourseManagement = ({ initialTab }) => {
                         <td className="cm-font-semibold" data-label="Course Name">{request.name}</td>
                         <td data-label="Department"><span className="cm-badge-tag">{request.department}</span></td>
                         <td data-label="Semester">Semester {request.semester}</td>
-                        <td data-label="Teacher">{request.teacher_name || 'Unassigned'}</td>
+                        {/* <td data-label="Teacher">{request.teacher_name || 'Unassigned'}</td> */}
                         <td data-label="Requested By" className="cm-font-medium">{request.requested_by_name || 'N/A'}</td>
                         <td data-label="Actions" className="cm-actions-cell">
                           <button

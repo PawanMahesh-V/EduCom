@@ -86,10 +86,7 @@ class CommunityController {
     static async createCommunity(req, res, next) {
         try {
             const { id, name, status = 'active' } = req.body;
-            // Note: Standalone communities not linked to course? 
-            // The route logic suggested id can be passed, but usually course_id is needed if relational.
-            // The original route had INSERT logic without course_id check. Assuming standard communities.
-
+           
             const joinCode = CommunityController.generateJoinCode();
             console.log(`[COMMUNITY_CREATE] Generated join code for ${name}: ${joinCode}`);
 
@@ -278,9 +275,6 @@ class CommunityController {
             const userId = req.user.userId;
             const userRole = req.user.role;
 
-            // Notice: The underlying Community model method needs to handle the Admin role,
-            // or we must check roles here. Assuming the model handles the DB query, we should
-            // update the model or just pass userRole. Let's look at what the model does.
             const result = await Community.deleteMultipleMessages(messageIds, userId, communityId, userRole);
 
             res.json({

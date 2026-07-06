@@ -389,8 +389,8 @@ const MessageLayout = ({
     setShowUserSearch(false);
     setUserSearchQuery('');
   };
-
-  const canSendAnonymously = mode === 'direct' && userRole === 'Student' && 
+//---------------
+  const canSendAnonymously = mode === 'direct' && userRole === 'teacher' && 
                             TEACHING_ROLES.includes(selectedItem?.user_role);
 
   const scrollToMessage = (msgId) => {

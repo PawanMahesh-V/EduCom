@@ -25,8 +25,8 @@ const UserTable = ({
           <tr>
             <th>Registration ID</th>
             <th>Full Name</th>
-            <th>Institutional Email</th>
-            <th>Account Role</th>
+            <th>Email</th>
+            <th>Role</th>
             <th>Department</th>
             <th className="um-text-center">Actions</th>
           </tr>

@@ -23,8 +23,8 @@ const RegistrationRequests = ({
         <thead>
           <tr>
             <th>Registration ID</th>
-            <th>Name</th>
-            <th>Email Profile</th>
+            <th>Full Name</th>
+            <th>Email</th>
             <th>Role</th>
             <th>Department</th>
             <th>Semester/Year</th>

@@ -20,6 +20,12 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
+    const [fieldErrors, setFieldErrors] = useState({
+        title: '',
+        price: '',
+        quantity: '',
+        description: ''
+    });
 
     useEffect(() => {
         if (isOpen) {
@@ -42,6 +48,8 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 setImagePreview(null);
                 setImageFile(null);
             }
+            setFieldErrors({ title: '', price: '', quantity: '', description: '' });
+            setError('');
         }
     }, [editItem, isOpen]);
 
@@ -53,6 +61,10 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
             value = '1000';
         }
         setFormData(prev => ({ ...prev, [name]: value }));
+        if (fieldErrors[name]) {
+            setFieldErrors(prev => ({ ...prev, [name]: '' }));
+        }
+        if (error) setError('');
     };
 
     const handleFileChange = async (e) => {
@@ -91,6 +103,31 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
+        setFieldErrors({ title: '', price: '', quantity: '', description: '' });
+
+        let hasError = false;
+        const newFieldErrors = { title: '', price: '', quantity: '', description: '' };
+
+        if (!formData.title || formData.title.trim() === '') {
+            newFieldErrors.title = 'Please fill in this field.';
+            hasError = true;
+        }
+        
+        if (!formData.price || formData.price <= 0) {
+            newFieldErrors.price = 'Please fill in this field.';
+            hasError = true;
+        }
+        
+        if (!formData.description || formData.description.trim() === '') {
+            newFieldErrors.description = 'Please fill in this field.';
+            hasError = true;
+        }
+
+        if (hasError) {
+            setFieldErrors(newFieldErrors);
+            return;
+        }
+
         setIsSubmitting(true);
 
         try {
@@ -153,7 +190,7 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                 
                 {error && <div className="qp-field-error-notice fade-in">{error}</div>}
 
-                <form onSubmit={handleSubmit} className="qp-modal-form">
+                <form onSubmit={handleSubmit} className="qp-modal-form" noValidate>
                     <div className="qp-split-layout">
                         
                         <div className="qp-media-column">
@@ -197,8 +234,16 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                     placeholder="e.g., CS-402 Recommended Textbook" 
                                     value={formData.title} 
                                     onChange={handleChange} 
-                                    className="qp-input-field"
+                                    className={`qp-input-field ${fieldErrors.title ? 'qp-input-field--error' : ''}`}
                                 />
+                                {fieldErrors.title && (
+                                    <div className="login-error-message fade-in" style={{ marginTop: '4px' }}>
+                                      <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                      </svg>
+                                      <span>{fieldErrors.title}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="qp-form-row-grid">
@@ -213,8 +258,16 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                         placeholder="e.g., 1200" 
                                         value={formData.price} 
                                         onChange={handleChange} 
-                                        className="qp-input-field qp-input-field--no-spin"
+                                        className={`qp-input-field qp-input-field--no-spin ${fieldErrors.price ? 'qp-input-field--error' : ''}`}
                                     />
+                                    {fieldErrors.price && (
+                                        <div className="login-error-message fade-in" style={{ marginTop: '4px' }}>
+                                          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                          </svg>
+                                          <span>{fieldErrors.price}</span>
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="qp-form-group">
                                     <label className="qp-form-label">Units Stock *</label>
@@ -228,8 +281,16 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                         placeholder="1" 
                                         value={formData.quantity} 
                                         onChange={handleChange} 
-                                        className="qp-input-field"
+                                        className={`qp-input-field ${fieldErrors.quantity ? 'qp-input-field--error' : ''}`}
                                     />
+                                    {fieldErrors.quantity && (
+                                        <div className="login-error-message fade-in" style={{ marginTop: '4px' }}>
+                                          <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                          </svg>
+                                          <span>{fieldErrors.quantity}</span>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -243,8 +304,16 @@ const QuickPostModal = ({ isOpen, onClose, onSuccess, editItem = null }) => {
                                     rows="4" 
                                     value={formData.description} 
                                     onChange={handleChange} 
-                                    className="qp-textarea-field"
+                                    className={`qp-textarea-field ${fieldErrors.description ? 'qp-textarea-field--error' : ''}`}
                                 />
+                                {fieldErrors.description && (
+                                    <div className="login-error-message fade-in" style={{ marginTop: '4px' }}>
+                                      <svg width="18" height="18" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                                      </svg>
+                                      <span>{fieldErrors.description}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="qp-modal-action-footer">

@@ -7,24 +7,6 @@ Merchant ID: 102
 Secured Key : zWHjBp2AlttNu1sK
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ------------------------------------------
 Bank Name: Demo Bank
 Account No: 12353940226802034243

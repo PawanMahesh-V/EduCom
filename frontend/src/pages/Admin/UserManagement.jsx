@@ -153,7 +153,7 @@ const UserManagement = () => {
                     { value: 'All', label: 'All Departments' },
                     { value: 'CS', label: 'CS' },
                     { value: 'BBA', label: 'BBA' },
-                    { value: 'IT', label: 'IT' }
+                    // { value: 'IT', label: 'IT' }
                   ]}
                   value={userDepartmentFilter}
                   onChange={(val) => setUserDepartmentFilter(val)}
@@ -253,7 +253,7 @@ const UserManagement = () => {
                           options={[
                             { value: 'CS', label: 'CS' },
                             { value: 'BBA', label: 'BBA' },
-                            { value: 'IT', label: 'IT' }
+                            // { value: 'IT', label: 'IT' }
                           ]}
                           value={userFormData.department}
                           onChange={(val) => setUserFormData({ ...userFormData, department: val })}

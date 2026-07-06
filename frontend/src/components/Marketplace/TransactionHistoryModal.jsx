@@ -63,7 +63,7 @@ const TransactionHistoryModal = ({ isOpen, onClose, orders }) => {
                   
                   <div className="th-transaction-financials">
                     <span className="th-price-value">+ Rs. {orderTotal.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
-                    <span className="th-payment-type">Cash on Delivery</span>
+                    {/* <span className="th-payment-type">Cash on Delivery</span> */}
                   </div>
                 </div>
               );

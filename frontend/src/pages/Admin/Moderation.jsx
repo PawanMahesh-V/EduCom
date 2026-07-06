@@ -228,11 +228,11 @@ const Moderation = () => {
                 <table className="md-data-table">
                   <thead>
                     <tr>
-                      <th>Date Flagged</th>
-                      <th>Sender Profile</th>
-                      <th>Origin Source Hub</th>
-                      <th>Audit Source Method</th>
-                      <th>Flagged Content Body</th>
+                      <th>Date</th>
+                      <th>Sender </th>
+                      <th>Recivier</th>
+                      <th>Source</th>
+                      <th>Message</th>
                       <th className="md-text-center">Actions</th>
                     </tr>
                   </thead>
@@ -381,10 +381,10 @@ const Moderation = () => {
                 <table className="md-data-table">
                   <thead>
                     <tr>
-                      <th>Isolated User Name</th>
-                      <th>Account Email Identifier</th>
-                      <th>Platform Access Role</th>
-                      <th>Assigned Department</th>
+                      <th>Name</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Department</th>
                       <th className="md-text-center">Actions</th>
                     </tr>
                   </thead>

@@ -7,7 +7,8 @@ import {
   faUsers,
   faTachometerAlt,
   faShieldHalved,
-  faStore
+  faStore,
+  faTelevision
 } from '@fortawesome/free-solid-svg-icons';
 import DashboardLayout from '../components/DashboardLayout';
 import { useSocket } from '../context/SocketContext';

@@ -264,9 +264,6 @@ class UserController {
                 }
             }
 
-            // Delete from all tables with foreign key references to users
-            // Order matters due to dependencies
-
             // Get assignments created by user to delete submissions first
             const userAssignments = await client.query(
                 'SELECT id FROM assignments WHERE created_by = $1',
