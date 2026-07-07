@@ -2,6 +2,18 @@
 
 EduCom is an enterprise-grade, full‑stack education communication platform providing real‑time chat, course communities, a campus marketplace, role‑based access, and an AI moderation microservice to keep conversations safer.
 
+## Live Demo & Test Credentials
+
+**Live App:** [https://edu-com-six.vercel.app/](https://edu-com-six.vercel.app/)
+
+Feel free to test the live application using the following test accounts:
+
+| Role | Email | Password |
+| :--- | :--- | :--- |
+| **Admin** | `admin@szabist.pk` | `password` |
+| **Teacher** | `teacher@szabist.pk` | `password` |
+| **Student** | `Student@szabist.pk` | `password` |
+
 ## Architecture & Tech Stack
 
 EduCom strictly adheres to modern **PERN Stack** (PostgreSQL, Express, React, Node.js) development principles, ensuring a decoupled, scalable, and highly maintainable architecture.
